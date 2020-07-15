@@ -25,3 +25,6 @@
 [submodule "vim/pack/leo/start/vim-syntax-extra"]
 	path = vim/pack/leo/start/vim-syntax-extra
 	url = https://github.com/justinmk/vim-syntax-extra
+[submodule "vim/colorschemes/nord-vim"]
+	path = vim/colorschemes/nord-vim
+	url = https://github.com/arcticicestudio/nord-vim
