@@ -1,0 +1,27 @@
+[submodule "vim/pack/leo/start/nord-vim"]
+	path = vim/pack/leo/start/nord-vim
+	url = https://github.com/arcticicestudio/nord-vim
+[submodule "vim/pack/leo/start/ultisnips"]
+	path = vim/pack/leo/start/ultisnips
+	url = https://github.com/SirVer/ultisnips
+[submodule "vim/pack/leo/start/vim-airline"]
+	path = vim/pack/leo/start/vim-airline
+	url = https://github.com/vim-airline/vim-airline
+[submodule "vim/pack/leo/start/vim-bufkill"]
+	path = vim/pack/leo/start/vim-bufkill
+	url = https://github.com/qpkorr/vim-bufkill
+[submodule "vim/pack/leo/start/vim-fugitive"]
+	path = vim/pack/leo/start/vim-fugitive
+	url = https://github.com/tpope/vim-fugitive
+[submodule "vim/pack/leo/start/vim-go"]
+	path = vim/pack/leo/start/vim-go
+	url = https://github.com/fatih/vim-go
+[submodule "vim/pack/leo/start/vim-snippets"]
+	path = vim/pack/leo/start/vim-snippets
+	url = https://github.com/lbise/vim-snippets
+[submodule "vim/pack/leo/start/vim-obsession"]
+	path = vim/pack/leo/start/vim-obsession
+	url = https://github.com/tpope/vim-obsession
+[submodule "vim/pack/leo/start/vim-syntax-extra"]
+	path = vim/pack/leo/start/vim-syntax-extra
+	url = https://github.com/justinmk/vim-syntax-extra
