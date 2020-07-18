@@ -28,3 +28,6 @@
 [submodule "vim/colorschemes/nord-vim"]
 	path = vim/colorschemes/nord-vim
 	url = https://github.com/arcticicestudio/nord-vim
+[submodule "gdb/gdb-dashboard"]
+	path = gdb/gdb-dashboard
+	url = https://github.com/cyrus-and/gdb-dashboard
