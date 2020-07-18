@@ -17,3 +17,7 @@ $DIR/tools/new_symlink.sh $DIR/githooks ~/.githooks
 $DIR/tools/new_symlink.sh $DIR/.ctags ~/.ctags
 # Unicersal ctags
 $DIR/tools/new_symlink.sh $DIR/.ctags ~/.ctags.d/default.ctags
+
+# gdb
+$DIR/tools/new_symlink.sh $DIR/gdb/gdb-dashboard/.gdbinit ~/.ctags.d/default.ctags
+$DIR/tools/new_symlink.sh $DIR/.gdbinit ~/.gdbinit.d/.gdbinit
