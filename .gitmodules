@@ -31,3 +31,6 @@
 [submodule "gdb/gdb-dashboard"]
 	path = gdb/gdb-dashboard
 	url = https://github.com/cyrus-and/gdb-dashboard
+[submodule "urxvt/nord-xresources"]
+	path = urxvt/nord-xresources
+	url = https://github.com/arcticicestudio/nord-xresources.git
