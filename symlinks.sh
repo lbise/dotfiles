@@ -2,6 +2,9 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
+# urxvt
+$DIR/tools/new_symlink.sh $DIR/.Xresources ~/.Xresources
+
 # vim
 $DIR/tools/new_symlink.sh $DIR/.vimrc ~/.vimrc
 $DIR/tools/new_symlink.sh $DIR/vim/ftplugin ~/.vim/ftplugin
@@ -15,7 +18,7 @@ $DIR/tools/new_symlink.sh $DIR/githooks ~/.githooks
 
 # Exuberant ctags
 $DIR/tools/new_symlink.sh $DIR/.ctags ~/.ctags
-# Unicersal ctags
+# Universal ctags
 $DIR/tools/new_symlink.sh $DIR/.ctags ~/.ctags.d/default.ctags
 
 # gdb
