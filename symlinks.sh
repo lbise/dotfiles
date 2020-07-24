@@ -32,3 +32,6 @@ $DIR/tools/new_symlink.sh $DIR/config/rofi/config ~/.config/rofi/config
 # zsh
 $DIR/tools/new_symlink.sh $DIR/.zshrc  ~/.zshrc
 $DIR/tools/new_symlink.sh $DIR/powerlevel10k  ~/.oh-my-zsh/custom/themes/powerlevel10k
+
+# X11
+sudo $DIR/tools/new_symlink.sh $DIR/00-keyboard.conf  /etc/X11/xorg.conf.d/00-keyboard.conf
