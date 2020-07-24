@@ -151,5 +151,10 @@ setopt hist_ignore_space
 autoload -Uz compinit
 compinit
 
-source ~/.profile
-#source ~/.fonts/*.sh
+# Add .scripts to PATH
+export PATH=$PATH:~/.scripts
+
+# Aliases
+alias zephyr-env=". src-zephyr"
+alias zgo="cd $HOME/gitrepo/fwv6;zephyr-env"
+alias esp32-env=". src-esp32"
