@@ -28,3 +28,6 @@ $DIR/tools/new_symlink.sh $DIR/.gdbinit ~/.gdbinit.d/.gdbinit
 # i3
 $DIR/tools/new_symlink.sh $DIR/config/i3/config ~/.config/i3/config
 $DIR/tools/new_symlink.sh $DIR/config/rofi/config ~/.config/rofi/config
+
+# zsh
+$DIR/tools/new_symlink.sh $DIR/.zshrc  ~/.zshrc
