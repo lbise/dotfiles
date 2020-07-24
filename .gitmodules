@@ -34,3 +34,6 @@
 [submodule "urxvt/nord-xresources"]
 	path = urxvt/nord-xresources
 	url = https://github.com/arcticicestudio/nord-xresources.git
+[submodule "powerlevel10k"]
+	path = powerlevel10k
+	url = https://github.com/romkatv/powerlevel10k
