@@ -18,38 +18,20 @@ else
     OS=$(uname -s)
 fi
 
-echo "OS: $OS"
+echo "Initializing git submodules:"
+git submodule update --init --recursive
+echo "-------------------------------------------------------------------------"
 
+echo "OS: $OS"
 case "$OS" in
 	"Arch Linux")
-		ENABLE_SERVICE="systemctl enable "
-		INSTALL_CMD="pacman -S --needed "
-		PKGS_DIST="xorg-server lightdm lightdm-webkit2-greeter i3-gaps man-db man-pages"
-		SERVICES="lightdm"
-		;;
-	"Fedora")
-		ENABLE_SERVICE="systemctl start "
-		INSTALL_CMD="dnf install "
-		PKGS_DIST="i3 i3status gnome-tweaks"
-		SERVICES=""
+		$DIR/arch.sh
 		;;
 	*)
 		echo "Unsupported OS: $OS"
 		exit 1
 		;;
 esac
-
-echo "Initializing git submodules:"
-git submodule update --init --recursive
-echo "-------------------------------------------------------------------------"
-
-echo "Installing packages: $PKGS $PKGS_DIST"
-sudo $INSTALL_CMD $PKGS $PKGS_DIST
-echo "-------------------------------------------------------------------------"
-
-echo "Enabling services: $SERVICES"
-sudo $ENABLE_SERVICE $SERVICES
-echo "-------------------------------------------------------------------------"
 
 echo "Installation completed"
 echo "-------------------------------------------------------------------------"
