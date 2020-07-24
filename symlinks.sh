@@ -2,7 +2,7 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
-# urxvt
+# rxvt
 $DIR/tools/new_symlink.sh $DIR/.Xresources ~/.Xresources
 
 # vim
@@ -24,3 +24,7 @@ $DIR/tools/new_symlink.sh $DIR/.ctags ~/.ctags.d/default.ctags
 # gdb
 $DIR/tools/new_symlink.sh $DIR/gdb/gdb-dashboard/.gdbinit ~/.ctags.d/default.ctags
 $DIR/tools/new_symlink.sh $DIR/.gdbinit ~/.gdbinit.d/.gdbinit
+
+# i3
+$DIR/tools/new_symlink.sh $DIR/config/i3/config ~/.config/i3/config
+$DIR/tools/new_symlink.sh $DIR/config/rofi/config ~/.config/rofi/config
