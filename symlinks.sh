@@ -31,3 +31,4 @@ $DIR/tools/new_symlink.sh $DIR/config/rofi/config ~/.config/rofi/config
 
 # zsh
 $DIR/tools/new_symlink.sh $DIR/.zshrc  ~/.zshrc
+$DIR/tools/new_symlink.sh $DIR/powerlevel10k  ~/.oh-my-zsh/custom/themes/powerlevel10k

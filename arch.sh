@@ -37,6 +37,13 @@ echo "Installing AUR packages: $AUR_PKGS"
 $AUR_INSTALL_CMD $AUR_PKGS
 echo "-------------------------------------------------------------------------"
 
+echo "Setting up system:"
+echo "	zsh"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+# Change default shell to zsh
+chsh -s $(which zsh)
+echo "-------------------------------------------------------------------------"
+
 echo "Enabling services: $SERVICES"
 sudo $ENABLE_SERVICE $SERVICES
 echo "-------------------------------------------------------------------------"
