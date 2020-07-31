@@ -37,3 +37,6 @@
 [submodule "powerlevel10k"]
 	path = powerlevel10k
 	url = https://github.com/romkatv/powerlevel10k
+[submodule "nord-kitty"]
+	path = nord-kitty
+	url = https://github.com/connorholyday/nord-kitty
