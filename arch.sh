@@ -8,6 +8,7 @@ PKGS="vim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps x
 
 # AUR to install
 AUR_PKGS="google-chrome"
+AUR_FONTS="nerd-fonts-source-code-pro"
 
 # Services to enable
 SERVICES="lightdm"
@@ -42,6 +43,10 @@ echo "	zsh"
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
 # Change default shell to zsh
 chsh -s $(which zsh)
+echo "-------------------------------------------------------------------------"
+
+echo "	fonts"
+$AUR_INSTALL_CMD $AUR_FONTS
 echo "-------------------------------------------------------------------------"
 
 echo "Enabling services: $SERVICES"
