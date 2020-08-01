@@ -4,10 +4,10 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 # Packages to install
-PKGS="vim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm lightdm-webkit2-greeter i3-gaps man-db man-pages"
+PKGS="vim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages"
 
 # AUR to install
-AUR_PKGS="google-chrome"
+AUR_PKGS="google-chrome lightdm-slick-greeter"
 AUR_FONTS="nerd-fonts-source-code-pro"
 
 # Services to enable
