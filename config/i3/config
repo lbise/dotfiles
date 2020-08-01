@@ -46,7 +46,7 @@ bindsym $mod+d exec rofi -show drun
 # shipping a .desktop file. It is a wrapper around dmenu, so you need that
 # installed.
 # bindsym $mod+d exec --no-startup-id i3-dmenu-desktop
-
+#
 # change focus
 bindsym $mod+h focus left
 bindsym $mod+j focus down
@@ -217,6 +217,12 @@ exec --no-startup-id xrandr --output DVI-I-1 --mode 1920x1080 --pos 2560x0 --rot
 # Set wallpaper
 #exec --no-startup-id feh --bg-scale ~/Pictures/star_nebula_glow_94217_1920x1080.jpg
 exec --no-startup-id feh --randomize --bg-scale ~/gitrepo/wallpapers
+
+# i3-gaps stuff
+gaps inner 20
+gaps outer 10
+smart_borders on
+new_window none
 
 # Options
 focus_follows_mouse no
