@@ -39,3 +39,6 @@ sudo $DIR/tools/new_symlink.sh $DIR/00-keyboard.conf  /etc/X11/xorg.conf.d/00-ke
 # kitty
 $DIR/tools/new_symlink.sh $DIR/config/kitty/kitty.conf ~/.config/kitty/kitty.conf
 $DIR/tools/new_symlink.sh $DIR/nord-kitty/nord.conf ~/.config/kitty/nord.conf
+
+# lightdm
+sudo $DIR/tools/new_symlink.sh $DIR/lightdm.conf  /etc/lightdm/lightdm.conf
