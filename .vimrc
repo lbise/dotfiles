@@ -32,6 +32,7 @@ set history=8192	" More history
 set tabstop=8
 set softtabstop=8
 set shiftwidth=8
+set hlsearch
 " smart case-sensitive search
 set ignorecase
 set smartcase
