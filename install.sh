@@ -33,5 +33,9 @@ case "$OS" in
 		;;
 esac
 
-echo "Installation completed"
+echo "Creating symlinks:"
 echo "-------------------------------------------------------------------------"
+$DIR/symlinks.sh
+
+echo "Installation completed"
+echo "#########################################################################"
