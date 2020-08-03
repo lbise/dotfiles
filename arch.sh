@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Specific install script for Arch Linux
 
+# TODO:
+# - plymouth
+# - polybar
+# - wallpapers
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 # Packages to install
