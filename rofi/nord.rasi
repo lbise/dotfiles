@@ -40,7 +40,7 @@
     background-color: @background;
     border:           0;
     padding:          200;
-    font: "fira Code 16"; 
+    font: "Sauce Code Pro Nerd Font Mono 12"; 
     width: 100%;
 }
 #mainbox {
