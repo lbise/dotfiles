@@ -40,3 +40,6 @@
 [submodule "nord-kitty"]
 	path = nord-kitty
 	url = https://github.com/connorholyday/nord-kitty
+[submodule "nord-rofi"]
+	path = rofi/nord-rofi
+	url = https://github.com/lbise/nord-rofi

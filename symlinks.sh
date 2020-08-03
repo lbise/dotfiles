@@ -28,7 +28,7 @@ $DIR/tools/new_symlink.sh $DIR/.gdbinit ~/.gdbinit.d/.gdbinit
 # i3
 $DIR/tools/new_symlink.sh $DIR/config/i3/config ~/.config/i3/config
 $DIR/tools/new_symlink.sh $DIR/config/rofi/config ~/.config/rofi/config
-sudo $DIR/tools/new_symlink.sh $DIR/rofi/nord.rasi /usr/share/rofi/themes/nord.rasi
+sudo $DIR/tools/new_symlink.sh $DIR/rofi/nord-rofi/nord.rasi /usr/share/rofi/themes/nord.rasi
 
 # zsh
 $DIR/tools/new_symlink.sh $DIR/.zshrc  ~/.zshrc
