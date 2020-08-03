@@ -2,7 +2,7 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
-PKGS="evolution evolution-ews"
+PKGS="evolution evolution-ews python-ecdsa"
 AUR_PKGS="netextender"
 
 # Commands
