@@ -1,0 +1,29 @@
+#!/bin/bash
+# Any subsequent(*) commands which fail will cause the shell script to exit immediately
+set -e
+
+serialfile="$HOME/.scripts/segger_sn.txt"
+if [ "$#" -ne 2 ]; then
+	echo "Usage: segreset <brm|brx|mch|rbr> <0|1>"
+	exit
+fi
+
+if  [ "$1" == "mch" ] || [ "$1" == "brx" ] || [ "$1" == "rbr" ]; then
+	mcu=STM32L4A6RG
+elif [ "$1" == "brm" ]; then
+	mcu=STM32L4A6VG
+elif [ "$1" == "rbr2" ]; then
+	mcu=STM32F479II
+else
+	echo "Arg1 should be brm, brx, mch or rbr"
+	exit
+fi
+
+serialidx=`expr $2 + 1`
+sn=`sed "${serialidx}q;d" $serialfile`
+if [ "$sn" == "" ]; then
+	echo "Cannot find segger serial number"
+	exit
+fi
+
+JLinkExe -device $mcu -if SWD -speed 4000 -SelectEmuBySN $sn -CommanderScript ~/.scripts/reset.txt

@@ -1,0 +1,59 @@
+#!/usr/bin/bash
+# Starts a Segger GDB server
+# $1: 0 = sn0, 1 = sn1
+# $2: Port number, default if not specified
+
+# Any subsequent(*) commands which fail will cause the shell script to exit immediately
+set -e
+
+serialfile="$HOME/.scripts/segger_sn.txt"
+
+if [ -z "$1" ]
+then
+	serialidx=1
+	port=2331
+	swoport=2332
+	telport=2333
+else
+	serialidx=`expr $1 + 1`
+	if [ "$1" == "0" ]
+	then
+		port=2331
+		swoport=2332
+		telport=2333
+	elif [ "$1" == "1" ]
+	then
+		port=2341
+		swoport=2342
+		telport=2343
+	elif [ "$1" == "2" ]
+	then
+		port=2351
+		swoport=2352
+		telport=2353
+	elif [ "$1" == "3" ]
+	then
+		port=2361
+		swoport=2362
+		telport=2363
+	else
+		echo "Unknown device $1"
+		exit 1
+	fi
+fi
+
+sn=`sed "${serialidx}q;d" $serialfile`
+if [ "$sn" == "" ]; then
+	echo "Cannot find segger serial number"
+	exit
+fi
+
+if [ -n "$2" ]
+then
+	port=$2
+fi
+
+echo "GDB server on device $sn port $port"
+#JLinkGDBServer -device STM32L4A6VG -if SWD -select usb="$sn" -port $port -swoport $swoport -telnetport $telport
+JLinkGDBServer -device STM32F479II -if SWD -select usb="$sn" -port $port -swoport $swoport -telnetport $telport
+

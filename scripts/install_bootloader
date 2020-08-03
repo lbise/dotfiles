@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -e
+HWVERSION="6.0.2"
+SECONDSTAGESLOT="boot2_1"
+SERIALS="$HOME/.scripts/segger_sn.txt"
+
+function print_usage {
+echo "Usage: $0 [OPTION] [BINARY]"
+echo ""
+echo "Installs the bootloader first stage and second stage and optionnally flashes a firmware"
+echo "BINARY: Optional firmware to flash once bootloader is installed"
+echo "OPTION:"
+echo "	-h : Help message"
+echo "	-d <device>: Device to program (brm|brx|mch)"
+echo "	-i <index>: Segger serial index to use for programming"
+echo "	-w <version>: Hardware version of the device to program (Default is 6.0.2)"
+}
+
+while getopts "hd:i:w:" opt; do
+case "$opt" in
+h)
+	print_usage
+	exit 0
+	;;
+d)
+	DEVICE=$OPTARG
+	if [ "$DEVICE" != "brm" ] && [ "$DEVICE" != "brx" ] && [ "$DEVICE" != "mch" ]
+	then
+		echo "Unknown device type $DEVICE"
+		exit 1
+	fi
+	;;
+i)
+	SERIALIDX=`expr $OPTARG + 1`
+	;;
+w)
+	HWVERSION=$OPTARG
+	if [ $HWVERSION != "6.0.2" ] && [ $HWVERSION != "6.0.3" ] && [ $HWVERSION != "6.0.4" ]; then
+		echo "Invalid HW version $HWVERSION"
+		exit 1
+	fi
+	;;
+\?)
+	echo "Invalid option: -$OPTARG" >&2
+	;;
+esac
+done
+
+shift $((OPTIND-1))
+
+GITROOT=`git rev-parse --show-toplevel`
+if [ -z "$GITROOT" ]; then
+	echo "Not in a git repo, aborting"
+	exit 1
+fi
+
+FWV6JTAG="$GITROOT/geosatis/fw6_jtag.py"
+
+#FW="$1"
+#shift
+
+SN=`sed "${SERIALIDX}q;d" $SERIALS`
+if [ "$SN" == "" ]; then
+	echo "Cannot find segger serial number"
+	exit 1
+fi
+
+if [ -z "${ZEPHYR_BASE}" ]; then
+	. src-zephyr
+fi
+
+echo "Flashing $FW $DEVICE $HWVERSION $SN"
+
+# Send all remaining args further
+if [ "$1" == "--" ]; then
+	shift
+	ARGS=$@
+fi
+ARGS=$@
+# Install second stage
+echo "Installing bootloader second stage $DEVICE $HWVERSION using $SN"
+$FWV6JTAG -u $SN geosatis/bootloader/secondstage -s boot2_1 -b $DEVICE --hw $HWVERSION $ARGS
+
+# Install first stage
+echo "Installing bootloader first stage using $SN"
+$FWV6JTAG -u $SN geosatis/bootloader/firststage -s boot1 $ARGS
+
+if [ "$FW" != "" ]; then
+	echo "Flashing $FW"
+	$FWV6JTAG -u $SN $FW -b $DEVICE --hw $HWVERSION $ARGS
+fi

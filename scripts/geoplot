@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+# Create plots from a log file from a device
+import argparse
+import csv
+import os
+import re
+import sys
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import matplotlib.dates as mdates
+import numpy as np
+
+# Used for the output plots
+plot_height=1080
+plot_width=1920
+
+# RegEx to extract Timestamp,Voltage,Current,Level
+bat_sta_regex = "\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3})\] \[bat_mon_mgr\] \[INF\] bat_mon_mgr_report: V = ([+-]?\d+) \[mV\], I = ([+-]?\d+) \[mA\], Level = ([+-]?\d+) \[%\]"
+bat_sta_rows = ['Timestamp', 'Voltage', 'Current', 'Level']
+bat_sta_avg_curr_wnd_size = 10
+
+def writeCSV(csv_name, csv_rows, data):
+    with open(csv_name, 'w') as out:
+        csv_out = csv.writer(out)
+        csv_out.writerow(csv_rows)
+        csv_out.writerows(data)
+
+def extractData(log, regex, csv_name, csv_rows):
+    log.seek(0)
+    match = re.findall(regex, log.read())
+    print('Found {} matches'.format(len(match)))
+    writeCSV(csv_name, csv_rows, match)
+    print('Writing data to {}'.format(csv_name))
+
+def plotBatSta(csv_name, plot_name, bat_sta_rows, avgcurr_window_size):
+    print('Plotting battery status from {}'.format(csv_name))
+    df = pd.read_csv(str(csv_name), delimiter=',', header=0, comment='#')
+
+    ts_row = bat_sta_rows[0]
+    voltage_row = bat_sta_rows[1]
+    current_row = bat_sta_rows[2]
+    avg_current_row = 'AvgCurrent'
+    level_row = bat_sta_rows[3]
+
+    # Remove 65535 voltages
+    volts_65535 = df.query('{} == 65535'.format(voltage_row))
+    df = df.query('{} != 65535'.format(voltage_row))
+    volts_0 = df.query('{} == 0'.format(voltage_row))
+    df = df.query('{} != 0'.format(voltage_row))
+
+    # Converts timestamps to pandas format
+    df[ts_row] = df[ts_row].apply(pd.to_datetime)
+    # Calculate current moving average
+    df[avg_current_row] = df[current_row].rolling(avgcurr_window_size).mean()
+
+    fig, ax1 = plt.subplots()
+    fig.set_size_inches(plot_width/fig.dpi, plot_height/fig.dpi)
+    plt.xlabel(ts_row)
+
+    # Axis 1
+    line_voltage = ax1.plot(df[ts_row], df[voltage_row], '-b')
+    ax1.set_ylabel('[mV]')
+    ax1.yaxis.set_ticks(np.arange(0, 10000, 500))
+
+    # Axis 2
+    ax2 = ax1.twinx()
+    ax2.grid(True)
+    line_current = ax2.plot(df[ts_row], df[current_row], '-g')
+    line_avgcurrent = ax2.plot(df[ts_row], df[avg_current_row], '-m')
+    line_level = ax2.plot(df[ts_row], df[level_row], '-r')
+
+    # x axis time format
+    ax1.xaxis_date()
+    ax1.set_xlim(df[ts_row].min() - pd.Timedelta(1, 'h'),
+                 df[ts_row].max() + pd.Timedelta(1, 'h'))
+    ax1.xaxis.set_major_locator(mdates.HourLocator())
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
+
+    # Create legends
+    blue_patch = mpatches.Patch(color='blue', label='Voltage [mV]')
+    green_patch = mpatches.Patch(color='green', label='Current [mA]')
+    red_patch = mpatches.Patch(color='red', label='Level [%]')
+    magenta_patch = mpatches.Patch(color='magenta', label='Avg Current [mA]')
+    plt.legend(handles=[blue_patch, green_patch,red_patch, magenta_patch])
+
+    # Print statistics
+    print(80*'=')
+    print('Statistics:\n')
+
+    time_duration = df[ts_row].iloc[-1] - df[ts_row].iloc[0]
+    print('Time duration: {}\n'.format(time_duration))
+
+    print('Voltage:')
+    print(df[voltage_row].describe())
+    print('\n')
+
+    print('Current:')
+    print(df[current_row].describe())
+    print('\n')
+
+    print('Avg current:')
+    print(df[avg_current_row].describe())
+    print('\n')
+
+    print('Level:')
+    print(df[level_row].describe())
+    print('\n')
+
+    print('Discarded {} voltages with value 65535'.format(volts_65535[voltage_row].count()))
+    print(volts_65535)
+    print('\n')
+
+    print('Discarded {} voltages with value 0'.format(volts_0[voltage_row].count()))
+    print(volts_0)
+    print('\n')
+
+    fig.tight_layout()
+    plt.savefig(plot_name, dpi=fig.dpi)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+            description='Create plots from data extracted from device log files')
+    parser.add_argument('-b', '--bat-sta', action='store_true',
+                    help = 'Create the battery status plot of the device')
+    parser.add_argument('log',
+                    help = 'Log file to extract data from')
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.log):
+        print('{} does not exist'.format(args.log))
+        sys.exit()
+
+    with open(args.log, 'r', errors='ignore') as log:
+        if (args.bat_sta):
+            base_name, ext = os.path.splitext(args.log)
+            csv_name = base_name + '.csv'
+            extractData(log, bat_sta_regex, csv_name, bat_sta_rows)
+            plotBatSta(csv_name, base_name + '_plot_bat_sta', bat_sta_rows, bat_sta_avg_curr_wnd_size)
+

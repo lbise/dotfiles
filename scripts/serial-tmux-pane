@@ -1,0 +1,26 @@
+#!/usr/bin/bash
+# Create a new serial pane from within tmux
+# no param -> both serial windows
+# 0 -> minicom_0
+# 1 -> minicom_1
+if [ -z "$TMUX" ]; then
+	echo "Not running in tmux"
+	exit 1
+fi
+
+if [ -z "$1" ]; then
+	serial_wnd="minicom_0"
+else
+	if [ "$1" == "0" ]; then
+		serial_wnd="minicom_0"
+	elif [ "$1" == "1" ]; then
+		serial_wnd="minicom_1"
+	fi
+fi
+
+tmux new-window -n "serial" $serial_wnd
+tmux setw remain-on-exit on
+
+if [ -z "$1" ]; then
+	tmux split-window -v "minicom_1"
+fi

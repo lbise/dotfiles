@@ -1,0 +1,27 @@
+#! /usr/bin/bash
+# Run checkpatch in the current git repo
+# $1: Path of file to find repo to check
+
+function get_git_toplevel()
+{
+	# Get git repo root
+	echo `git rev-parse --show-toplevel`
+}
+
+if [ -z "$1" ]; then
+	echo "No path specified"
+	exit 1
+fi
+
+cd $1
+
+gitroot=$(get_git_toplevel)
+if [ -z $gitroot ]; then
+	echo "Not in a git repo, aborting"
+	exit 1
+fi
+
+echo "Running $gitroot/geosatis/ci-checkpatch.sh --fix-inplace"
+cd $gitroot
+./geosatis/ci-checkpatch.sh --fix-inplace
+

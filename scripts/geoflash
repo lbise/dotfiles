@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+# Flash Geosatis devices
+# Script needs to be run from within git repo
+import argparse
+import os
+import git # Package gitpython
+
+from geoflasher.geoflasher import GeoFlasher
+
+SEG_SERIALS='segger_sn.txt'
+BOOTLOADER_1='geosatis/bootloader/firststage'
+BOOTLOADER_2='geosatis/bootloader/secondstage'
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+            description='Flash Geosatis devices')
+    parser.add_argument('-i', '--seg-index', required = True, type = int,
+                    help = 'Segger serial index (See {} file)'.format(SEG_SERIALS))
+    parser.add_argument('-l', '--flash-bootloader', action = 'store_true',
+                    help = 'Flash the bootloader itself')
+    parser.add_argument('-n', '--no-bootloader', action = 'store_true',
+                    help = 'Flash firmware at start of flash (i.e. no bootloader present)')
+    parser.add_argument('--seg-serials', default = SEG_SERIALS,
+                    help = 'Segger serial file (Default {})'.format(SEG_SERIALS))
+    parser.add_argument('-g', '--geosap-programmer', action = 'store_true',
+                    help = 'Program using geosap programmer over serial')
+    parser.add_argument('firmware',
+                    help = 'Firmware to flash')
+    parser.add_argument('args', nargs = argparse.REMAINDER,
+    #parser.add_argument('args', nargs = '*',
+                    help = 'Arguments passed to the underlying script')
+
+    args = parser.parse_args()
+
+    git_repo = git.Repo(os.getcwd(), search_parent_directories=True)
+    z_root = git_repo.git.rev_parse("--show-toplevel")
+    print('Zephyr repo root {}'.format(z_root))
+
+    flasher = GeoFlasher(z_root, os.path.dirname(os.path.realpath(__file__)) + '/' + args.seg_serials)
+
+    if args.geosap_programmer:
+        raise NotImplementedError('Functionnality not implemented')
+        #flasher.geosap(args.seg_index, z_root + '/' + args.firmware, args.args)
+    else:
+        if args.flash_bootloader:
+            flasher.flash(args.seg_index, z_root + '/' + BOOTLOADER_2, [ '-s', 'boot2_1' ] + args.args)
+            # Do not specify board when building first stage
+ #            tmp = args.args.copy()
+ #            del tmp[tmp.index('-b') + 1]
+ #            tmp.remove('-b')
+ #            del tmp[tmp.index('--hw') + 1]
+ #            tmp.remove('--hw')
+            flasher.flash(args.seg_index, z_root + '/' + BOOTLOADER_1, [ '-s', 'boot1' ] + args.args)
+        flasher.flash(args.seg_index, z_root + '/' + args.firmware, args.args)

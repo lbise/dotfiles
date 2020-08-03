@@ -1,0 +1,4 @@
+#!/usr/bin/bash
+# Join an already created session
+sleep 2
+tmux -2 new-session -t dev -s dev2

@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+import argparse
+import re
+import os
+import csv
+
+batStaRegex="\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}.\d{3})\] \[bat_mon_mgr\] \[INF\] bat_mon_mgr_report: V = ([+-]?\d+) \[mV\], I = ([+-]?\d+) \[mA\], Level = ([+-]?\d+) \[%\]"
+
+def writeBatStaDelimited(out, data):
+    csv_out=csv.writer(out)
+    csv_out.writerow(['Data','Time','Voltage','Current','Level'])
+    csv_out.writerows(data)
+
+def extractBatSta(log, out):
+    log.seek(0)
+    match = re.findall(batStaRegex, log.read())
+    writeBatStaDelimited(out, match)
+    print("Found {} matches".format(len(match)))
+    #print(match)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+	        description='Extract data from log files produced by devices')
+    parser.add_argument('log',
+	                help = 'Log file to extract data from')
+    parser.add_argument('-b', '--bat_sta', action='store_true',
+                        help = 'Extract battery status')
+    args = parser.parse_args()
+
+    with open(args.log, 'r', errors='ignore') as log, open(os.path.dirname(args.log) + '/' + 'extract_' + os.path.basename(args.log), 'w') as out:
+        if (args.bat_sta):
+            extractBatSta(log, out)

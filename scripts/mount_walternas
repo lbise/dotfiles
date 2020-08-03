@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#USERNAME="leo"
+WALTERNAS="//192.168.1.10"
+MNT_DIR="$HOME/mnt"
+shares=(Shared Download Multimedia)
+
+ACTION="MOUNT"
+if [ "$1" == "umount" ]; then
+	ACTION="UMOUNT"
+fi
+
+for share in ${shares[@]}; do
+	LOCAL_DIR=$MNT_DIR/$share
+	REMOTE_DIR=$WALTERNAS/$share
+
+	if [ $ACTION == "MOUNT" ]; then
+		if mount | grep $LOCAL_DIR > /dev/null; then
+			echo "$LOCAL_DIR already mounted"
+		else
+			echo "Mounting $REMOTE_DIR to $LOCAL_DIR"
+			sudo mount -t cifs -o rw,uid=1000,gid=1000,username=$USERNAME $REMOTE_DIR $LOCAL_DIR
+		fi
+	elif [ $ACTION == "UMOUNT" ]; then
+		echo "Unmounting $LOCAL_DIR"
+		sudo umount -f -t cifs $REMOTE_DIR $LOCAL_DIR
+	fi
+done

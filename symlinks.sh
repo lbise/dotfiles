@@ -42,3 +42,6 @@ $DIR/tools/new_symlink.sh $DIR/nord-kitty/nord.conf ~/.config/kitty/nord.conf
 
 # lightdm
 sudo $DIR/tools/new_symlink.sh $DIR/lightdm.conf  /etc/lightdm/lightdm.conf
+
+# scripts
+sudo $DIR/tools/new_symlink.sh $DIR/scripts  ~/.scripts

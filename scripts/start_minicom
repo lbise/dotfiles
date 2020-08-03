@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# $1 : device
+if [ "$#" -lt 1 ]; then
+	echo "Usage: $0 <device>"
+	exit 1
+fi
+
+DEVICE=$(basename -- "$1")
+ARGS="-w --color=on -m -b 115200"
+LOG="$HOME/logs/minicom_${DEVICE}_`date +"%Y-%m-%d_%H-%M-%S"`.log"
+echo "$DEVICE"
+echo "$ARGS"
+echo "$LOG"
+#echo -ne "^[n^[n"
+#echo -ne "^[n^[n" | minicom $ARGS -D $1 -C $LOG
+#minicom $ARGS -D $1 -C $LOG << echo "^[n^[n"
+#minicom $ARGS -D $1 -C $LOG <<EOF
+#^[n
+#^[n
+#EOF
+#yes "^[n^[n" | minicom $ARGS -D $1 -C $LOG
+#minicom $ARGS -D $1 -C $LOG && xdotool key "meta+n" & xdotool key "meta+n"
+minicom $ARGS -D $1 -C $LOG

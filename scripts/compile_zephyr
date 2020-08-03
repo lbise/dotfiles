@@ -1,0 +1,120 @@
+#!/usr/bin/bash
+# Compile a zephyr program
+# $1: File path to start from to try and find where to build
+# $2: Build type
+#	distclean: Clears content of build dir if found before building
+#	clean: Run clean before build
+
+function is_project_root()
+{
+	local __resultvar=$2
+	echo "Looking for project in $1"
+	if [ -f "$1/prj.conf" ] && [ -f "$1/CMakeLists.txt" ]; then
+		eval $__resultvar=true
+	else
+		eval $__resultvar=false
+	fi
+}
+
+function run_cmake()
+{
+	local __resultvar=$1
+	eval $__resultvar=true
+	echo "Running cmake in $2"
+	cd $2
+	cmake ..
+}
+
+function build_proj()
+{
+	local __resultvar=$1
+	eval $__resultvar=true
+	echo "Building project in $2"
+	cd $2
+	nbcores=`cat /proc/cpuinfo | awk '/^processor/{print $3}' | wc -l`
+	make -j${nbcores}
+}
+
+function clean_proj()
+{
+	local __resultvar=$1
+	eval $__resultvar=true
+	echo "Cleaning project in $2"
+	cd $2
+	make clean
+}
+
+function get_git_toplevel()
+{
+	# Get git repo root
+	echo `git rev-parse --show-toplevel`
+}
+
+if [ -z "$1" ]; then
+	echo "File path missing"
+	exit 1
+fi
+
+if [ ! -z "$2" ]; then
+	if [ "$2" = "distclean" ]; then
+		echo "Recreate makefiles before build"
+		distclean=true
+	elif [ "$2" = "clean" ]; then
+		echo "Cleaning before build"
+		clean=true
+	fi
+fi
+
+proj_path=$1
+cd $proj_path
+
+gitroot=$(get_git_toplevel)
+if [ -z "$gitroot" ]; then
+	echo "Not in a git repo, aborting"
+	exit 1
+fi
+echo "Git toplevel: $gitroot"
+
+found_proj=false
+while [ "$proj_path" != "$gitroot" ] && [ "$found_proj" = false ]; do
+	is_project_root $proj_path res
+	if [ "$res" = true ]; then
+		found_proj=true
+	else
+		cd ..
+		proj_path=$PWD
+	fi
+done
+
+if [ "$found_proj" = true ]; then
+	echo "Found project $proj_path"
+	build_path=$proj_path/build
+	echo "Sourcing $gitroot/zephyr-env.sh"
+	source $gitroot/zephyr-env.sh
+	echo "Zephyr base: $ZEPHYR_BASE"	
+	if [ ! -d "$build_path" ]; then
+		mkdir build
+	elif [ "$distclean" = true ]; then
+		echo "Distclean $build_path/*"
+		rm -rI $build_path/*
+	fi
+	if [ -z "$(ls -A $build_path)" ]; then
+		echo "Creating makefiles"
+		run_cmake res $build_path
+	fi
+	if [ "$clean" = true ]; then
+		clean_proj res $build_path	
+	fi	
+	build_proj res $build_path
+	if [ "$res" = true ]; then
+		echo "Built project in $build_path"
+	else
+		echo "Couldn't build project in $build_path"
+	fi
+else
+	echo "Couldn't find project"
+	exit 1
+fi
+
+exit 0
+

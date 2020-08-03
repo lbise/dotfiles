@@ -1,0 +1,58 @@
+#!/usr/bin/bash
+# Connect to a given GDB server
+# $1: Executable to load
+# $2: 0 = sn0, 1 = sn1
+
+sn0port=2331
+sn1port=2341
+sn2port=2351
+sn3port=2361
+
+if [ -z "$1" ]
+then
+	exe="zephyr/zephyr.elf"
+else
+	exe=$1
+fi
+
+if [ -z "$2" ]
+then
+	port=$sn1port
+else
+	if [ "$2" == "0" ]
+	then
+		port=$sn0port
+	elif [ "$2" == "1" ]
+	then
+		port=$sn1port
+	elif [ "$2" == "2" ]
+	then
+		port=$sn2port
+	elif [ "$2" == "3" ]
+	then
+		port=$sn3port
+	else
+		echo "Unknown device $2"
+		exit 1
+	fi
+fi
+
+SDK_VER=$(basename "${ZEPHYR_SDK_INSTALL_DIR}")
+echo "SDK version $SDK_VER"
+
+if [ "$SDK_VER" == "zephyr-sdk-0.9.5" ]; then
+	TOOLCHAIN_FOLDER=$ZEPHYR_SDK_INSTALL_DIR/sysroots/x86_64-pokysdk-linux/usr/bin/arm-zephyr-eabi
+
+elif [ "$SDK_VER" == "zephyr-sdk-0.10.0" ]; then
+	TOOLCHAIN_FOLDER=$ZEPHYR_SDK_INSTALL_DIR/arm-zephyr-eabi/bin
+else
+	echo "Unknown SDK version"
+	exit
+fi
+
+GDB="arm-zephyr-eabi-gdb"
+echo "Connecting to port $port load `realpath $exe`"
+remote="target remote :$port"
+
+# Use this when toolchain is updated
+$TOOLCHAIN_FOLDER/$GDB -ex "$remote" $exe

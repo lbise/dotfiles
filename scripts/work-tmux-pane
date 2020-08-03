@@ -1,0 +1,23 @@
+#!/usr/bin/bash
+# Create a new work pane from within tmux
+# $1: Device ID [0-1]
+if [ -z "$TMUX" ]; then
+	echo "Not running in tmux"
+	exit 1
+fi
+
+if [ -z "$1" ]; then
+	device=0
+else
+	if [ "$1" == "0" ]; then
+		device=0
+	elif [ "$1" == "1" ]; then
+		device=1
+	fi
+fi
+
+tmux new-window -n "device-${device}"
+tmux setw remain-on-exit on
+tmux split-window -v
+tmux split-window -h "gdb_server $device"
+

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+declare -a search=("Booting" "BUS FAULT" "Watchdog fired" "segment retransmission exceeds" "Crypto chip communication failure" "TLS Handshake end" "TLS Handshake fail" "cgreg_cb: URC CGREG" "cgreg_cb: URC CGREG received with status: 1" "Need AGNSS" "AGNSS data download OK" "report_gps_fix_info: No Fix" "report_gps_fix_info: Fix:")
+declare -a search_desc=("Reboots" "Bus faults" "Watchdog fired" "TCP aborts" "Crypto chip failures" "Handshake total" "Handshake fail" "GSM reg total" "GSM reg success" "AGNSS needed" "AGNSS download OK" "No GPS fix" "GPS fix found")
+
+if [ "$#" -lt 1 ]; then
+	echo "Usage: $0 [options] <log>"
+	echo "options:"
+	echo "-p: Print each error found"
+	echo "log: Log file to analyze"
+	exit 1
+fi
+
+PRINT=false
+# Check options
+if [ "$#" -gt 1 ]; then
+	for opt in "$@"
+	do
+		case $opt in
+		"-p"*)
+			PRINT=true
+			;;
+		esac
+	done
+fi
+
+# File name is last param
+for FILE; do true; done
+
+if [ ! -f "$FILE" ]; then
+	echo "$FILE does not exist"
+	exit 1
+fi
+
+echo "Analyzing $FILE"
+echo ""
+IDX=0
+for i in "${search[@]}"
+do
+	echo -n "${search_desc[$IDX]}: "
+	cat "$FILE" | grep -a -c "$i"
+	if [ $PRINT = true ]; then
+		cat "$FILE" | grep -a -n "$i"
+		echo ""
+	fi
+	IDX=$IDX+1
+done

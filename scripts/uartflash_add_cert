@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+CERTIF_PATH="$HOME/Downloads"
+RAGES_PATH="$HOME/go/src/rages"
+SERIAL=$1
+
+if [ "$SERIAL" = "" ]; then
+	echo "No serial found"
+	exit 1
+fi
+
+echo "Getting public key for $SERIAL"
+openssl ec -pubin -in ~/Downloads/deviceKeypairPublicKey1_${SERIAL}.pem -outform der -out ~/dev/${SERIAL}.der
+
+# Copy device cert to RaGeS
+cp $CERTIF_PATH/deviceTestCertificate_${SERIAL}.der ${RAGES_PATH}/deviceCertificate/deviceCertificate_${SERIAL}.der
