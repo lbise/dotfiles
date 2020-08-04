@@ -19,8 +19,7 @@ augroup numbertoggle
   autocmd BufLeave,FocusLost,InsertEnter   * set norelativenumber
 augroup END
 
-" TODO Find non idiotic clipboard management
-set clipboard+=unnamed	" Yank to primary clipboard
+set clipboard+=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
 set autowrite		" Write buffer on :next, :last etc...
 set autoread		" Read file on outside change
 set ttimeoutlen=10	" Lower delay on exit insert mode
