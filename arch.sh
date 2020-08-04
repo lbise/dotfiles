@@ -9,7 +9,7 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 # Packages to install
-PKGS="vim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython"
+PKGS="vim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp"
 
 # AUR to install
 AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation"
@@ -48,6 +48,9 @@ echo "	zsh"
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
 # Change default shell to zsh
 chsh -s $(which zsh)
+echo "	ntp"
+sudo systemctl enable ntpd.service
+sudo systemctl start ntpd.service
 echo "-------------------------------------------------------------------------"
 
 echo "	fonts"
