@@ -46,3 +46,7 @@ sudo $DIR/tools/new_symlink.sh $DIR/lightdm.conf  /etc/lightdm/lightdm.conf
 
 # scripts
 sudo $DIR/tools/new_symlink.sh $DIR/scripts  ~/.scripts
+
+# polybar
+$DIR/tools/new_symlink.sh $DIR/config/polybar/config ~/.config/polybar/config
+$DIR/tools/new_symlink.sh $DIR/config/polybar/launch.sh ~/.config/polybar/launch.sh
