@@ -6,7 +6,7 @@ echo "#########################################################################"
 echo "Zephyr installation"
 echo "#########################################################################"
 
-PKGS="git cmake ninja gperf ccache dfu-util dtc wget python-setuptools python-wheel tk xz file make"
+PKGS="git cmake ninja gperf ccache dfu-util dtc wget python-setuptools python-wheel tk xz file make gcc-multilib lib32-gcc-libs"
 PKGS_PYTHON="python-yaml python-pyelftools python-protobuf"
 
 SDK_VERS=("0.10.0" "0.11.4")
