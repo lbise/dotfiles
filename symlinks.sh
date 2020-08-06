@@ -50,3 +50,5 @@ sudo $DIR/tools/new_symlink.sh $DIR/scripts  ~/.scripts
 # polybar
 $DIR/tools/new_symlink.sh $DIR/config/polybar/config ~/.config/polybar/config
 $DIR/tools/new_symlink.sh $DIR/config/polybar/launch.sh ~/.config/polybar/launch.sh
+$DIR/tools/new_symlink.sh $DIR/config/polybar/nord-colors ~/.config/polybar/colors
+$DIR/tools/new_symlink.sh $DIR/config/polybar/global-config ~/.config/polybar/global-config

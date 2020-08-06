@@ -16,59 +16,11 @@
 ;
 ;==========================================================
 
-[colors]
-; Nord
-; Dark
-nord0 = #2E3440
-nord1 = #3B4252
-nord2 = #434C5E
-nord3 = #4C566A
-; Light
-nord4 = #D8DEE9
-nord5 = #E5E9F0
-nord6 = #ECEFF4
-; Forst
-nord7 = #8FBCBB
-nord8 = #88C0D0
-nord9 = #81A1C1
-nord10 = #5E81AC
-; Aurora
-nord11 = #BF616A
-nord12 = #D08770
-nord13 = #EBCB8B
-nord14 = #A3BE8C
-nord15 = #B48EAD
-
-;background = #2E3440
-;buffer = #4c566a
-;foreground = #D8DEE9
-;nord6 = #ECEFF4
-;nord7 = #8FBCBB
-;nord8 = #88C0D0
-;nord9 = #81A1C1
-;urgent = #BF616A
-;warning = #D08770
-;notify = #EBCB8B
-;success = #A3BE8C
-;function = #B48EAD
-
-;background = ${xrdb:color0:#222}
-;background = #222
-background = ${colors.nord0}
-background-alt = ${colors.nord3}
-;foreground = ${xrdb:color7:#222}
-;foreground = #dfdfdf
-foreground = ${colors.nord4}
-foreground-alt = ${colors.nord6}
-;primary = #ffb52a
-primary = ${colors.nord12}
-;secondary = #e60053
-secondary = ${colors.nord15}
-;alert = #bd2c40
-alert = ${colors.nord11}
+include-file = $HOME/.config/polybar/colors
+include-file = $HOME/.config/polybar/global-config
 
 [bar/example]
-monitor = ${env:MONITOR:DP-1}
+monitor = ${config.monitor}
 width = 100%
 height = 27
 ;offset-x = 1%
@@ -92,28 +44,27 @@ padding-right = 2
 module-margin-left = 1
 module-margin-right = 2
 
-font-0 = fixed:pixelsize=10;1
+font-0 = SauceCodePro Nerd Font Mono:style=Regular:pixelsize=10;1
 font-1 = unifont:fontformat=truetype:size=8:antialias=false;0
 font-2 = siji:pixelsize=10;1
 
-modules-left = bspwm i3
-modules-center = mpd
-modules-right = filesystem xbacklight alsa pulseaudio xkeyboard memory cpu wlan eth battery temperature date powermenu
+modules-left = i3
+;modules-center = mpd
+modules-right = xbacklight alsa pulseaudio cpu memory wlan eth battery temperature date powermenu
 
 tray-position = right
 tray-padding = 2
 ;tray-background = #0063ff
 
 ;wm-restack = bspwm
-;wm-restack = i3
-
-;override-redirect = true
+wm-restack = i3
+override-redirect = true
 
 ;scroll-up = bspwm-desknext
 ;scroll-down = bspwm-deskprev
 
-;scroll-up = i3wm-wsnext
-;scroll-down = i3wm-wsprev
+scroll-up = i3wm-wsnext
+scroll-down = i3wm-wsprev
 
 cursor-click = pointer
 cursor-scroll = ns-resize
@@ -246,18 +197,51 @@ card = intel_backlight
 [module/cpu]
 type = internal/cpu
 interval = 2
-format-prefix = " "
-format-prefix-foreground = ${colors.foreground-alt}
-format-underline = #f90000
-label = %percentage:2%%
+label = CPU %percentage:2%%
+format = <label> <ramp-load>
+
+; Spacing between individual per-core ramps
+ramp-load-spacing = 1
+ramp-load-0-foreground = ${colors.nord13}
+ramp-load-0 = ▁
+ramp-load-1-foreground = ${colors.nord13}
+ramp-load-1 = ▂
+ramp-load-2-foreground = ${colors.nord13}
+ramp-load-2 = ▃
+ramp-load-3-foreground = ${colors.nord12}
+ramp-load-3 = ▄
+ramp-load-4-foreground = ${colors.nord12}
+ramp-load-4 = ▅
+ramp-load-5-foreground = ${colors.nord11}
+ramp-load-5 = ▆
+ramp-load-6-foreground = ${colors.nord11}
+ramp-load-6 = ▇
+ramp-load-7-foreground = ${colors.nord11}
+ramp-load-7 = █
 
 [module/memory]
 type = internal/memory
 interval = 2
-format-prefix = " "
-format-prefix-foreground = ${colors.foreground-alt}
-format-underline = #4bffdc
-label = %percentage_used%%
+label = RAM %percentage_used%%
+format = <label> <ramp-used>
+
+; Only applies if <ramp-used> is used
+ramp-used-0 = ▁
+ramp-used-0-foreground = ${colors.nord13}
+ramp-used-1 = ▂
+ramp-used-1-foreground = ${colors.nord13}
+ramp-used-2 = ▃
+ramp-used-2-foreground = ${colors.nord13}
+ramp-used-3 = ▄
+ramp-used-3-foreground = ${colors.nord12}
+ramp-used-4 = ▅
+ramp-used-4-foreground = ${colors.nord12}
+ramp-used-5 = ▆
+ramp-used-5-foreground = ${colors.nord11}
+ramp-used-6 = ▇
+ramp-used-6-foreground = ${colors.nord11}
+ramp-used-7 = █
+ramp-used-7-foreground = ${colors.nord11}
 
 [module/wlan]
 type = internal/network
@@ -299,18 +283,11 @@ format-disconnected =
 
 [module/date]
 type = internal/date
-interval = 5
+interval = 1
 
-date =
-date-alt = " %Y-%m-%d"
-
+; See https://en.cppreference.com/w/cpp/io/manip/put_time
+date = %e %b %Y [W%U]
 time = %H:%M
-time-alt = %H:%M:%S
-
-format-prefix = 
-format-prefix-foreground = ${colors.foreground-alt}
-format-underline = #0a6cf5
-
 label = %date% %time%
 
 [module/pulseaudio]
@@ -403,22 +380,24 @@ animation-discharging-framerate = 750
 
 [module/temperature]
 type = internal/temperature
-thermal-zone = 0
+base-temperature = 20
 warn-temperature = 60
 
+hwmon-path = ${config.hwmon-path}
+
 format = <ramp> <label>
-format-underline = #f50a4d
 format-warn = <ramp> <label-warn>
-format-warn-underline = ${self.format-underline}
 
 label = %temperature-c%
-label-warn = %temperature-c%
-label-warn-foreground = ${colors.secondary}
+label-warn =   %temperature-c% 
+label-warn-foreground = ${colors.nord11}
 
-ramp-0 = 
-ramp-1 = 
-ramp-2 = 
-ramp-foreground = ${colors.foreground-alt}
+ramp-0 = 
+ramp-0-foreground = ${colors.nord10}
+ramp-1 = 
+ramp-1-foreground = ${colors.nord12}
+ramp-2 = 
+ramp-2-foreground = ${colors.nord11}
 
 [module/powermenu]
 type = custom/menu
