@@ -197,7 +197,7 @@ card = intel_backlight
 [module/cpu]
 type = internal/cpu
 interval = 2
-label = CPU %percentage:2%%
+label =  %percentage:2%%
 format = <label> <ramp-load>
 
 ; Spacing between individual per-core ramps
@@ -222,9 +222,9 @@ ramp-load-7 = █
 [module/memory]
 type = internal/memory
 interval = 2
-label = RAM %percentage_used%%
+label =  %percentage_used%%
 format = <label> <ramp-used>
-
+;
 ; Only applies if <ramp-used> is used
 ramp-used-0 = ▁
 ramp-used-0-foreground = ${colors.nord13}
@@ -393,7 +393,7 @@ label-warn =   %temperature-c% 
 label-warn-foreground = ${colors.nord11}
 
 ramp-0 = 
-ramp-0-foreground = ${colors.nord10}
+ramp-0-foreground = ${colors.nord8}
 ramp-1 = 
 ramp-1-foreground = ${colors.nord12}
 ramp-2 = 
