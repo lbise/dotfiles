@@ -22,7 +22,7 @@ $DIR/tools/new_symlink.sh $DIR/.ctags ~/.ctags
 $DIR/tools/new_symlink.sh $DIR/.ctags ~/.ctags.d/default.ctags
 
 # gdb
-$DIR/tools/new_symlink.sh $DIR/gdb/gdb-dashboard/.gdbinit ~/.ctags.d/default.ctags
+$DIR/tools/new_symlink.sh $DIR/gdb/gdb-dashboard/.gdbinit ~/.gdbinit
 $DIR/tools/new_symlink.sh $DIR/.gdbinit ~/.gdbinit.d/.gdbinit
 
 # i3
