@@ -21,31 +21,20 @@ nord13 = #EBCB8B
 nord14 = #A3BE8C
 nord15 = #B48EAD
 
-;background = #2E3440
-;buffer = #4c566a
-;foreground = #D8DEE9
-;nord6 = #ECEFF4
-;nord7 = #8FBCBB
-;nord8 = #88C0D0
-;nord9 = #81A1C1
-;urgent = #BF616A
-;warning = #D08770
-;notify = #EBCB8B
-;success = #A3BE8C
-;function = #B48EAD
-
-;background = ${xrdb:color0:#222}
-;background = #222
 background = ${colors.nord0}
 background-alt = ${colors.nord3}
-;foreground = ${xrdb:color7:#222}
-;foreground = #dfdfdf
 foreground = ${colors.nord4}
 foreground-alt = ${colors.nord6}
-;primary = #ffb52a
-primary = ${colors.nord12}
-;secondary = #e60053
-secondary = ${colors.nord15}
-;alert = #bd2c40
+
+primary = ${colors.nord9}
+secondary = ${colors.nord14}
+
+low = ${colors.nord13}
+medium = ${colors.nord12}
+high = ${colors.nord11}
+
+warn = ${colors.nord13}
 alert = ${colors.nord11}
 
+good = ${colors.nord14}
+bad = ${colors.nord11}
