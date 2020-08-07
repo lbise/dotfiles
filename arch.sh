@@ -4,16 +4,19 @@
 # TODO:
 # - plymouth
 # - wallpapers
+# - clean up i3 config (xrandr properly depending on computer)
+# - greeter
+# - polybar
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 # Packages to install
 # gvim to have +clipboard
-PKGS="gvim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp polybar"
+PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp polybar samba"
 
 # AUR to install
 AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation"
-AUR_FONTS="nerd-fonts-source-code-pro"
+AUR_FONTS="nerd-fonts-source-code-pro noto-fonts-emoji"
 
 # Services to enable
 SERVICES="lightdm"

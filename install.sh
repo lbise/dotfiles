@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Install dotfiles and setup system
 
-PKGS="vim zsh ctags python gdb i3lock rofi feh xautolock"
-
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 echo "#########################################################################"
