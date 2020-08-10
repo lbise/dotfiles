@@ -26,8 +26,8 @@ echo "	go"
 mkdir -p $HOME/go/src
 go env -w GOPRIVATE="geo-satis.com/golang"
 git config --global url."ssh://git@gstjira1.ju.geo-satis.com:7999/".insteadof "https://geo-satis.com/golang/"
-if [ -f $HOME/.ssh/config ]; then
-	echo "Host *\n\tUser lbise" > $HOME/.ssh/config
+if [ ! -f $HOME/.ssh/config ]; then
+	echo -e "Host *\n\tUser lbise" > $HOME/.ssh/config
 	chmod 600 $HOME/.ssh/config
 else
 	echo "~/.ssh/config exists, skipping"
