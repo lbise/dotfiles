@@ -2,11 +2,8 @@
 # Specific install script for Arch Linux
 
 # TODO:
-# - plymouth
 # - wallpapers
-# - clean up i3 config (xrandr properly depending on computer)
 # - greeter
-# - polybar
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
@@ -16,11 +13,11 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp polybar samba gendesk"
 
 # AUR to install
-AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin"
+AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth"
 AUR_FONTS="nerd-fonts-source-code-pro noto-fonts-emoji"
 
 # Services to enable
-SERVICES="lightdm"
+SERVICES="lightdm-plymouth"
 
 # Commands
 ENABLE_SERVICE="systemctl enable "
@@ -55,6 +52,20 @@ chsh -s $(which zsh)
 echo "	ntp"
 sudo systemctl enable ntpd.service
 sudo systemctl start ntpd.service
+echo "	plymouth"
+if grep -Fq "sd-plymouth" /etc/mkinitcpio.conf; then
+	echo "Setting up Plymouth"
+	sudo sed -i 's/HOOKS=(base systemd autodetect/HOOKS=(base systemd sd-plymouth autodetect' /etc/mkinitcpio.conf
+	sudo mkinitcpio -p linux
+	if grep -Fq "vt.global_cursor_default=0" /etc/default/grub; then
+		sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet/GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet splash vt.global_cursor_default=0/g' /etc/default/grub
+		sudo grub-mkconfig -o /boot/grub/grub.cfg
+	else
+		echo "Grub already setup for plymouth"
+	fi
+else
+	echo "mkinit already setup for plymouth"
+fi
 echo "-------------------------------------------------------------------------"
 
 echo "	fonts"
