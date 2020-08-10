@@ -153,6 +153,7 @@ compinit
 
 # Add .scripts to PATH
 export PATH=$PATH:~/.scripts
+export PATH=$PATH:~/go/bin
 
 # Aliases
 alias zephyr-env=". src-zephyr"
