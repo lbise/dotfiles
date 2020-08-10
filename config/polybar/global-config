@@ -1,5 +1,5 @@
 [config]
-monitor = ${env:MONITOR:DP-1}
+monitor = ${env:MONITOR:DP-0}
 
 ; Use `sensors` to find preferred temperature source, then run
 ; $ for i in /sys/class/hwmon/hwmon*/temp*_input; do echo "$(<$(dirname $i)/name): $(cat ${i%_*}_label 2>/dev/null || echo $(basename ${i%_*})) $(readlink -f $i)"; done
