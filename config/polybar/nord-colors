@@ -23,10 +23,10 @@ nord15 = #B48EAD
 
 background = ${colors.nord0}
 background-alt = ${colors.nord3}
-foreground = ${colors.nord4}
+foreground = ${colors.nord6}
 foreground-alt = ${colors.nord6}
 
-primary = ${colors.nord9}
+primary = ${colors.nord8}
 secondary = ${colors.nord14}
 
 low = ${colors.nord13}
