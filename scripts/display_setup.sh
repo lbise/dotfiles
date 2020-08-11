@@ -11,5 +11,6 @@ if [ "$HOSTNAME" = "$HOME" ]; then
 	$DIR/xrandr_home.sh
 elif [ "$HOSTNAME" = "$work" ]; then
 	echo "Work setup"
-	$DIR/xrandr_docked.sh
+	# TODO: Detect docked/undocked
+	$DIR/xrandr_laptop.sh
 fi
