@@ -19,8 +19,8 @@
 include-file = $HOME/.config/polybar/colors
 include-file = $HOME/.config/polybar/global-config
 
-[bar/example]
-monitor = ${config.monitor}
+[bar/main]
+monitor = ${env:PRIMARY}
 width = 100%
 height = 27
 ;offset-x = 1%
@@ -167,7 +167,7 @@ type = internal/cpu
 interval = 2
 label = %percentage:2%%
 format = <label> <ramp-load>
-format-prefix = " "
+format-prefix = " "
 format-prefix-foreground = ${colors.primary}
 
 ; Spacing between individual per-core ramps
@@ -255,7 +255,7 @@ type = internal/date
 interval = 1
 
 ; See https://en.cppreference.com/w/cpp/io/manip/put_time
-date = [W%U] %e %b %Y
+date = %e %b %Y [W%U]
 time = %H:%M
 label = %date% %time%
 
@@ -379,7 +379,7 @@ format-spacing = 1
 
 label-open = 
 label-open-foreground = ${colors.primary}
-label-close = 
+label-close = 
 label-close-foreground = ${colors.primary}
 label-separator = " "
 label-separator-foreground = ${colors.foreground-alt}
@@ -423,5 +423,12 @@ screenchange-reload = true
 [global/wm]
 margin-top = 5
 margin-bottom = 5
+
+[bar/second]
+inherit = bar/main
+modules-left = i3
+modules-right = date time
+modules-center =
+monitor = ${env:SECONDARY}
 
 ; vim:ft=dosini
