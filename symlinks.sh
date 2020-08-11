@@ -43,6 +43,10 @@ $DIR/tools/new_symlink.sh $DIR/nord-kitty/nord.conf ~/.config/kitty/nord.conf
 
 # lightdm
 sudo $DIR/tools/new_symlink.sh $DIR/lightdm.conf  /etc/lightdm/lightdm.conf
+sudo $DIR/tools/new_symlink.sh $DIR/scripts/display_setup.sh  /usr/share/display_setup.sh
+sudo $DIR/tools/new_symlink.sh $DIR/scripts/xrandr_home.sh  /usr/share/xrandr_home.sh
+sudo $DIR/tools/new_symlink.sh $DIR/scripts/xrandr_docked.sh  /usr/share/xrandr_docked.sh
+sudo $DIR/tools/new_symlink.sh $DIR/scripts/xrandr_laptop.sh  /usr/share/xrandr_laptop.sh
 
 # scripts
 sudo $DIR/tools/new_symlink.sh $DIR/scripts  ~/.scripts
