@@ -12,12 +12,6 @@ set autoindent
 set shell=/bin/zsh	" Set shell as zsh
 set number		" Add line number
 set relativenumber	" Add relative line number (number + relative = hybrid)
-" Toggle between relative / norelative when changing window
-augroup numbertoggle
-  autocmd!
-  autocmd BufEnter,FocusGained,InsertLeave * set relativenumber
-  autocmd BufLeave,FocusLost,InsertEnter   * set norelativenumber
-augroup END
 
 set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
 set autowrite		" Write buffer on :next, :last etc...
@@ -41,25 +35,13 @@ set laststatus=2
 set noshowmode		" Hide the default mode text
 set incsearch		" Display search results as search string is typed
 set ruler		" Show the line and column number of the cursor position
-set wildmode=longest,list " tab completion for files/bufferss
+set wildmode=longest:full,full " tab completion for files/bufferss
 set wildmenu		" Command line completion shows menu
 set display+=lastline	" Display as much as possible of the last line in a window
 
 if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
 endif
-
-" Highlight column 80
-set colorcolumn=80
-highlight ColorColumn ctermbg=darkgray
-" Highlight trailing spaces
-" http://vim.wikia.com/wiki/Highlight_unwanted_spaces
-highlight ExtraWhitespace ctermbg=red guibg=red
-match ExtraWhitespace /\s\+$/
-autocmd BufWinEnter * match ExtraWhitespace /\s\+$/
-autocmd InsertEnter * match ExtraWhitespace /\s\+\%#\@<!$/
-autocmd InsertLeave * match ExtraWhitespace /\s\+$/
-autocmd BufWinLeave * call clearmatches()
 
 " save read-only files
 command -nargs=0 Sudow w !sudo tee % >/dev/null
@@ -120,3 +102,27 @@ let g:airline_powerline_fonts = 1
 let g:UltiSnipsExpandTrigger="<tab>"
 let g:UltiSnipsJumpForwardTrigger="<tab>"
 let g:UltiSnipsJumpBackwardTrigger="<c-b>"
+
+" #############################################################################
+" Misc
+" #############################################################################
+" Highlight column 80
+set colorcolumn=80
+highlight ColorColumn ctermbg=darkgray
+" Highlight trailing spaces
+" http://vim.wikia.com/wiki/Highlight_unwanted_spaces
+" HAVE TO BE AFTER COLORSCHEME
+highlight ExtraWhitespace ctermbg=red guibg=red
+match ExtraWhitespace /\s\+$/
+autocmd BufWinEnter * match ExtraWhitespace /\s\+$/
+autocmd InsertEnter * match ExtraWhitespace /\s\+\%#\@<!$/
+autocmd InsertLeave * match ExtraWhitespace /\s\+$/
+autocmd BufWinLeave * call clearmatches()
+
+" Toggle between relative / norelative when changing window
+" HAVE TO BE AFTER COLORSCHEME
+augroup numbertoggle
+  autocmd!
+  autocmd BufEnter,FocusGained,InsertLeave * set relativenumber
+  autocmd BufLeave,FocusLost,InsertEnter   * set norelativenumber
+augroup END
