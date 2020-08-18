@@ -10,14 +10,14 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 # Packages to install
 # gvim to have +clipboard
 # gendesk for dropbox
-PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp polybar samba gendesk"
+PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp polybar samba gendesk gthumb networkmanager network-manager-applet"
 
 # AUR to install
 AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth"
 AUR_FONTS="nerd-fonts-source-code-pro noto-fonts-emoji"
 
 # Services to enable
-SERVICES="lightdm-plymouth"
+SERVICES="lightdm-plymouth NetworkManager"
 
 # Commands
 ENABLE_SERVICE="systemctl enable "
