@@ -430,5 +430,6 @@ modules-left = i3
 modules-right = date time
 modules-center =
 monitor = ${env:SECONDARY}
+tray-position = ${env:TRAY_POSITION:none}
 
 ; vim:ft=dosini
