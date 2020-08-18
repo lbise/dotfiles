@@ -13,7 +13,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp polybar samba gendesk gthumb networkmanager network-manager-applet"
 
 # AUR to install
-AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth"
+AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth plymouth-theme-dark-arch"
 AUR_FONTS="nerd-fonts-source-code-pro noto-fonts-emoji"
 
 # Services to enable
@@ -66,6 +66,7 @@ if grep -Fq "sd-plymouth" /etc/mkinitcpio.conf; then
 else
 	echo "mkinit already setup for plymouth"
 fi
+sudo plymouth-set-default-theme -R dark-arch
 echo "-------------------------------------------------------------------------"
 
 echo "	fonts"
