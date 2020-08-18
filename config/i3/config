@@ -15,6 +15,9 @@ set $mod Mod4
 # is used in the bar {} block below.
 font pango:SauceCodePro Nerd Font Mono:style=Regular 11
 
+# Start NetworkManager applet
+exec --no-startup-id nm-applet
+
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
 # text rendering and scalability on retina/hidpi displays (thanks to pango).
 #font pango:DejaVu Sans Mono 8
@@ -200,6 +203,7 @@ exec --no-startup-id display_setup.sh
 exec --no-startup-id feh --randomize --bg-scale ~/gitrepo/wallpapers
 
 # i3-gaps stuff
+# Disable titlebars
 for_window [class=".*"] border pixel 0
 gaps bottom 27
 gaps inner 5
@@ -209,6 +213,9 @@ new_window none
 # Options
 focus_follows_mouse no
 default_border none
+
+# Assign
+assign [class="Evolution"] $ws5
 
 # Bindings
 # Screen lock
