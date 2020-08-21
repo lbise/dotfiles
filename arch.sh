@@ -10,10 +10,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 # Packages to install
 # gvim to have +clipboard
 # gendesk for dropbox
-PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp polybar samba gendesk gthumb networkmanager network-manager-applet"
+PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp samba gendesk gthumb networkmanager network-manager-applet"
 
 # AUR to install
-AUR_PKGS="google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth plymouth-theme-dark-arch"
+AUR_PKGS="polybar google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth plymouth-theme-dark-arch"
 AUR_FONTS="nerd-fonts-source-code-pro noto-fonts-emoji"
 
 # Services to enable
@@ -54,8 +54,10 @@ sudo systemctl enable ntpd.service
 sudo systemctl start ntpd.service
 echo "	plymouth"
 if grep -Fq "sd-plymouth" /etc/mkinitcpio.conf; then
+	echo "mkinit already setup for plymouth"
+else
 	echo "Setting up Plymouth"
-	sudo sed -i 's/HOOKS=(base systemd autodetect/HOOKS=(base systemd sd-plymouth autodetect' /etc/mkinitcpio.conf
+	sudo sed -i 's/HOOKS=(base systemd autodetect/HOOKS=(base systemd sd-plymouth autodetect/g' /etc/mkinitcpio.conf
 	sudo mkinitcpio -p linux
 	if grep -Fq "vt.global_cursor_default=0" /etc/default/grub; then
 		sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet/GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet splash vt.global_cursor_default=0/g' /etc/default/grub
@@ -63,8 +65,6 @@ if grep -Fq "sd-plymouth" /etc/mkinitcpio.conf; then
 	else
 		echo "Grub already setup for plymouth"
 	fi
-else
-	echo "mkinit already setup for plymouth"
 fi
 sudo plymouth-set-default-theme -R dark-arch
 echo "-------------------------------------------------------------------------"
