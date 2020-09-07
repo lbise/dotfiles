@@ -4,16 +4,17 @@
 # TODO:
 # - wallpapers
 # - greeter
+set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 # Packages to install
 # gvim to have +clipboard
 # gendesk for dropbox
-PKGS="gvim zsh ctags python gdb cmsis-svd-git i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp samba gendesk gthumb networkmanager network-manager-applet evince snapper xdg-utils"
+PKGS="gvim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp samba gendesk gthumb networkmanager network-manager-applet evince snapper xdg-utils"
 
 # AUR to install
-AUR_PKGS="polybar google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth plymouth-theme-dark-arch snapper-gui-git"
+AUR_PKGS="polybar google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth plymouth-theme-dark-arch snapper-gui-git cmsis-svd-git "
 AUR_FONTS="nerd-fonts-source-code-pro noto-fonts-emoji"
 
 # Services to enable
@@ -40,13 +41,25 @@ else
 fi
 echo "-------------------------------------------------------------------------"
 
+# Somehow importing Dropbox key from the gpg server fails, we have to do it manually
+echo "Import Dropbox key"
+keys=`gpg --list-keys`
+if [[ ! "$keys" == *"dropbox"* ]]; then
+	wget https://linux.dropbox.com/fedora/rpm-public-key.asc
+	gpg --import rpm-public-key.asc
+	rm rpm-public-key.asc
+else
+	echo "Dropbox key already imported"
+fi
+echo "-------------------------------------------------------------------------"
+
 echo "Installing AUR packages: $AUR_PKGS"
 $AUR_INSTALL_CMD $AUR_PKGS
 echo "-------------------------------------------------------------------------"
 
 echo "Setting up system:"
 echo "	zsh"
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 # Change default shell to zsh
 chsh -s $(which zsh)
 echo "	ntp"
