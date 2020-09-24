@@ -68,3 +68,5 @@
 	decorate = short
 [url "ssh://git@gstjira1.ju.geo-satis.com:7999/"]
 	insteadof = https://geo-satis.com/golang/
+[pull]
+	ff = only
