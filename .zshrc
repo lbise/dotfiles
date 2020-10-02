@@ -76,6 +76,7 @@ plugins=(
   git
   colorize
   colored-man-pages
+  fzf
 )
 
 source $ZSH/oh-my-zsh.sh

@@ -11,7 +11,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 # Packages to install
 # gvim to have +clipboard
 # gendesk for dropbox
-PKGS="gvim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp samba gendesk gthumb networkmanager network-manager-applet evince snapper xdg-utils gnome-screenshot"
+PKGS="gvim zsh ctags python gdb i3lock rofi feh xautolock xorg-server xorg-apps xorg-xrandr xorg-xinit kitty numlockx lightdm i3-gaps man-db man-pages thunar alsa-utils zip unzip minicom python-gitpython ntp samba gendesk gthumb networkmanager network-manager-applet evince snapper xdg-utils gnome-screenshot fzf"
 
 # AUR to install
 AUR_PKGS="polybar google-chrome lightdm-slick-greeter jlink-software-and-documentation dropbox thunar-dropbox thunar-archive-plugin plymouth plymouth-theme-dark-arch snapper-gui-git cmsis-svd-git "
