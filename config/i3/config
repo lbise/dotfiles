@@ -109,9 +109,9 @@ set $monitorPrimaryWork DP-3-1
 set $monitorSecondaryWork DP-3-2
 set $monitorThirdaryWork eDP-1
 # Home
-set $monitorPrimaryHome DP-0
-set $monitorSecondaryHome DVI-I-1
-set $monitorThirdaryHome DVI-I-1
+set $monitorPrimaryHome DP-4
+set $monitorSecondaryHome HDMI-1-5
+set $monitorThirdaryHome HDMI-1-5
 
 set $monitorPrimary $monitorPrimaryHome $monitorPrimaryWork
 set $monitorSecondary $monitorSecondaryHome $monitorSecondaryWork
