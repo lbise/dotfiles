@@ -9,11 +9,15 @@ set autoindent
 " #############################################################################
 " Basic config
 " #############################################################################
-set shell=/bin/zsh	" Set shell as zsh
+if has('unix')
+        set shell=/bin/zsh	" Set shell as zsh
+endif
 set number		" Add line number
 set relativenumber	" Add relative line number (number + relative = hybrid)
 
-set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
+if has('unix')
+        set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
+endif
 set autowrite		" Write buffer on :next, :last etc...
 set autoread		" Read file on outside change
 set ttimeoutlen=10	" Lower delay on exit insert mode
@@ -23,8 +27,11 @@ set scrolloff=5		" Show lines above and below cursor (when possible)
 set backspace=indent,eol,start " allow backspacing over everything
 set history=8192	" More history
 set tabstop=8
-set softtabstop=8
-set shiftwidth=8
+"set softtabstop=8
+"set shiftwidth=8
+set softtabstop=4
+set shiftwidth=4
+set expandtab           " Expand TABs to spaces
 set hlsearch
 " smart case-sensitive search
 set ignorecase
@@ -43,8 +50,10 @@ if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
 endif
 
-" save read-only files
-command -nargs=0 Sudow w !sudo tee % >/dev/null
+if has('unix')
+    " save read-only files
+    command -nargs=0 Sudow w !sudo tee % >/dev/null
+endif
 
 " #############################################################################
 " Mappings
@@ -75,9 +84,12 @@ map <C-l> :bp<CR>
 nnoremap <silent> <Leader><Esc> <Esc>:nohlsearch<CR><Esc>
 " Remove all trailing and leading whitespaces
 map <F4> :%s/\s\+$//e<CR>
-" Copy/paste to system clipboard
-noremap <Leader>y "*y <bar> :let @+=@*<CR>
-noremap <Leader>p "*p
+
+if has('unix')
+    " Copy/paste to system clipboard
+    noremap <Leader>y "*y <bar> :let @+=@*<CR>
+    noremap <Leader>p "*p
+endif
 
 " #############################################################################
 " Plugins
@@ -89,19 +101,15 @@ let g:nord_cursor_line_number_background = 1
 colorscheme nord
 
 " vim-airline
+let g:airline_theme='nord_minimal'
 let g:airline#extensions#tabline#enabled = 1
 " Disable branch name
 let g:airline#extensions#branch#enabled = 0
 " Customize sections
 let g:airline_section_y = ""
-let g:airline_powerline_fonts = 1
-
-" ultisnips
-" Trigger configuration. Do not use <tab> if you use https://github.com/Valloric/YouCompleteMe.
-" snippets used are those of the vim-snippets bundle see ~/.vimrc/bundle/vim-snippets
-let g:UltiSnipsExpandTrigger="<tab>"
-let g:UltiSnipsJumpForwardTrigger="<tab>"
-let g:UltiSnipsJumpBackwardTrigger="<c-b>"
+if has('unix')
+    let g:airline_powerline_fonts = 1
+endif
 
 " #############################################################################
 " Misc
@@ -126,3 +134,12 @@ augroup numbertoggle
   autocmd BufEnter,FocusGained,InsertLeave * set relativenumber
   autocmd BufLeave,FocusLost,InsertEnter   * set norelativenumber
 augroup END
+
+" Automatically remove trailing white space when saving a buffer
+autocmd BufWritePre * %s/\s\+$//e
+
+" #############################################################################
+" File association
+" #############################################################################
+au BufRead,BufNewFile *.unity set filetype=c
+au BufRead,BufNewFile *.map   set filetype=xml
