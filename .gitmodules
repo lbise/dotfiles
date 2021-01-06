@@ -37,3 +37,6 @@
 [submodule "nord-rofi"]
 	path = rofi/nord-rofi
 	url = https://github.com/lbise/nord-rofi
+[submodule "vim/pack/leo/start/vim-airline-themes"]
+	path = vim/pack/leo/start/vim-airline-themes
+	url = https://github.com/vim-airline/vim-airline-themes
