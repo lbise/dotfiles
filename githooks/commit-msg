@@ -1,30 +1,30 @@
 #!/bin/sh
 
-# Allow Merge branch commit message longer than 72
-if [[ ! `cat $1` == 'Merge branch '*  ]] && [[ ! `cat $1` == 'Merge remote-tracking branch'* ]] && [[ ! `cat $1` == 'Revert '* ]]; then
-	# Check first line does not exceed 72 characters
-	cat "$1" | head -1 | grep -e '^..\{72\}' >/dev/null && {
-	        echo >&2 "First line exceeds 72 char limit."
-	        exit 1
-	}
-
-	# If commit message has more than 1 line check that second line is empty
-	NBLINE=`cat "$1" | wc -l`
-	if [ $NBLINE -gt 1 ]; then
-	cat "$1" | head -2 | tail -1 | grep -e '^\S*$' 2>/dev/null || {
-	        echo >&2 "Second line must be empty."
-	        exit 1
-	}
-	fi
-fi
-
-# check for fixup commits
-[[ -n "$(cat $1 | grep 'fixup!')" ]] && exit
-
-# check if JIRA is already set
-[[ -n "$(cat $1 | grep 'JIRA:')" ]] && exit
-
-TICKET=$(git symbolic-ref HEAD | rev | cut -d/ -f1 | rev | grep -o -E "[A-Z]+-[0-9]+")
-if [[ -n "${TICKET}" ]]; then
-    echo -e "\nJIRA: ${TICKET}" >> $1
-fi
+## Allow Merge branch commit message longer than 72
+#if [[ ! `cat $1` == 'Merge branch '*  ]] && [[ ! `cat $1` == 'Merge remote-tracking branch'* ]] && [[ ! `cat $1` == 'Revert '* ]]; then
+#	# Check first line does not exceed 72 characters
+#	cat "$1" | head -1 | grep -e '^..\{72\}' >/dev/null && {
+#	        echo >&2 "First line exceeds 72 char limit."
+#	        exit 1
+#	}
+#
+#	# If commit message has more than 1 line check that second line is empty
+#	NBLINE=`cat "$1" | wc -l`
+#	if [ $NBLINE -gt 1 ]; then
+#	cat "$1" | head -2 | tail -1 | grep -e '^\S*$' 2>/dev/null || {
+#	        echo >&2 "Second line must be empty."
+#	        exit 1
+#	}
+#	fi
+#fi
+#
+## check for fixup commits
+#[[ -n "$(cat $1 | grep 'fixup!')" ]] && exit
+#
+## check if JIRA is already set
+#[[ -n "$(cat $1 | grep 'JIRA:')" ]] && exit
+#
+#TICKET=$(git symbolic-ref HEAD | rev | cut -d/ -f1 | rev | grep -o -E "[A-Z]+-[0-9]+")
+#if [[ -n "${TICKET}" ]]; then
+#    echo -e "\nJIRA: ${TICKET}" >> $1
+#fi

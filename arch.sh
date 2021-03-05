@@ -5,7 +5,6 @@
 # - wallpapers
 # - greeter
 set -e
-
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 # Packages to install
@@ -80,6 +79,15 @@ else
 	fi
 fi
 sudo plymouth-set-default-theme -R dark-arch
+echo "  lightdm"
+# lightdm - files need to be copied
+sudo cp $DIR/lightdm.conf /etc/lightdm/lightdm.conf
+sudo cp $DIR/slick-greeter.conf /etc/lightdm/slick-greeter.conf
+sudo cp $DIR/greeter_background.jpg /usr/share/pixmaps/greeter_background.jpg
+sudo cp $DIR/scripts/display_setup.sh /usr/share/display_setup.sh
+sudo cp $DIR/scripts/xrandr_home.sh /usr/share/xrandr_home.sh
+sudo cp $DIR/scripts/xrandr_docked.sh /usr/share/xrandr_docked.sh
+sudo cp $DIR/scripts/xrandr_laptop.sh /usr/share/xrandr_laptop.sh
 echo "-------------------------------------------------------------------------"
 
 echo "	fonts"

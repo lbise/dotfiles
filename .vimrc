@@ -5,7 +5,6 @@ syntax on		" Enable syntax highlighting
 set showmatch		" Show matching braces when text indicator is over them
 filetype plugin indent on " enable file type detection
 set autoindent
-
 " #############################################################################
 " Basic config
 " #############################################################################

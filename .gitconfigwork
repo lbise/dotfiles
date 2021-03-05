@@ -9,11 +9,11 @@
 	new = green bold
 
 [core]
-	editor = vim
+	editor = gvim
 	hooksPath = ~/.githooks
 
 [user]
-	name = 13lbise
+	name = Leonard Bise
 	email = leonard.bise@phonak.com
 
 [diff]
@@ -79,6 +79,7 @@
 	decorate = short
 [pull]
 	ff = only
+	rebase = true
 [include]
 	path = C:/SVN/wp_13lbise/andromeda/.gitconfig
 [credential]
@@ -87,3 +88,13 @@
 	gcwarning = false
 [mergetool]
 	keepBackup = false
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[winUpdater]
+	recentlySeenVersion = 2.30.0.windows.2
+[rebase]
+	autoSquash = yes
+	autoStash = yes
