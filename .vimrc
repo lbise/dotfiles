@@ -15,9 +15,7 @@ endif
 set number		" Add line number
 set relativenumber	" Add relative line number (number + relative = hybrid)
 
-if has('unix')
-        set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
-endif
+set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
 set autowrite		" Write buffer on :next, :last etc...
 set autoread		" Read file on outside change
 set ttimeoutlen=10	" Lower delay on exit insert mode
@@ -67,13 +65,16 @@ noremap <Down> <Nop>
 noremap <Left> <Nop>
 noremap <Right> <Nop>
 
-map <f5> :Obsession ~/.vimsession/lbise.vim<CR>
-map <f6> :source ~/.vimsession/lbise.vim<CR>
+let g:session_dir = '~/vim-sessions'
+exec 'nnoremap <f5> :Obsession ' . g:session_dir . '/*.vim<C-D><BS><BS><BS><BS><BS>'
+exec 'nnoremap <f6> :so ' . g:session_dir . '/*.vim<C-D><BS><BS><BS><BS><BS>'
 
-map <f9> :!compile_zephyr %:p:h<CR>
-map <C-f9> :!compile_zephyr %:p:h clean<CR>
-map <S-f9> :!compile_zephyr %:p:h distclean<CR>
-map <f12> :!run_checkpatch %:p:h<CR>
+map <f12> :!ctags -R .<CR>
+
+" map <f9> :!compile_zephyr %:p:h<CR>
+" map <C-f9> :!compile_zephyr %:p:h clean<CR>
+" map <S-f9> :!compile_zephyr %:p:h distclean<CR>
+" map <f12> :!run_checkpatch %:p:h<CR>
 
 map <C-Left> :bn<CR>
 map <C-Right> :bp<CR>
@@ -136,7 +137,10 @@ augroup numbertoggle
 augroup END
 
 " Automatically remove trailing white space when saving a buffer
-autocmd BufWritePre * %s/\s\+$//e
+autocmd BufWritePre *.c %s/\s\+$//e
+autocmd BufWritePre *.unity %s/\s\+$//e
+autocmd BufWritePre *.py %s/\s\+$//e
+autocmd BufWritePre *.xml %s/\s\+$//e
 
 " #############################################################################
 " File association
