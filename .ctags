@@ -5,4 +5,9 @@
 --exclude=zephyr
 --exclude=fw6_build_dev
 --exclude=fw6_build_release
-
+--exclude=_prefix
+--exclude=_build
+--exclude=_export
+--exclude=_obj
+--exclude=prj/host
+--exclude=scripts
