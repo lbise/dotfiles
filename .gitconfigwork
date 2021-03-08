@@ -13,7 +13,7 @@
 	hooksPath = ~/.githooks
 
 [user]
-	name = Leonard Bise
+	name = 13lbise
 	email = leonard.bise@phonak.com
 
 [diff]

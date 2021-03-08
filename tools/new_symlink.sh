@@ -15,7 +15,7 @@ fi
 
 if [ -L "$DST" ]; then
 	echo "Sym link already exists"
-	exit 1
+	exit 0
 fi
 
 echo "Creating sym link \"$2\" -> \"$1\""

@@ -2,7 +2,6 @@
 # Create symlinks from a file
 # Entry format: target destination
 
-set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 if [ -z "$1" ]; then
