@@ -39,6 +39,8 @@ while IFS= read -r line; do
         if [ -d "$SRC" ]; then
             OPT="-rT"
             mkdir -p "$DST"
+        elif [ -f "$SRC" ]; then
+            mkdir -p "$(dirname "${DST}")"
         fi
 
 	echo "Copying $SRC -> $DST"
