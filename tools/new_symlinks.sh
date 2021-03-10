@@ -7,6 +7,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 if [ -z "$1" ]; then
     echo "Missing arguments"
     echo "Usage: $0 <file>"
+    exit 1
 fi
 
 CFG="$1"

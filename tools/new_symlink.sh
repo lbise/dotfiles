@@ -3,6 +3,7 @@
 if [ -z "$1" ] || [ -z "$2" ]; then
 	echo "Missing arguments"
 	echo "Usage: $0 <src> <dst>"
+	exit 1
 fi
 
 SRC="$1"
