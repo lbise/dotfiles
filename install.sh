@@ -5,9 +5,10 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 function usage() {
-    echo "Usage: $0 home|work"
+    echo "Usage: $0 home|work [cpy]"
     echo "  home: Setup for home"
     echo "  work: Setup for work"
+    echo "  cpy: Copy files instead of creating symlinks"
 }
 
 echo "#########################################################################"
@@ -30,6 +31,11 @@ else
     echo "Unknown type of setup: $1"
     usage
     exit 1
+fi
+
+LNK="sym"
+if [ "$2" = "cpy" ]; then
+    LNK="cpy"
 fi
 
 echo "-------------------------------------------------------------------------"
@@ -63,27 +69,43 @@ case "$OS" in
 		;;
 esac
 echo "-------------------------------------------------------------------------"
-
-echo "Creating symlinks:"
+AFTER=""
+if [ $LNK = "sym" ]; then
+    echo "Creating symlinks:"
+    LNKSCRIPT="$DIR/tools/new_symlinks.sh"
+else
+    echo "Copying files:"
+    LNKSCRIPT="$DIR/tools/cp_files.sh"
+    AFTER="src"
+fi
 echo "-------------------------------------------------------------------------"
-"$DIR/tools/new_symlinks.sh" "$DIR/symlinks_common.cfg"
+LNKFILES=( "$DIR/symlinks_common.cfg" )
+
 if [ $OSTYPE == "LINUX" ]; then
-    "$DIR/tools/new_symlinks.sh" "$DIR/symlinks_linux.cfg"
+    LNKFILES+=( "$DIR/symlinks_linux.cfg" )
     sudo "$DIR/tools/new_symlinks.sh" "$DIR/symlinks_linux_root.cfg"
 elif [ $OSTYPE == "WINDOWS" ]; then
-    "$DIR/tools/new_symlinks.sh" "$DIR/symlinks_win.cfg"
+    LNKFILES+=( "$DIR/symlinks_win.cfg" )
 else
     echo "Unrecognized OS type!"
     exit 1
 fi
+
 if [ $SETUP == "HOME" ]; then
-    "$DIR/tools/new_symlinks.sh" "$DIR/symlinks_home.cfg"
+    LNKFILES+=( "$DIR/symlinks_home.cfg" )
 elif [ $SETUP == "WORK" ]; then
-    "$DIR/tools/new_symlinks.sh" "$DIR/symlinks_work.cfg"
+    LNKFILES+=( "$DIR/symlinks_work.cfg" )
 else
     echo "Unrecognized setup type!"
     exit 1
 fi
+
+for ((i = 0; i < ${#LNKFILES[@]}; i++))
+do
+    echo "${LNKFILES[$i]}:"
+    "$LNKSCRIPT" "${LNKFILES[$i]}" "$AFTER"
+done
+
 echo "-------------------------------------------------------------------------"
 
 echo "Installation completed"
