@@ -65,8 +65,11 @@ noremap <Left> <Nop>
 noremap <Right> <Nop>
 
 let g:session_dir = '~/vim-sessions'
-exec 'nnoremap <f5> :Obsession ' . g:session_dir . '/*.vim<C-D><BS><BS><BS><BS><BS>'
-exec 'nnoremap <f6> :so ' . g:session_dir . '/*.vim<C-D><BS><BS><BS><BS><BS>'
+let g:session_default = 'default.vim'
+exec 'nnoremap <f5> :Obsession ' . g:session_dir . '/' . g:session_default . '<CR>'
+exec 'nnoremap <f6> :so ' . g:session_dir . '/' . g:session_default . '<CR>'
+exec 'nnoremap <C-f5> :Obsession ' . g:session_dir . '/*.vim<C-D><BS><BS><BS><BS><BS>'
+exec 'nnoremap <C-f6> :so ' . g:session_dir . '/*.vim<C-D><BS><BS><BS><BS><BS>'
 
 map <f12> :!ctags -R .<CR>
 
