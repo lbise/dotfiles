@@ -7,3 +7,6 @@ fast_git_ps1 ()
 
 # Default prompt:  \[\033[01;32m\]\w \[\033[33m\]$(__git_ps1 "(%s)")\[\033[35m\]$\[\033[00m\]
 PS1='\[\033[01;32m\]\w\[\033[33m\]$(fast_git_ps1)\[\033[35m\]$\[\033[00m\] '
+
+# Add scripts to path
+export PATH=$PATH:"/c/Users/$USERNAME/OneDrive - Sonova/.scripts"
