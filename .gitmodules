@@ -1,6 +1,3 @@
-[submodule "vim/pack/leo/start/nord-vim"]
-	path = vim/pack/leo/start/nord-vim
-	url = https://github.com/arcticicestudio/nord-vim
 [submodule "vim/pack/leo/start/ultisnips"]
 	path = vim/pack/leo/start/ultisnips
 	url = https://github.com/SirVer/ultisnips
