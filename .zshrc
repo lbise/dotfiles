@@ -157,5 +157,22 @@ compinit
 # Add .scripts to PATH
 export PATH=$PATH:~/.scripts
 
+# Andromeda stuff
+ANDROMEDA_ROOT="/mnt/c/SVN/wp_${USER}/andromeda"
+
 # Aliases
-alias cdr="cd /mnt/c/SVN/wp_13lbise/andromeda/rom/dev"
+alias cdr="cd $ANDROMEDA_ROOT/rom/dev"
+
+#start QM, a graphic design tool for hierarchical state machines
+qm() {
+    MYPATH1=$ANDROMEDA_ROOT/_build/qm_4.5.1-win32/{app}/bin/
+    MYPATH2=$ANDROMEDA_ROOT/_build/qm_4.0.1-win32/{app}/bin/
+    if [ -d "$MYPATH1" ]; then
+        $MYPATH1/qm.exe &
+    else
+        if [ -d "$MYPATH2" ]; then
+            $MYPATH2/qm.exe &
+        fi
+    fi
+}
+
