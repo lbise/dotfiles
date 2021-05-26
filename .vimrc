@@ -9,6 +9,7 @@ set autoindent
 " #############################################################################
 " Basic config
 " #############################################################################
+set termguicolors	" Enable 24 bit colors
 set shell=/bin/zsh	" Set shell as zsh
 set number		" Add line number
 set relativenumber	" Add relative line number (number + relative = hybrid)
