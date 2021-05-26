@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/env bash
 
 # Allow Merge branch commit message longer than 72
 if [[ ! `cat $1` == 'Merge branch '*  ]] && [[ ! `cat $1` == 'Merge remote-tracking branch'* ]] && [[ ! `cat $1` == 'Revert '* ]]; then

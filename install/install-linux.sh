@@ -33,6 +33,10 @@ case "$OS" in
 esac
 
 echo "-------------------------------------------------------------------------"
+echo "Initializing submodules"
+git submodule update --init --recursive
+
+echo "-------------------------------------------------------------------------"
 echo "Installing base packages"
 PKGS="zsh"
 PKGS="$PKGS ctags"
@@ -40,9 +44,6 @@ PKGS="$PKGS fzf"
 PKGS="$PKGS rxvt-unicode"
 
 sudo $INSTALLER $PKGS
-
-########## Terminal
-sudo update-alternatives --config rxvt-unicode
 
 ########## Shell
 if [ -z "$ZSH" ]; then
@@ -59,14 +60,20 @@ echo "Delete existing files"
 sudo rm -rf ~/.vimrc
 sudo rm -rf ~/.vim
 sudo rm -rf ~/.gitconfig
+sudo rm -rf ~/.githooks
 sudo rm -rf ~/.zshrc
+sudo rm -rf ~/.ctags
+sudo rm -rf ~/.scripts
 
 echo "-------------------------------------------------------------------------"
 echo "Create symbolic links"
 ln -sf $DOTFILES/.vimrc ~/.vimrc
 ln -sf $DOTFILES/vim ~/.vim
 ln -sf $DOTFILES/.gitconfig ~/.gitconfig
+ln -sf $DOTFILES/githooks ~/.githooks
 ln -sf $DOTFILES/.zshrc ~/.zshrc
+ln -sf $DOTFILES/.ctags ~/.ctags
+ln -sf $DOTFILES/scripts ~/.scripts
 
 echo "#########################################################################"
 echo "Installation completed"
