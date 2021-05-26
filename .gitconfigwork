@@ -1,0 +1,98 @@
+[color]
+	excludesfile = h:/.gitignore_global
+	ui = auto
+
+[color "diff"]
+	meta = blue
+	frag = white
+	old = red bold
+	new = green bold
+
+[core]
+	editor = gvim
+	hooksPath = ~/.githooks
+
+[user]
+	name = Leonard Bise
+	email = leonard.bise@phonak.com
+
+[diff]
+	tool = kdiff3
+#	tool = meld
+
+[difftool]
+	prompt = false
+
+[difftool "meld"]
+	cmd = meld "$LOCAL" "$REMOTE"
+
+[difftool "kdiff3"]
+	keepBackup = false
+	trustExitCode = false
+
+[merge]
+	tool = kdiff3
+#	tool = meld
+
+[mergetool "meld"]
+	# $MERGED is the partially merged file with the merge conflict information in it
+	# $BASE is the shared commit ancestor of $LOCAL and $REMOTE, this is to say the file as it was when the branch containing $REMOTE was originally created
+	cmd = meld "$LOCAL" "$MERGED" "$REMOTE" --output "$MERGED"
+	cmd = meld "$LOCAL" "$BASE" "$REMOTE" --output "$MERGED"
+
+[mergetool "kdiff3"]
+	keepBackup = false
+	trustExitCode = false
+
+[grep]
+	extendRegexp = true
+	lineNumber = true
+
+[alias]
+	a = add
+	ua = reset HEAD
+	c = commit
+	ca = commit --amend
+	call = commit -a
+	cm = commit -m
+	cam = commit -am
+	cne = commit --no-edit
+	co = checkout
+	s = status
+	d = diff
+	cp = cherry-pick
+	l = log --graph --pretty=format:'%C(magenta)%h%C(blue)%d%Creset %s %C(blue bold)- %an, %ad%Creset'
+	ll = log --stat --abbrev-commit
+	# List my own commits
+	my = !git log --branches=* --no-merges --pretty=format:'%C(reset)%C(bold)%cd %C(reset)%C(white)%s  %C(reset)%h' --date=short --author=\"$(git config user.name)\"
+	# List of branches ordered by last change
+	branches = for-each-ref --sort=-committerdate refs/heads/ --format='%(color:bold)%(refname:short)%(color:reset)\t%(committerdate:relative)'
+	# Rebase: add changes and continue
+	cont = !git add . && git rebase --continue
+	# Rebase: skip a rebase step
+	skip = rebase --skip
+	# Rebase: abort
+	abort = rebase --abort
+
+[log]
+	# Show branch names with git log
+	decorate = short
+[pull]
+	ff = only
+	rebase = true
+[credential]
+	helper = wincred
+[gui]
+	gcwarning = false
+[mergetool]
+	keepBackup = false
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[winUpdater]
+	recentlySeenVersion = 2.30.0.windows.2
+[rebase]
+	autoSquash = yes
+	autoStash = yes
