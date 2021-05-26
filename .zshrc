@@ -1,6 +1,8 @@
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
+export COLORTERM=truecolor
+
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
@@ -73,7 +75,7 @@ POWERLEVEL9K_MODE='nerdfont-complete'
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-  git
+#  git Slows down a lot when using WSL
   colorize
   colored-man-pages
   fzf
@@ -154,9 +156,6 @@ compinit
 
 # Add .scripts to PATH
 export PATH=$PATH:~/.scripts
-export PATH=$PATH:~/go/bin
 
 # Aliases
-alias zephyr-env=". src-zephyr"
-alias zgo="cd $HOME/gitrepo/fwv6;zephyr-env"
-alias esp32-env=". src-esp32"
+alias cdr="cd /mnt/c/SVN/wp_13lbise/andromeda/rom/dev"
