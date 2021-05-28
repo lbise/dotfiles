@@ -80,6 +80,8 @@ map <F4> :%s/\s\+$//e<CR>
 noremap <Leader>y "*y <bar> :let @+=@*<CR>
 noremap <Leader>p "*p
 
+" Remap jump to tag because windows is shitty...
+noremap <C-m> <C-]>
 " #############################################################################
 " Plugins
 " #############################################################################
