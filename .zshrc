@@ -177,5 +177,5 @@ qm() {
 }
 
 # Start keychain
-/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa
+/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa-gitlab
 source $HOME/.keychain/$HOST-sh
