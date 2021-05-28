@@ -80,10 +80,6 @@
 [pull]
 	ff = only
 	rebase = true
-[credential]
-	helper = wincred
-[gui]
-	gcwarning = false
 [mergetool]
 	keepBackup = false
 [filter "lfs"]
@@ -91,8 +87,6 @@
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
-[winUpdater]
-	recentlySeenVersion = 2.30.0.windows.2
 [rebase]
 	autoSquash = yes
 	autoStash = yes
