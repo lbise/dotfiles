@@ -176,3 +176,6 @@ qm() {
     fi
 }
 
+# Start keychain
+/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa
+source $HOME/.keychain/$HOST-sh
