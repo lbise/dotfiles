@@ -157,10 +157,13 @@ compinit
 # Add .scripts to PATH
 export PATH=$PATH:~/.scripts
 
-# Andromeda stuff
+# Variables
 ANDROMEDA_ROOT="/mnt/c/SVN/wp_${USER}/andromeda"
+MYT="/mnt/t/${USER}"
+DOT="$HOME/gitrepo/dotfiles"
 
 # Aliases
+alias cdt="cd $ANDROMEDA_ROOT"
 alias cdr="cd $ANDROMEDA_ROOT/rom/dev"
 
 #start QM, a graphic design tool for hierarchical state machines
