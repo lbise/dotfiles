@@ -90,3 +90,6 @@
 [rebase]
 	autoSquash = yes
 	autoStash = yes
+[oh-my-zsh]
+	# Hides git status dirty symbol which might be very slow on some repo
+	hide-dirty = 1
