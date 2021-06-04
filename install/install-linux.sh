@@ -42,6 +42,7 @@ PKGS="zsh"
 PKGS="$PKGS ctags"
 PKGS="$PKGS fzf"
 PKGS="$PKGS rxvt-unicode"
+PKGS="$PKGS keychain"
 
 sudo $INSTALLER $PKGS
 

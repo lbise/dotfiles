@@ -180,5 +180,11 @@ qm() {
 }
 
 # Start keychain
-/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa-gitlab
-source $HOME/.keychain/$HOST-sh
+if [ -f $HOME/.ssh/id_rsa-gitlab ]; then
+	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa-gitlab
+	source $HOME/.keychain/$HOST-sh
+fi
+if [ -f $HOME/.ssh/id_rsa ]; then
+	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa
+	source $HOME/.keychain/$HOST-sh
+fi
