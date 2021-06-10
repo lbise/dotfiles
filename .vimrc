@@ -44,6 +44,22 @@ if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
 endif
 
+" WSL yank support
+let uname = substitute(system('uname'),'\n','','')
+if uname == 'Linux'
+    let lines = readfile("/proc/version")
+    if lines[0] =~ "Microsoft"
+		let s:clip = '/mnt/c/Windows/System32/clip.exe'  " default location
+		if executable(s:clip)
+		    augroup WSLYank
+		        autocmd!
+			"autocmd TextYankPost * call system('echo '.shellescape(join(v:event.regcontents, "\<CR>")).' | '.s:clip)
+			autocmd TextYankPost * call system(s:clip, join(v:event.regcontents, "\<CR>"))
+		    augroup END
+		end
+    endif
+endif
+
 " save read-only files
 command -nargs=0 Sudow w !sudo tee % >/dev/null
 
