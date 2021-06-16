@@ -8,6 +8,8 @@ $DIR/install-linux.sh
 
 echo "-------------------------------------------------------------------------"
 echo "Work specific configuration"
+sudo apt-get install git-lfs
+
 sudo rm -rf ~/.gitconfig
 ln -sf $DOTFILES/.gitconfigwork ~/.gitconfig
 
