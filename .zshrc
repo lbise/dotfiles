@@ -161,6 +161,7 @@ export PATH=$PATH:~/.scripts
 ANDROMEDA_ROOT="/mnt/c/SVN/wp_${USER}/andromeda"
 MYT="/mnt/t/${USER}"
 DOT="$HOME/gitrepo/dotfiles"
+WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
 
 # Aliases
 alias cdt="cd $ANDROMEDA_ROOT"
