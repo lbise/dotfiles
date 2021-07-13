@@ -78,10 +78,11 @@ noremap <Right> <Nop>
 map <f5> :Obsession ~/.vimsession/lbise.vim<CR>
 map <f6> :source ~/.vimsession/lbise.vim<CR>
 
-map <f9> :!compile_zephyr %:p:h<CR>
-map <C-f9> :!compile_zephyr %:p:h clean<CR>
-map <S-f9> :!compile_zephyr %:p:h distclean<CR>
-map <f12> :!run_checkpatch %:p:h<CR>
+"map <f9> :!compile_zephyr %:p:h<CR>
+"map <C-f9> :!compile_zephyr %:p:h clean<CR>
+"map <S-f9> :!compile_zephyr %:p:h distclean<CR>
+"map <f12> :!run_checkpatch %:p:h<CR>
+map <f12> :!ctags -R .<CR>
 
 map <C-Left> :bn<CR>
 map <C-Right> :bp<CR>
