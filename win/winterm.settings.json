@@ -183,6 +183,7 @@
                 "acrylicOpacity": 1.0,
                 "bellStyle": "none",
                 "colorScheme": "Nord",
+                "fontFace": "Cascadia Code",
                 "fontSize": 13,
                 "guid": "{2c4de342-38b7-51cf-b940-2309a097f518}",
                 "hidden": false,
@@ -196,6 +197,7 @@
                 "bellStyle": "none",
                 "colorScheme": "Nord",
                 "commandline": "wsl -d ubuntu -u root",
+                "fontFace": "Cascadia Code",
                 "fontSize": 13,
                 "hidden": false,
                 "icon": "ms-appx:///ProfileIcons/{9acb9455-ca41-5af7-950f-6bca1bc9722f}.png",
@@ -207,6 +209,7 @@
                 "bellStyle": "none",
                 "colorScheme": "Nord",
                 "commandline": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\bin\\bash.exe --init-file sourceme -i",
+                "fontFace": "Cascadia Code",
                 "fontSize": 13,
                 "icon": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\mingw64\\share\\git\\git-for-windows.ico",
                 "name": "Andromeda",
@@ -215,23 +218,44 @@
                 "useAcrylic": true
             },
             {
+                "acrylicOpacity": 1.0,
+                "bellStyle": "none",
+                "colorScheme": "Nord",
+                "commandline": "C:\\Shannon\\_tools\\PortableGit-2.32.0-64-bit\\bin\\bash.exe --init-file sourceme -i",
+                "fontFace": "Cascadia Code",
+                "fontSize": 13,
+                "icon": "C:\\Shannon\\_tools\\PortableGit-2.32.0-64-bit\\mingw64\\share\\git\\git-for-windows.ico",
+                "name": "Andromeda [TEST]",
+                "startingDirectory": "C:\\SVN\\wp_%USERNAME%\\andromeda",
+                "tabTitle": "Andromeda",
+                "useAcrylic": true
+            },
+            {
+                "colorScheme": "Nord",
                 "commandline": "powershell.exe",
+                "fontFace": "Cascadia Code",
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
                 "name": "Windows PowerShell"
             },
             {
+                "colorScheme": "Nord",
                 "commandline": "pwsh.exe -command Start-Process -Verb RunAs \"shell:appsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App\"",
+                "fontFace": "Cascadia Code",
                 "hidden": false,
                 "name": "PowerShell(admin)"
             },
             {
+                "colorScheme": "Nord",
                 "commandline": "cmd.exe",
+                "fontFace": "Cascadia Code",
                 "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
                 "hidden": true,
                 "name": "Invite de commandes"
             },
             {
+                "colorScheme": "Nord",
+                "fontFace": "Cascadia Code",
                 "guid": "{b453ae62-4e3d-5e58-b989-0a998ec441b8}",
                 "hidden": true,
                 "name": "Azure Cloud Shell",
