@@ -99,6 +99,9 @@ noremap <Leader>p "*p
 
 " Remap jump to tag because windows is shitty...
 noremap <C-m> <C-]>
+
+nnoremap <silent> <Leader>+ :exe "resize " . (winheight(0) * 3/2)<CR>
+nnoremap <silent> <Leader>- :exe "resize " . (winheight(0) * 2/3)<CR>
 " #############################################################################
 " Plugins
 " #############################################################################
