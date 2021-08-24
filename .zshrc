@@ -165,7 +165,8 @@ WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb
 
 # Aliases
 alias cdt="cd $ANDROMEDA_ROOT"
-alias cdr="cd $ANDROMEDA_ROOT/rom/dev"
+alias cdr="cd $ANDROMEDA_ROOT/rom"
+alias cdbt="cd $ANDROMEDA_ROOT/bt"
 
 #start QM, a graphic design tool for hierarchical state machines
 qm() {
