@@ -20,7 +20,6 @@ set autoread		" Read file on outside change
 set ttimeoutlen=10	" Lower delay on exit insert mode
 set cursorline		" Highlight cursor
 set ttyfast		" Fast scrolling
-set scrolloff=5		" Show lines above and below cursor (when possible)
 set backspace=indent,eol,start " allow backspacing over everything
 set history=8192	" More history
 set tabstop=8
