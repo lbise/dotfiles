@@ -28,15 +28,15 @@
 #if [[ -n "${TICKET}" ]]; then
 #    echo -e "\nJIRA: ${TICKET}" >> $1
 #fi
-
 # Check if Redmine ticket is already set
 [[ -n "$(cat $1 | grep 'Redmine:')" ]] && exit
 # Assumes branch name starts with ticket_branchname
-TICKET=$(basename `git symbolic-ref HEAD` | cut -d_ -f1)
+BRANCH=$(echo `git rev-parse --abbrev-ref HEAD`)
+TICKET=$(echo $BRANCH | cut -d_ -f1)
 # Check it's a number
 RE='^[0-9]+$'
 if ! [[ "$TICKET" =~ $RE ]]; then
-    echo "Branch name doesn't start by a ticket number! Cannot add Redmine ticket reference" >&2
+    echo "Branch $BRANCH doesn't start by a ticket number! Cannot add Redmine ticket reference" >&2
 else
     echo -e "\nRedmine: #${TICKET}" >> $1
 fi
