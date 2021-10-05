@@ -11,7 +11,8 @@
 [core]
 	editor = vim
 	hooksPath = ~/.githooks
-	autocrlf = false
+	filemode = false
+	autcrlf = true
 
 [user]
 	name = Leonard Bise
