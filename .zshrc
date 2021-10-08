@@ -157,13 +157,30 @@ compinit
 # Add .scripts to PATH
 export PATH=$PATH:~/.scripts
 
-# Variables
-ANDROMEDA_ROOT="/mnt/c/SVN/wp_${USER}/andromeda"
+# Start keychain
+#if [ -f $HOME/.ssh/id_rsa-gitlab ]; then
+#	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa-gitlab
+#	source $HOME/.keychain/$HOST-sh
+#fi
+if [ -f $HOME/.ssh/id_rsa ]; then
+	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa
+	source $HOME/.keychain/$HOST-sh
+fi
+
+#### ALIASES ####
+
 MYT="/mnt/t/${USER}"
 DOT="$HOME/gitrepo/dotfiles"
 WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
+alias wslandromeda="source $HOME/andromeda/sourceme_linux"
 
-# Aliases
+#### ANDROMEDA ####
+#source $HOME/andromeda/sourceme_linux
+
+## Variables
+ANDROMEDA_ROOT="/mnt/c/SVN/wp_${USER}/andromeda"
+
+## Aliases
 alias cdt="cd $ANDROMEDA_ROOT"
 alias cdr="cd $ANDROMEDA_ROOT/rom"
 alias cdbt="cd $ANDROMEDA_ROOT/bt"
@@ -181,12 +198,4 @@ qm() {
     fi
 }
 
-# Start keychain
-if [ -f $HOME/.ssh/id_rsa-gitlab ]; then
-	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa-gitlab
-	source $HOME/.keychain/$HOST-sh
-fi
-if [ -f $HOME/.ssh/id_rsa ]; then
-	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa
-	source $HOME/.keychain/$HOST-sh
-fi
+cd $ANDROMEDA_ROOT
