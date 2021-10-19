@@ -181,6 +181,9 @@ alias wslandromeda="source $HOME/andromeda/sourceme_linux"
 ANDROMEDA_ROOT="/mnt/c/SVN/wp_${USER}/andromeda"
 
 ## Aliases
+# FIXME(LeB): Duplicate those for now until andromeda supports Linux properly
+export PATH=$PATH:$ANDROMEDA_ROOT
+alias c="swcmp.py"
 alias cdt="cd $ANDROMEDA_ROOT"
 alias cdr="cd $ANDROMEDA_ROOT/rom"
 alias cdbt="cd $ANDROMEDA_ROOT/bt"
