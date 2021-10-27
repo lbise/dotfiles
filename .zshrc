@@ -167,6 +167,9 @@ if [ -f $HOME/.ssh/id_rsa ]; then
 	source $HOME/.keychain/$HOST-sh
 fi
 
+# Set x server display
+export DISPLAY=:0
+
 #### ALIASES ####
 
 MYT="/mnt/t/${USER}"
