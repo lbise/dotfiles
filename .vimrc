@@ -83,10 +83,12 @@ map <f6> :source ~/.vimsession/lbise.vim<CR>
 "map <f12> :!run_checkpatch %:p:h<CR>
 map <f12> :!ctags -R .<CR>
 
+" Next buffer remapping
 map <C-Left> :bn<CR>
 map <C-Right> :bp<CR>
 map <C-h> :bn<CR>
 map <C-l> :bp<CR>
+nnoremap <C-j> :BD<CR>
 
 " Clear search highlights
 nnoremap <silent> <Leader><Esc> <Esc>:nohlsearch<CR><Esc>
@@ -99,6 +101,7 @@ noremap <Leader>p "*p
 " Remap jump to tag because windows is shitty...
 noremap <C-m> <C-]>
 
+" Resize splits
 nnoremap <silent> <Leader>+ :exe "resize " . (winheight(0) * 3/2)<CR>
 nnoremap <silent> <Leader>- :exe "resize " . (winheight(0) * 2/3)<CR>
 " #############################################################################
