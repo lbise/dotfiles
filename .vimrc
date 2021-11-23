@@ -152,5 +152,7 @@ augroup numbertoggle
   autocmd BufLeave,FocusLost,InsertEnter   * set norelativenumber
 augroup END
 
-" Set C syntax to unity files
+" Use c syntax for unity files
 au BufRead,BufNewFile *.unity set filetype=c
+" Use c syntax for sid files
+au BufRead,BufNewFile *.sid set filetype=sid
