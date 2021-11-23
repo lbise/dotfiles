@@ -1,11 +1,23 @@
 {
     "$schema": "https://aka.ms/terminal-profiles-schema",
-    // Add custom actions and keybindings to this array.
-    // To unbind a key combination from your defaults.json, set the command to "unbound".
-    // To learn more about actions and keybindings, visit https://aka.ms/terminal-keybindings
     "actions": 
     [
-        // Press Ctrl+Shift+F to open the search box
+        {
+            "command": 
+            {
+                "action": "moveFocus",
+                "direction": "right"
+            },
+            "keys": "ctrl+shift+l"
+        },
+        {
+            "command": 
+            {
+                "action": "moveFocus",
+                "direction": "left"
+            },
+            "keys": "ctrl+shift+h"
+        },
         {
             "command": "find",
             "keys": "ctrl+shift+f"
@@ -22,6 +34,26 @@
         {
             "command": 
             {
+                "action": "switchToTab",
+                "index": 0
+            },
+            "keys": "ctrl+shift+1"
+        },
+        {
+            "command": "togglePaneZoom",
+            "keys": "ctrl+shift+r"
+        },
+        {
+            "command": 
+            {
+                "action": "switchToTab",
+                "index": 7
+            },
+            "keys": "ctrl+shift+8"
+        },
+        {
+            "command": 
+            {
                 "action": "splitPane",
                 "split": "horizontal",
                 "splitMode": "duplicate"
@@ -31,16 +63,14 @@
         {
             "command": 
             {
-                "action": "closePane"
+                "action": "switchToTab",
+                "index": 5
             },
-            "keys": "ctrl+shift+q"
+            "keys": "ctrl+shift+6"
         },
         {
-            "command": 
-            {
-                "action": "togglePaneZoom"
-            },
-            "keys": "ctrl+shift+r"
+            "command": "closePane",
+            "keys": "ctrl+shift+q"
         },
         {
             "command": 
@@ -53,18 +83,10 @@
         {
             "command": 
             {
-                "action": "moveFocus",
-                "direction": "left"
+                "action": "newTab",
+                "index": 8
             },
-            "keys": "ctrl+shift+h"
-        },
-        {
-            "command": 
-            {
-                "action": "moveFocus",
-                "direction": "right"
-            },
-            "keys": "ctrl+shift+l"
+            "keys": "ctrl+alt+9"
         },
         {
             "command": 
@@ -110,9 +132,9 @@
             "command": 
             {
                 "action": "switchToTab",
-                "index": 0
+                "index": 3
             },
-            "keys": "ctrl+shift+1"
+            "keys": "ctrl+shift+4"
         },
         {
             "command": 
@@ -126,22 +148,6 @@
             "command": 
             {
                 "action": "switchToTab",
-                "index": 2
-            },
-            "keys": "ctrl+shift+3"
-        },
-        {
-            "command": 
-            {
-                "action": "switchToTab",
-                "index": 3
-            },
-            "keys": "ctrl+shift+4"
-        },
-        {
-            "command": 
-            {
-                "action": "switchToTab",
                 "index": 4
             },
             "keys": "ctrl+shift+5"
@@ -150,9 +156,9 @@
             "command": 
             {
                 "action": "switchToTab",
-                "index": 5
+                "index": 2
             },
-            "keys": "ctrl+shift+6"
+            "keys": "ctrl+shift+3"
         },
         {
             "command": 
@@ -165,10 +171,18 @@
         {
             "command": 
             {
-                "action": "switchToTab",
-                "index": 7
+                "action": "newTab",
+                "index": 2
             },
-            "keys": "ctrl+shift+8"
+            "keys": "ctrl+alt+3"
+        },
+        {
+            "command": 
+            {
+                "action": "newTab",
+                "index": 3
+            },
+            "keys": "ctrl+alt+4"
         },
         {
             "command": 
@@ -193,22 +207,6 @@
                 "index": 1
             },
             "keys": "ctrl+alt+2"
-        },
-        {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 2
-            },
-            "keys": "ctrl+alt+3"
-        },
-        {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 3
-            },
-            "keys": "ctrl+alt+4"
         },
         {
             "command": 
@@ -241,19 +239,12 @@
                 "index": 7
             },
             "keys": "ctrl+alt+8"
-        },
-        {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 8
-            },
-            "keys": "ctrl+alt+9"
         }
     ],
     "copyFormatting": "none",
     "copyOnSelect": false,
     "defaultProfile": "{2c4de342-38b7-51cf-b940-2309a097f518}",
+    "focusFollowMouse": true,
     "largePasteWarning": false,
     "multiLinePasteWarning": false,
     "profiles": 
@@ -263,27 +254,46 @@
         [
             {
                 "acrylicOpacity": 1.0,
+                "backgroundImage": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
+                "backgroundImageAlignment": "bottomRight",
+                "backgroundImageOpacity": 0.40000000000000002,
+                "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "fontFace": "Cascadia Code",
-                "fontSize": 13,
+                "font": 
+                {
+                    "face": "Cascadia Code",
+                    "size": 13
+                },
                 "guid": "{2c4de342-38b7-51cf-b940-2309a097f518}",
                 "hidden": false,
+                "icon": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "name": "Ubuntu",
+                "padding": "4",
+                "scrollbarState": "hidden",
                 "source": "Windows.Terminal.Wsl",
                 "suppressApplicationTitle": false,
                 "useAcrylic": true
             },
             {
                 "acrylicOpacity": 1.0,
+                "backgroundImage": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
+                "backgroundImageAlignment": "bottomRight",
+                "backgroundImageOpacity": 0.40000000000000002,
+                "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
                 "commandline": "wsl -d ubuntu -u root",
-                "fontFace": "Cascadia Code",
-                "fontSize": 13,
+                "font": 
+                {
+                    "face": "Cascadia Code",
+                    "size": 13
+                },
                 "hidden": false,
-                "icon": "ms-appx:///ProfileIcons/{9acb9455-ca41-5af7-950f-6bca1bc9722f}.png",
+                "icon": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "name": "Ubuntu root",
+                "padding": "4",
+                "scrollbarState": "hidden",
                 "useAcrylic": true
             },
             {
@@ -291,8 +301,11 @@
                 "bellStyle": "none",
                 "colorScheme": "Nord",
                 "commandline": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\bin\\bash.exe --init-file sourceme -i",
-                "fontFace": "Cascadia Code",
-                "fontSize": 13,
+                "font": 
+                {
+                    "face": "Cascadia Code",
+                    "size": 13
+                },
                 "icon": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\mingw64\\share\\git\\git-for-windows.ico",
                 "name": "Andromeda",
                 "startingDirectory": "C:\\SVN\\wp_%USERNAME%\\andromeda",
@@ -304,8 +317,11 @@
                 "bellStyle": "none",
                 "colorScheme": "Nord",
                 "commandline": "C:\\Shannon\\_tools\\PortableGit-2.32.0-64-bit\\bin\\bash.exe --init-file sourceme -i",
-                "fontFace": "Cascadia Code",
-                "fontSize": 13,
+                "font": 
+                {
+                    "face": "Cascadia Code",
+                    "size": 13
+                },
                 "icon": "C:\\Shannon\\_tools\\PortableGit-2.32.0-64-bit\\mingw64\\share\\git\\git-for-windows.ico",
                 "name": "Andromeda [TEST]",
                 "startingDirectory": "C:\\SVN\\wp_%USERNAME%\\andromeda",
@@ -315,7 +331,10 @@
             {
                 "colorScheme": "Nord",
                 "commandline": "powershell.exe",
-                "fontFace": "Cascadia Code",
+                "font": 
+                {
+                    "face": "Cascadia Code"
+                },
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
                 "name": "Windows PowerShell"
@@ -323,21 +342,30 @@
             {
                 "colorScheme": "Nord",
                 "commandline": "pwsh.exe -command Start-Process -Verb RunAs \"shell:appsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App\"",
-                "fontFace": "Cascadia Code",
+                "font": 
+                {
+                    "face": "Cascadia Code"
+                },
                 "hidden": false,
                 "name": "PowerShell(admin)"
             },
             {
                 "colorScheme": "Nord",
                 "commandline": "cmd.exe",
-                "fontFace": "Cascadia Code",
+                "font": 
+                {
+                    "face": "Cascadia Code"
+                },
                 "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
                 "hidden": true,
                 "name": "Invite de commandes"
             },
             {
                 "colorScheme": "Nord",
-                "fontFace": "Cascadia Code",
+                "font": 
+                {
+                    "face": "Cascadia Code"
+                },
                 "guid": "{b453ae62-4e3d-5e58-b989-0a998ec441b8}",
                 "hidden": true,
                 "name": "Azure Cloud Shell",
@@ -584,6 +612,7 @@
             "yellow": "#808000"
         }
     ],
-    "theme": "system",
+    "theme": "dark",
+    "trimBlockSelection": true,
     "wordDelimiters": " ()\"':,;<>~!@#$%^&*|+=[]{}~?\u2502"
 }
