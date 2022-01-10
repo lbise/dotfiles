@@ -21,10 +21,12 @@ fi
 echo "OS detected: $OS"
 case "$OS" in
         "Ubuntu")
-                INSTALLER="apt-get install "
+                INSTALLER="apt install "
+		DO_UPDATE="apt update"
                 ;;
 	"Arch Linux")
                 INSTALLER="pacman -S --needed "
+		DO_UPDATE="pacman -Syy"
 		;;
 	*)
 		echo "Unsupported OS: $OS"
@@ -44,6 +46,7 @@ PKGS="$PKGS fzf"
 PKGS="$PKGS rxvt-unicode"
 PKGS="$PKGS keychain"
 
+sudo $DO_UPDATE
 sudo $INSTALLER $PKGS
 
 ########## Shell
