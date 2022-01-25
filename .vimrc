@@ -156,3 +156,6 @@ augroup END
 au BufRead,BufNewFile *.unity set filetype=c
 " Use c syntax for sid files
 au BufRead,BufNewFile *.sid set filetype=sid
+
+let g:colorizer_auto_filetype='css,html,log'
+let g:colorizer_auto_color = 1
