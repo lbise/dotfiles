@@ -34,10 +34,11 @@ set splitbelow		" When splitting open window below
 set laststatus=2
 set noshowmode		" Hide the default mode text
 set incsearch		" Display search results as search string is typed
-set ruler		" Show the line and column number of the cursor position
+set ruler		    " Show the line and column number of the cursor position
 set wildmode=longest:full,full " tab completion for files/bufferss
 set wildmenu		" Command line completion shows menu
 set display+=lastline	" Display as much as possible of the last line in a window
+set expandtab		" Convert tabs to space
 
 if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
