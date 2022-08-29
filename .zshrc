@@ -175,33 +175,4 @@ export DISPLAY=:0
 MYT="/mnt/t/${USER}"
 DOT="$HOME/gitrepo/dotfiles"
 WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
-alias wslandromeda="source $HOME/andromeda/sourceme_linux"
-
-#### ANDROMEDA ####
-#source $HOME/andromeda/sourceme_linux
-
-## Variables
-ANDROMEDA_ROOT="/mnt/c/SVN/wp_${USER}/andromeda"
-
-## Aliases
-# FIXME(LeB): Duplicate those for now until andromeda supports Linux properly
-export PATH=$PATH:$ANDROMEDA_ROOT
-alias c="swcmp.py"
-alias cdt="cd $ANDROMEDA_ROOT"
-alias cdr="cd $ANDROMEDA_ROOT/rom"
-alias cdbt="cd $ANDROMEDA_ROOT/bt"
-
-#start QM, a graphic design tool for hierarchical state machines
-qm() {
-    MYPATH1=$ANDROMEDA_ROOT/_build/qm_4.5.1-win32/{app}/bin/
-    MYPATH2=$ANDROMEDA_ROOT/_build/qm_4.0.1-win32/{app}/bin/
-    if [ -d "$MYPATH1" ]; then
-        $MYPATH1/qm.exe &
-    else
-        if [ -d "$MYPATH2" ]; then
-            $MYPATH2/qm.exe &
-        fi
-    fi
-}
-
-cd $ANDROMEDA_ROOT
+alias andro="cd $HOME/andromeda; source sourceme"
