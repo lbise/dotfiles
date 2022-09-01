@@ -169,6 +169,8 @@ fi
 
 # Set x server display
 export DISPLAY=:0
+# Prompt for passphrase
+export GPG_TTY=$(tty)
 
 #### ALIASES ####
 
@@ -176,3 +178,4 @@ MYT="/mnt/t/${USER}"
 DOT="$HOME/gitrepo/dotfiles"
 WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
 alias andro="cd $HOME/andromeda; source sourceme"
+alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda"
