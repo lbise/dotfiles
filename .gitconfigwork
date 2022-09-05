@@ -17,6 +17,7 @@
 [user]
 	name = Leonard Bise
 	email = leonard.bise@sonova.com
+	signingkey = 74C8AEB4E19420A7
 
 [diff]
 	tool = kdiff3
@@ -97,3 +98,5 @@
 	hide-dirty = 1
 [credential]
 	helper = /mnt/c/Program\\ Files/Git/mingw64/libexec/git-core/git-credential-manager.exe
+[commit]
+	gpgsign = true
