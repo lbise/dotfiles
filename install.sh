@@ -80,30 +80,50 @@ function install_zsh() {
     fi
 }
 
-function install_ssh_keys_sonova() {
+function install_keys_sonova() {
     echo "-------------------------------------------------------------------------"
     echo "Installing SSH keys..."
-    KEY_NAME="id_ed25519_git_sonova"
-    KEY_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova/.ssh"
-    KEY_PRIV="$KEY_PATH/$KEY_NAME"
-    KEY_PUB="$KEY_PATH/$KEY_NAME.pub"
+    ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
+    SSH_NAME="id_ed25519_git_sonova"
+    SSH_PATH="$ONEDRIVE_PATH/.ssh"
+    SSH_PRIV="$SSH_PATH/$SSH_NAME"
+    SSH_PUB="$SSH_PATH/$SSH_NAME.pub"
+    PGP_PATH="$ONEDRIVE_PATH/.gnupg"
+    PGP_PRIV_NAME="sonova_private.pgp"
+    PGP_PUB_NAME="sonova_public.pgp"
+    PGP_PRIV="$PGP_PATH/$PGP_PRIV_NAME"
+    PGP_PUB="$PGP_PATH/$PGP_PUB_NAME"
 
     if [[ ! -d ~/.ssh ]]; then
 		$MKDIR ~/.ssh
         $CHMOD 700 ~/.ssh
     fi
 
-    if [[ ! -f ~/.ssh/$KEY_NAME ]]; then
-	    $CP "$KEY_PRIV" ~/.ssh
-	    $CHMOD 600 ~/.ssh/$KEY_NAME
-	    $CP "$KEY_PUB" ~/.ssh
-	    $CHMOD 644 ~/.ssh/$KEY_NAME.pub
+    if [ ! -f ~/.ssh/$SSH_NAME ] || [ ! -f ~/.ssh/$SSH_NAME.pub ]; then
+	    $CP "$SSH_PRIV" ~/.ssh
+	    $CHMOD 600 ~/.ssh/$SSH_NAME
+	    $CP "$SSH_PUB" ~/.ssh
+	    $CHMOD 644 ~/.ssh/$SSH_NAME.pub
+    fi
+
+    if [[ ! -d ~/.gnupg ]]; then
+		$MKDIR ~/.gnupg
+        $CHMOD 700 ~/.gnupg
+    fi
+
+    if [ ! -f ~/.gnupg/$PGP_PRIV_NAME ] || [ ! -f ~/.ssh/$PGP_PUB_NAME ]; then
+        # For pinentry configuration (passphrase enter in command line)
+        $CP "$PGP_PATH/gpg.conf" ~/.gnupg
+	    $CP "$PGP_PRIV" ~/.gnupg
+	    $CHMOD 600 ~/.gnupg/$PGP_PRIV_NAME
+	    $CP "$PGP_PUB" ~/.gnupg
+	    $CHMOD 644 ~/.gnupg/$PGP_PUB_NAME
     fi
 }
 
 function install_work() {
     echo "Work specific install..."
-    install_ssh_keys_sonova
+    install_keys_sonova
 }
 
 function install_for_wsl() {
