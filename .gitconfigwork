@@ -96,4 +96,4 @@
 	# Hides git status dirty symbol which might be very slow on some repo
 	hide-dirty = 1
 [credential]
-	helper = /mnt/c/Program\\ Files/Git/mingw64/libexec/git-core/git-credential-manager.exe
+	helper = /mnt/c/Shannon/_tools/PortableGit-2.25.0-64-bit/mingw64/libexec/git-core/git-credential-manager.exe
