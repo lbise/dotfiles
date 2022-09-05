@@ -75,11 +75,15 @@ POWERLEVEL9K_MODE='nerdfont-complete'
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-#  git Slows down a lot when using WSL
+  git # Slows down a lot when using WSL
   colorize
   colored-man-pages
   fzf
+  ssh-agent
 )
+
+# !! MUST BE BEFORE SOURCE !!
+zstyle :omz:plugins:ssh-agent identities id_ed25519_git_sonova
 
 source $ZSH/oh-my-zsh.sh
 
@@ -113,29 +117,30 @@ export SSH_KEY_PATH="~/.ssh/rsa_id"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 #
 # Bindings
-function setkeybind {
-	if [ "${key[$1]}" != "" ]; then
-		bindkey "${key[$1]}" $2
-	else
-		echo "No key code for $1"
-	fi
-}
-
-if [ -f "$HOME/.zkbd/$TERM-:0" ]; then
-	source $HOME/.zkbd/$TERM-:0
-	setkeybind Home beginning-of-line
-	setkeybind End end-of-line
-	setkeybind Insert overwrite-mode
-	setkeybind Delete delete-char
-	setkeybind Up up-line-or-history
-	setkeybind Down down-line-or-history
-	setkeybind Left backward-char
-	setkeybind Right forward-char
-	setkeybind PageUp history-beginning-search-backward
-	setkeybind PageDown history-beginning-search-forward
-else
-	echo "zkbd file missing for $TERM"
-fi
+# FIXME: Not used any more
+#function setkeybind {
+#	if [ "${key[$1]}" != "" ]; then
+#		bindkey "${key[$1]}" $2
+#	else
+#		echo "No key code for $1"
+#	fi
+#}
+#
+#if [ -f "$HOME/.zkbd/$TERM-:0" ]; then
+#	source $HOME/.zkbd/$TERM-:0
+#	setkeybind Home beginning-of-line
+#	setkeybind End end-of-line
+#	setkeybind Insert overwrite-mode
+#	setkeybind Delete delete-char
+#	setkeybind Up up-line-or-history
+#	setkeybind Down down-line-or-history
+#	setkeybind Left backward-char
+#	setkeybind Right forward-char
+#	setkeybind PageUp history-beginning-search-backward
+#	setkeybind PageDown history-beginning-search-forward
+#else
+#	echo "zkbd file missing for $TERM"
+#fi
 
 setopt notify    # immediate job notifications
 
