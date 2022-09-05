@@ -106,6 +106,17 @@ function install_work() {
     install_ssh_keys_sonova
 }
 
+function install_for_wsl() {
+    echo "-------------------------------------------------------------------------"
+    echo "WSL specific install..."
+
+    echo "Copying Windows Terminal config..."
+    WINHOME=$(wslpath $(cmd.exe /C "echo %USERPROFILE%") | sed 's/\r$//')
+    WINTERMCFG="${WINHOME}/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json"
+    $RM_RF $WINTERMCFG
+    $CP $DIR/win/winterm.settings.json $WINTERMCFG
+}
+
 ################################################################################
 # Ubuntu
 ################################################################################
@@ -229,6 +240,10 @@ esac
 
 if [ "$WORK_INSTALL" = 1 ]; then
     install_work
+fi
+
+if grep -qi microsoft /proc/version; then
+    install_for_wsl
 fi
 
 echo "#########################################################################"
