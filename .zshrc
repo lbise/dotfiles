@@ -183,7 +183,7 @@ MYT="/mnt/t/${USER}"
 DOT="$HOME/gitrepo/dotfiles"
 WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
 alias andro="cd $HOME/andromeda; source sourceme"
-alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda"
+alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
 
 cd $HOME/andromeda
 source sourceme
