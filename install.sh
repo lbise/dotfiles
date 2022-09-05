@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Install dotfiles and setup system
 
+set -e
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
 ################################################################################
@@ -14,6 +16,9 @@ SH_C="sh -c"
 CHSH_ZSH="chsh -s $(which zsh)"
 X_ON="set -x"
 X_OFF="set +x"
+CHMOD="chmod"
+CP="cp"
+MKDIR="mkdir"
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
@@ -21,6 +26,7 @@ function print_usage() {
         where:
             -h|--help: Print this help
             -l|--linkonly: Only perform symlink setup. Do not install packages.
+            -w|--work: Perform installation for work.
             -t|--test: Do not perfrom any operation just print"
     echo "$USAGE"
 }
@@ -45,7 +51,11 @@ function ln_symlinks() {
     $X_ON
     $LN_SF $DIR/.vimrc ~/.vimrc
     $LN_SF $DIR/vim ~/.vim
-    $LN_SF $DIR/.gitconfig ~/.gitconfig
+    if [ "$WORK_INSTALL" = 1 ]; then
+        $LN_SF $DIR/.gitconfigwork ~/.gitconfig
+    else
+        $LN_SF $DIR/.gitconfig ~/.gitconfig
+    fi
     $LN_SF $DIR/githooks ~/.githooks
     $LN_SF $DIR/.zshrc ~/.zshrc
     $LN_SF $DIR/.ctags ~/.ctags
@@ -70,6 +80,32 @@ function install_zsh() {
     fi
 }
 
+function install_ssh_keys_sonova() {
+    echo "-------------------------------------------------------------------------"
+    echo "Installing SSH keys..."
+    KEY_NAME="id_ed25519_git_sonova"
+    KEY_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova/.ssh"
+    KEY_PRIV="$KEY_PATH/$KEY_NAME"
+    KEY_PUB="$KEY_PATH/$KEY_NAME.pub"
+
+    if [[ ! -d ~/.ssh ]]; then
+		$MKDIR ~/.ssh
+        $CHMOD 700 ~/.ssh
+    fi
+
+    if [[ ! -f ~/.ssh/$KEY_NAME ]]; then
+	    $CP "$KEY_PRIV" ~/.ssh
+	    $CHMOD 600 ~/.ssh/$KEY_NAME
+	    $CP "$KEY_PUB" ~/.ssh
+	    $CHMOD 644 ~/.ssh/$KEY_NAME.pub
+    fi
+}
+
+function install_work() {
+    echo "Work specific install..."
+    install_ssh_keys_sonova
+}
+
 ################################################################################
 # Ubuntu
 ################################################################################
@@ -88,6 +124,10 @@ function install_ubuntu_20_04() {
 
 function install_ubuntu_common() {
     PKGS="zsh fzf"
+    if [ "$WORK_INSTALL" = 1 ]; then
+        PKGS="$PKGS git-lfs"
+    fi
+
     $UBUNTU_UPDATE
     $UBUNTU_INSTALL $PKGS
 }
@@ -126,16 +166,20 @@ fi
 
 TEST_MODE=0
 LINK_ONLY=0
+WORK_INSTALL=0
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         -t|--test)
-        echo "Test mode enabled!"
         TEST_MODE=1
         shift # get next arg
         ;;
         -l|--linkonly)
         LINK_ONLY=1
+        shift # get next arg
+        ;;
+        -w|--work)
+        WORK_INSTALL=1
         shift # get next arg
         ;;
         -h|--help)
@@ -148,7 +192,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ $TEST_MODE = 1 ]; then
+if [ $TEST_MODE = 1 ] || [ $LINK_ONLY = 1 ]; then
     RM_RF="echo test: ${RM_RF}"
     LN_SF="echo test: ${LN_SF}"
     GIT_SUBMODULE_INIT="echo test: ${GIT_SUBMODULE_INIT}"
@@ -158,12 +202,14 @@ if [ $TEST_MODE = 1 ]; then
     CHSH_ZSH="echo test: ${CHSH_ZSH}"
     X_ON=""
     X_OFF=""
-elif [ $LINK_ONLY = 1 ]; then
-    GIT_SUBMODULE_INIT="echo skip: ${GIT_SUBMODULE_INIT}"
-    UBUNTU_UPDATE="echo skip: ${UBUNTU_UPDATE}"
-    UBUNTU_INSTALL="echo skip: ${UBUNTU_INSTALL}"
-    ZSH_INSTALL="echo test: ${ZSH_INSTALL}"
-    CHSH_ZSH="echo test: ${CHSH_ZSH}"
+    CHMOD="echo test: ${CHMOD}"
+    CP="echo test: ${CP}"
+    MKDIR="echo test: ${MKDIR}"
+fi
+
+if [ $LINK_ONLY = 1 ]; then
+    RM_RF="sudo rm -rf"
+    LN_SF="ln -sf"
 fi
 
 # TODO: Drop submodules, just copy stuff
@@ -180,6 +226,10 @@ case "$OS" in
         exit 1
         ;;
 esac
+
+if [ "$WORK_INSTALL" = 1 ]; then
+    install_work
+fi
 
 echo "#########################################################################"
 echo "Installation completed"
