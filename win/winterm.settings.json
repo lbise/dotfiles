@@ -315,7 +315,7 @@
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "commandline": "wsl -d ubuntu-20.04",
+                "commandline": "wsl",
                 "font": 
                 {
                     "face": "Cascadia Code",
@@ -337,7 +337,7 @@
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "commandline": "wsl -d ubuntu-20.04 -u root",
+                "commandline": "wsl -u root",
                 "font": 
                 {
                     "face": "Cascadia Code",
