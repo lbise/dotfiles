@@ -75,7 +75,7 @@ POWERLEVEL9K_MODE='nerdfont-complete'
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-  git # Slows down a lot when using WSL
+  #git # Slows down a lot when using WSL
   colorize
   colored-man-pages
   fzf
@@ -184,3 +184,6 @@ DOT="$HOME/gitrepo/dotfiles"
 WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
 alias andro="cd $HOME/andromeda; source sourceme"
 alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda"
+
+cd $HOME/andromeda
+source sourceme
