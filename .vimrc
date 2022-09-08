@@ -160,3 +160,6 @@ au BufRead,BufNewFile *.sid set filetype=sid
 
 let g:colorizer_auto_filetype='css,html,log'
 let g:colorizer_auto_color = 1
+
+" Create ~/.vimsession if needed
+silent !mkdir ~/.vimsession > /dev/null 2>&1
