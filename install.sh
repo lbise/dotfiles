@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Install dotfiles and setup system
-
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
@@ -20,6 +19,8 @@ X_OFF="set +x"
 CHMOD="chmod"
 CP="cp"
 MKDIR="mkdir"
+ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
+KEYS_DIR=$ONEDRIVE_PATH
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
@@ -28,6 +29,7 @@ function print_usage() {
             -h|--help: Print this help
             -l|--linkonly: Only perform symlink setup. Do not install packages.
             -w|--work: Perform installation for work.
+            -k|--keys: Folder to find keys to install
             -t|--test: Do not perfrom any operation just print"
     echo "$USAGE"
 }
@@ -83,48 +85,66 @@ function install_zsh() {
 
 function install_keys_sonova() {
     echo "-------------------------------------------------------------------------"
-    echo "Installing SSH keys..."
+    echo "Installing keys..."
 
-    if [ "$WSL" = 0 ]; then
-        echo "Cannot install keys automatically on native Ubuntu!"
+    SSH_NAME="id_ed25519_git_sonova"
+    SSH_SRC_PATH="$KEYS_DIR"
+    SSH_DST_PATH="$HOME/.ssh"
+    SSH_SRC_PRIV="$SSH_SRC_PATH/$SSH_NAME"
+    SSH_SRC_PUB="$SSH_SRC_PATH/$SSH_NAME.pub"
+    SSH_DST_PRIV="$SSH_DST_PATH/$SSH_NAME"
+    SSH_DST_PUB="$SSH_DST_PATH/$SSH_NAME.pub"
+
+    PGP_SRC_PATH="$KEYS_DIR"
+    PGP_DST_PATH="$HOME/.gnupg"
+    PGP_PRIV_NAME="sonova_private.pgp"
+    PGP_PUB_NAME="sonova_public.pgp"
+    PGP_CONF_NAME="gpg.conf"
+    PGP_SRC_PRIV="$PGP_SRC_PATH/$PGP_PRIV_NAME"
+    PGP_SRC_PUB="$PGP_SRC_PATH/$PGP_PUB_NAME"
+    PGP_SRC_CONF="$DIR/pgp/$PGP_CONF_NAME"
+    PGP_DST_PRIV="$PGP_DST_PATH/$PGP_PRIV_NAME"
+    PGP_DST_PUB="$PGP_DST_PATH/$PGP_PUB_NAME"
+    PGP_DST_CONF="$PGP_DST_PATH/$PGP_CONF_NAME"
+
+    if [ ! -f "$SSH_SRC_PRIV" ] || [ ! -f "$SSH_SRC_PUB" ]; then
+        echo "Cannot find SSH keys: $SSH_SRC_PRIV $SSH_SRC_PUB. Skipping..."
         return
     fi
 
-    ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
-    SSH_NAME="id_ed25519_git_sonova"
-    SSH_PATH="$ONEDRIVE_PATH/.ssh"
-    SSH_PRIV="$SSH_PATH/$SSH_NAME"
-    SSH_PUB="$SSH_PATH/$SSH_NAME.pub"
-    PGP_PATH="$ONEDRIVE_PATH/.gnupg"
-    PGP_PRIV_NAME="sonova_private.pgp"
-    PGP_PUB_NAME="sonova_public.pgp"
-    PGP_PRIV="$PGP_PATH/$PGP_PRIV_NAME"
-    PGP_PUB="$PGP_PATH/$PGP_PUB_NAME"
+    echo "Installing SSH keys: $SSH_SRC_PRIV -> $SSH_DST_PRIV; $SSH_SRC_PUB -> $SSH_DST_PUB"
 
-    if [[ ! -d ~/.ssh ]]; then
-		$MKDIR ~/.ssh
-        $CHMOD 700 ~/.ssh
+    if [[ ! -d "$SSH_DST_PATH" ]]; then
+		$MKDIR "$SSH_DST_PATH"
+        $CHMOD 700 "$SSH_DST_PATH"
     fi
 
-    if [ ! -f ~/.ssh/$SSH_NAME ] || [ ! -f ~/.ssh/$SSH_NAME.pub ]; then
-	    $CP "$SSH_PRIV" ~/.ssh
-	    $CHMOD 600 ~/.ssh/$SSH_NAME
-	    $CP "$SSH_PUB" ~/.ssh
-	    $CHMOD 644 ~/.ssh/$SSH_NAME.pub
+    if [ ! -f "$SSH_DST_PRIV" ] || [ ! -f "$SSH_DST_PUB" ]; then
+	    $CP "$SSH_SRC_PRIV" "$SSH_DST_PATH"
+	    $CHMOD 600 "$SSH_DST_PRIV"
+	    $CP "$SSH_SRC_PUB" "$SSH_DST_PATH"
+	    $CHMOD 644 "SSH_DST_PUB"
     fi
 
-    if [[ ! -d ~/.gnupg ]]; then
-		$MKDIR ~/.gnupg
-        $CHMOD 700 ~/.gnupg
+    if [ ! -f "$PGP_SRC_PRIV" ] || [ ! -f "$PGP_SRC_PUB" ]; then
+        echo "Cannot find PGP keys: $PGP_SRC_PRIV $PGP_SRC_PUB. Skipping..."
+        return
     fi
 
-    if [ ! -f ~/.gnupg/$PGP_PRIV_NAME ] || [ ! -f ~/.ssh/$PGP_PUB_NAME ]; then
+    echo "Installing PGP keys: $PGP_SRC_PRIV -> $PGP_DST_PRIV; $PGP_SRC_PUB -> $PGP_DST_PUB"
+
+    if [[ ! -d "$PGP_DST_PATH" ]]; then
+		$MKDIR "$PGP_DST_PATH"
+        $CHMOD 700 "$PGP_DST_PATH"
+    fi
+
+    if [ ! -f "$PGP_DST_PRIV" ] || [ ! -f "$PGP_DST_PRIV" ] || [ ! -f "$PGP_DST_CONF" ]; then
         # For pinentry configuration (passphrase enter in command line)
-        $CP "$PGP_PATH/gpg.conf" ~/.gnupg
-	    $CP "$PGP_PRIV" ~/.gnupg
-	    $CHMOD 600 ~/.gnupg/$PGP_PRIV_NAME
-	    $CP "$PGP_PUB" ~/.gnupg
-	    $CHMOD 644 ~/.gnupg/$PGP_PUB_NAME
+        $CP "$PGP_SRC_CONF" "$PGP_DST_CONF"
+	    $CP "$PGP_SRC_PRIV" "$PGP_DST_PRIV"
+	    $CHMOD 600 "$PGP_DST_PRIV"
+	    $CP "$PGP_SRC_PUB" "$PGP_DST_PUB"
+	    $CHMOD 644 "$PGP_DST_PUB"
     fi
 }
 
@@ -224,6 +244,12 @@ while [[ $# -gt 0 ]]; do
         ;;
         -w|--work)
         WORK_INSTALL=1
+        shift # get next arg
+        ;;
+
+        -k|--keys)
+        KEYS_DIR=$2
+        shift # get next arg
         shift # get next arg
         ;;
         -h|--help)
