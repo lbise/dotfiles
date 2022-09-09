@@ -43,6 +43,7 @@ function rm_symlinks() {
     $RM_RF ~/.gitconfig
     $RM_RF ~/.githooks
     $RM_RF ~/.zshrc
+    $RM_RF ~/.bashrc
     $RM_RF ~/.ctags
     $RM_RF ~/.scripts
     $X_OFF
@@ -61,6 +62,7 @@ function ln_symlinks() {
     fi
     $LN_SF $DIR/githooks ~/.githooks
     $LN_SF $DIR/.zshrc ~/.zshrc
+    $LN_SF $DIR/.bashrc ~/.bashrc
     $LN_SF $DIR/.ctags ~/.ctags
     $LN_SF $DIR/scripts ~/.scripts
     $X_OFF
@@ -75,6 +77,11 @@ function install_zsh() {
     echo "Installing zsh..."
     if [ -z "$ZSH" ]; then
         $ZSH_INSTALL
+    fi
+
+    if [ "$WSL" = 0 ] && [ "$WORK_INSTALL" = 1 ]; then
+        echo "Skipping changing default shell as we cannot do it ..."
+        exit
     fi
 
     # Change default shell to zsh
