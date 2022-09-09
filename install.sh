@@ -8,12 +8,13 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 ################################################################################
 # Common
 ################################################################################
+
 GIT_SUBMODULE_INIT="git submodule update --init --recursive"
 RM_RF="sudo rm -rf"
 LN_SF="ln -sf"
 ZSH_INSTALL="install_ohmyzsh"
 SH_C="sh -c"
-CHSH_ZSH="chsh -s $(which zsh)"
+CHSH_S="chsh -s"
 X_ON="set -x"
 X_OFF="set +x"
 CHMOD="chmod"
@@ -76,13 +77,19 @@ function install_zsh() {
 
     # Change default shell to zsh
     if [ "$SHELL" != "$(which zsh)" ]; then
-        $CHSH_ZSH
+        $CHSH_S $(which zsh)
     fi
 }
 
 function install_keys_sonova() {
     echo "-------------------------------------------------------------------------"
     echo "Installing SSH keys..."
+
+    if [ "$WSL" = 0 ]; then
+        echo "Cannot install keys automatically on native Ubuntu!"
+        return
+    fi
+
     ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
     SSH_NAME="id_ed25519_git_sonova"
     SSH_PATH="$ONEDRIVE_PATH/.ssh"
@@ -195,6 +202,12 @@ else
     OS_VER=$(lsb_release -r | cut -f2)
 fi
 
+if grep -qi microsoft /proc/version; then
+    WSL=1
+else
+    WSL=0
+fi
+
 TEST_MODE=0
 LINK_ONLY=0
 WORK_INSTALL=0
@@ -262,7 +275,7 @@ if [ "$WORK_INSTALL" = 1 ]; then
     install_work
 fi
 
-if grep -qi microsoft /proc/version; then
+if [ "$WSL" = 1 ]; then
     install_for_wsl
 fi
 
