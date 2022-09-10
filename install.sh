@@ -8,7 +8,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 # Common
 ################################################################################
 
-GIT_SUBMODULE_INIT="git submodule update --init --recursive"
 RM_RF="sudo rm -rf"
 LN_SF="ln -sf"
 ZSH_INSTALL="install_ohmyzsh"
@@ -198,6 +197,7 @@ function install_ubuntu_common() {
 }
 
 function install_ubuntu() {
+    OS_VER=$VERSION_ID
     echo "Installing for Ubuntu-${OS_VER}..."
 
     install_ubuntu_common
@@ -206,6 +206,20 @@ function install_ubuntu() {
     elif [ "$OS_VER" = "22.04" ]; then
         install_ubuntu_22_04
     fi
+
+    install_zsh
+
+    rm_symlinks
+    ln_symlinks
+}
+################################################################################
+# MacOs
+################################################################################
+MACOS_UPDATE="sudo apt update"
+MACOS_INSTALL="sudo apt install -y "
+
+function install_macos() {
+    echo "Installing for MacOs..."
 
     install_zsh
 
@@ -222,17 +236,8 @@ echo "#########################################################################"
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$NAME
-    OS_VER=$VERSION_ID
 else
-    # Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
     OS=$(uname -s)
-    OS_VER=$(lsb_release -r | cut -f2)
-fi
-
-if grep -qi microsoft /proc/version; then
-    WSL=1
-else
-    WSL=0
 fi
 
 TEST_MODE=0
@@ -272,7 +277,6 @@ done
 if [ $TEST_MODE = 1 ] || [ $LINK_ONLY = 1 ]; then
     RM_RF="echo test: ${RM_RF}"
     LN_SF="echo test: ${LN_SF}"
-    GIT_SUBMODULE_INIT="echo test: ${GIT_SUBMODULE_INIT}"
     UBUNTU_UPDATE="echo test: ${UBUNTU_UPDATE}"
     UBUNTU_INSTALL="echo test: ${UBUNTU_INSTALL}"
     ZSH_INSTALL="echo test: ${ZSH_INSTALL}"
@@ -289,15 +293,21 @@ if [ $LINK_ONLY = 1 ]; then
     LN_SF="ln -sf"
 fi
 
-# TODO: Drop submodules, just copy stuff
-echo "Initializing git submodules:"
-$GIT_SUBMODULE_INIT
-echo "-------------------------------------------------------------------------"
+# Detect WSL
+WSL=0
+if [[ "$OS" == "Ubuntu" ]]; then
+    if grep -qi microsoft /proc/version; then
+        WSL=1
+    fi
+fi
 
 case "$OS" in
     "Ubuntu")
         install_ubuntu
         ;;
+    "Darwin")
+	install_macos
+	;;
     *)
         echo "Unsupported OS: $OS"
         exit 1
