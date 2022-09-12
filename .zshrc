@@ -173,7 +173,7 @@ if [ -f $HOME/.ssh/id_rsa ]; then
 fi
 
 # Set x server display
-export DISPLAY=:0
+export DISPLAY=10.64.65.250:0
 # Prompt for passphrase
 export GPG_TTY=$(tty)
 
