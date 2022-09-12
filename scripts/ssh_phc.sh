@@ -1,6 +1,6 @@
 #!/bin/env bash
 USER="13lbise"
-OPTS=""
+OPTS="-X"
 
 if [ -z "$1" ]; then
     echo "You must provide the machine index!"
