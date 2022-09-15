@@ -11,6 +11,14 @@ if [ -f "$NETRC" ]; then
 	rm -i $NETRC
 fi
 
-echo -e "machine $1\nlogin $2\npassword $3\nprotocol $4" > $NETRC
+NETRCGPG="$HOME/.netrc.gpg"
+DECRYPTED=""
+if [ -f "$NETRCGPG" ]; then
+	echo "$NETRCGPG already exists. Decrypting..."
+	DECRYPTED=$(gpg --decrypt $NETRCGPG)
+	echo -e "$DECRYPTED"
+fi
+
+echo -e "${DECRYPTED}machine $1\nlogin $2\npassword $3\nprotocol $4" > $NETRC
 gpg -e -r $5 ~/.netrc
 rm -i $NETRC
