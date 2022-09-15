@@ -120,18 +120,18 @@ function install_keys_sonova() {
         return
     fi
 
-    echo "Installing SSH keys: $SSH_SRC_PRIV -> $SSH_DST_PRIV; $SSH_SRC_PUB -> $SSH_DST_PUB"
-
     if [[ ! -d "$SSH_DST_PATH" ]]; then
+        echo "Creating $SSH_DST_PATH"
 		$MKDIR "$SSH_DST_PATH"
         $CHMOD 700 "$SSH_DST_PATH"
     fi
 
     if [ ! -f "$SSH_DST_PRIV" ] || [ ! -f "$SSH_DST_PUB" ]; then
+        echo "Installing SSH keys: $SSH_SRC_PRIV -> $SSH_DST_PRIV; $SSH_SRC_PUB -> $SSH_DST_PUB"
 	    $CP "$SSH_SRC_PRIV" "$SSH_DST_PATH"
 	    $CHMOD 600 "$SSH_DST_PRIV"
 	    $CP "$SSH_SRC_PUB" "$SSH_DST_PATH"
-	    $CHMOD 644 "SSH_DST_PUB"
+	    $CHMOD 644 "$SSH_DST_PUB"
     fi
 
     if [ ! -f "$GPG_SRC_PRIV" ] || [ ! -f "$GPG_SRC_PUB" ]; then
@@ -139,16 +139,17 @@ function install_keys_sonova() {
         return
     fi
 
-    echo "Installing GPG keys: $GPG_SRC_PRIV -> $GPG_DST_PRIV; $GPG_SRC_PUB -> $GPG_DST_PUB"
-
     if [[ ! -d "$GPG_DST_PATH" ]]; then
+        echo "Creating $GPG_DST_PATH"
 		$MKDIR "$GPG_DST_PATH"
         $CHMOD 700 "$GPG_DST_PATH"
     fi
 
     if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_CONF" ]; then
+        echo "Installing GPG keys: $GPG_SRC_PRIV -> $GPG_DST_PRIV; $GPG_SRC_PUB -> $GPG_DST_PUB"
         # For pinentry configuration (passphrase enter in command line)
-        $CP "$GPG_SRC_CONF" "$GPG_DST_CONF"
+        $RM_RF "$GPG_DST_CONF"
+        $LN_SF "$GPG_SRC_CONF" "$GPG_DST_CONF"
 	    $CP "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
 	    $CHMOD 600 "$GPG_DST_PRIV"
 	    $CP "$GPG_SRC_PUB" "$GPG_DST_PUB"
