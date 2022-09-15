@@ -1,5 +1,5 @@
 #!/bin/env bash
-KEYS_DIR="/mnt/c/Users/13lbise/OneDrive\ -\ Sonova"
+KEYS_DIR="/mnt/c/Users/13lbise/OneDrive - Sonova"
 MACHINE="ch03ww5027"
 
 scp "${KEYS_DIR}/.gnupg/sonova_public.pgp" 13lbise@${MACHINE}.corp.ads:/home/13lbise
