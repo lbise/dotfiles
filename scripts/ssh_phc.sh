@@ -17,4 +17,4 @@ fi
 MACHINE="${MACHINE}.corp.ads"
 
 echo "Connecting to $MACHINE"
-ssh $USER@$MACHINE $OPTS
+ssh $USER@$MACHINE $OPTS $2
