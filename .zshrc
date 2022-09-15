@@ -173,17 +173,20 @@ if [ -f $HOME/.ssh/id_rsa ]; then
 fi
 
 # Set x server display
-export DISPLAY=10.64.65.250:0
+export DISPLAY=10.64.65.133:0
 # Prompt for passphrase
 export GPG_TTY=$(tty)
 
 #### ALIASES ####
 
-MYT="/mnt/t/${USER}"
-DOT="$HOME/gitrepo/dotfiles"
-WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
-alias andro="cd $HOME/andromeda; source sourceme"
-alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
+if [ "$USER" = "13lbise" ]; then
+    MYT="/mnt/t/${USER}"
+    DOT="$HOME/gitrepo/dotfiles"
+    WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
+    alias andro="cd $HOME/andromeda; source sourceme"
+    alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
+    alias vim="vim -X" # So it doesn't hang at start when on SSH
 
-cd $HOME/andromeda
-source sourceme
+    cd $HOME/andromeda
+    source sourceme
+fi
