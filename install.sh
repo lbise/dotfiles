@@ -19,7 +19,8 @@ CHMOD="chmod"
 CP="cp"
 MKDIR="mkdir"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
-KEYS_DIR=$ONEDRIVE_PATH
+KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
+KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
@@ -82,7 +83,7 @@ function install_zsh() {
 
     if [ "$WSL" = 0 ] && [ "$WORK_INSTALL" = 1 ]; then
         echo "Skipping changing default shell as we cannot do it ..."
-        exit
+        return
     fi
 
     # Change default shell to zsh
@@ -96,14 +97,14 @@ function install_keys_sonova() {
     echo "Installing keys..."
 
     SSH_NAME="id_ed25519_git_sonova"
-    SSH_SRC_PATH="$KEYS_DIR/.ssh"
+    SSH_SRC_PATH="$KEYS_SSH_DIR"
     SSH_DST_PATH="$HOME/.ssh"
     SSH_SRC_PRIV="$SSH_SRC_PATH/$SSH_NAME"
     SSH_SRC_PUB="$SSH_SRC_PATH/$SSH_NAME.pub"
     SSH_DST_PRIV="$SSH_DST_PATH/$SSH_NAME"
     SSH_DST_PUB="$SSH_DST_PATH/$SSH_NAME.pub"
 
-    GPG_SRC_PATH="$KEYS_DIR/.gnupg"
+    GPG_SRC_PATH="$KEYS_GPG_DIR"
     GPG_DST_PATH="$HOME/.gnupg"
     GPG_PRIV_NAME="sonova_private.pgp"
     GPG_PUB_NAME="sonova_public.pgp"
@@ -263,7 +264,8 @@ while [[ $# -gt 0 ]]; do
         ;;
 
         -k|--keys)
-        KEYS_DIR=$2
+        KEYS_SSH_DIR="$2"
+        KEYS_GPG_DIR="$2"
         shift # get next arg
         shift # get next arg
         ;;
