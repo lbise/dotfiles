@@ -16,9 +16,9 @@ DECRYPTED=""
 if [ -f "$NETRCGPG" ]; then
 	echo "$NETRCGPG already exists. Decrypting..."
 	DECRYPTED=$(gpg --decrypt $NETRCGPG)
-	echo -e "$DECRYPTED"
+	echo -e "$DECRYPTED" > $NETRC
 fi
 
-echo -e "${DECRYPTED}machine $1\nlogin $2\npassword $3\nprotocol $4" > $NETRC
+echo -e "machine $1\nlogin $2\npassword $3\nprotocol $4\n" >> $NETRC
 gpg -e -r $5 ~/.netrc
 rm -i $NETRC
