@@ -1,0 +1,3 @@
+set pagination off
+dashboard -layout source variables stack threads breakpoints
+dashboard source -style height 25

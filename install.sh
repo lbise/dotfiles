@@ -47,6 +47,7 @@ function rm_symlinks() {
     $RM_RF ~/.ctags
     $RM_RF ~/.scripts
     $RM_RF ~/.gdbinit
+    $RM_RF ~/.gdbinit.d
     $X_OFF
 }
 
@@ -67,6 +68,7 @@ function ln_symlinks() {
     $LN_SF $DIR/.ctags ~/.ctags
     $LN_SF $DIR/scripts ~/.scripts
     $LN_SF $DIR/.gdbinit ~/.gdbinit
+    $LN_SF $DIR/.gdbinit.d ~/.gdbinit.d
     $X_OFF
 }
 
