@@ -9,6 +9,8 @@ fi
 
 if [ "$1" = 0 ]; then
     MACHINE="ch03ww5027"
+elif [ "$1" = 1 ]; then
+    MACHINE="ch03ww6xd2cf3"
 else
     echo "Invalid index!"
     exit

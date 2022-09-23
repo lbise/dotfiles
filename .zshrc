@@ -178,7 +178,6 @@ export DISPLAY=10.64.65.133:0
 export GPG_TTY=$(tty)
 
 #### ALIASES ####
-
 if [ "$USER" = "13lbise" ]; then
     MYT="/mnt/t/${USER}"
     DOT="$HOME/gitrepo/dotfiles"
