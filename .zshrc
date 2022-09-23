@@ -178,6 +178,8 @@ export DISPLAY=10.64.65.133:0
 export GPG_TTY=$(tty)
 
 #### ALIASES ####
+alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
+
 if [ "$USER" = "13lbise" ]; then
     MYT="/mnt/t/${USER}"
     DOT="$HOME/gitrepo/dotfiles"
