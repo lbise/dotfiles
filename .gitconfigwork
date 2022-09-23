@@ -97,6 +97,6 @@
 	# Hides git status dirty symbol which might be very slow on some repo
 	hide-dirty = 1
 [credential]
-	helper = /usr/share/doc/git/contrib/credential/netrc/git-credential-netrc -f ~/.netrc.gpg -v
+	helper = /home/13lbise/.scripts/git-credential-netrc -f ~/.netrc.gpg -v
 [commit]
 	gpgsign = true
