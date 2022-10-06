@@ -30,6 +30,7 @@ function print_usage() {
             -l|--linkonly: Only perform symlink setup. Do not install packages.
             -w|--work: Perform installation for work.
             -k|--keys: Folder to find keys to install
+            -s|--wslonly: Perform WSL installation only.
             -t|--test: Do not perfrom any operation just print"
     echo "$USAGE"
 }
@@ -161,6 +162,10 @@ function install_keys_sonova() {
 }
 
 function install_work() {
+    if [ "$WSL_ONLY" = 1 ]; then
+        return
+    fi
+
     echo "Work specific install..."
     install_keys_sonova
 }
@@ -203,6 +208,10 @@ function install_ubuntu_common() {
 }
 
 function install_ubuntu() {
+    if [ "$WSL_ONLY" = 1 ]; then
+        return
+    fi
+
     OS_VER=$VERSION_ID
     echo "Installing for Ubuntu-${OS_VER}..."
 
@@ -225,6 +234,10 @@ MACOS_UPDATE="sudo apt update"
 MACOS_INSTALL="sudo apt install -y "
 
 function install_macos() {
+    if [ "$WSL_ONLY" = 1 ]; then
+        return
+    fi
+
     echo "Installing for MacOs..."
 
     install_zsh
@@ -271,6 +284,10 @@ while [[ $# -gt 0 ]]; do
         shift # get next arg
         shift # get next arg
         ;;
+        -s|--wslonly)
+        WSL_ONLY=1
+        shift # get next arg
+        ;;
         -h|--help)
         print_usage
         exit
@@ -310,15 +327,15 @@ fi
 
 case "$OS" in
     "Ubuntu")
-        install_ubuntu
-        ;;
+    install_ubuntu
+    ;;
     "Darwin")
 	install_macos
 	;;
     *)
-        echo "Unsupported OS: $OS"
-        exit 1
-        ;;
+    echo "Unsupported OS: $OS"
+    exit 1
+    ;;
 esac
 
 if [ "$WORK_INSTALL" = 1 ]; then
