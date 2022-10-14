@@ -176,6 +176,8 @@ fi
 export DISPLAY=10.64.65.133:0
 # Prompt for passphrase
 export GPG_TTY=$(tty)
+# Prevent zsh opening a new window on git diff for example
+unset LESS
 
 #### ALIASES ####
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
