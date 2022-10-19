@@ -5,7 +5,7 @@ NETRCGPG="$HOME/.netrc.gpg"
 function print_help {
 	echo "Usage: $0 [OPTION]"
     echo "  Options:"
-    echo "  -a/--add address login password email   Add new password"
+    echo "  -a/--add address login email            Add new password"
     echo "  -d/--decrypt                            Decrypt netrc file"
     echo "  -o/--overwrite                          Overwrite netrc.gpg file"
 }
@@ -39,8 +39,6 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     LOGIN="$1"
     shift # past argument
-    PASSWD="$1"
-    shift # past argument
     EMAIL="$1"
     shift # past argument
     ;;
@@ -69,7 +67,7 @@ if [ "$DECRYPT" = 1 ]; then
 fi
 
 if [ "$ADD" = 1 ]; then
-    if [ "$ADDRESS" = "" ] || [ "$LOGIN" = "" ] || [ "$PASSWD" = "" ] || [ "$EMAIL" = "" ]; then
+    if [ "$ADDRESS" = "" ] || [ "$LOGIN" = "" ] || [ "$EMAIL" = "" ]; then
         echo "Bad parameters for add"
         print_help
         exit 0
@@ -77,6 +75,9 @@ if [ "$ADD" = 1 ]; then
 
     echo "Add new password"
     echo "$ADDRESS $LOGIN $EMAIL"
+
+    echo -n "Enter $LOGIN password: "
+    read -s PASSWD
 
     if [ "$OVERWRITE" = 0 ] && [ -f "$NETRCGPG" ]; then
         decrypt
