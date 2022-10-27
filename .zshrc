@@ -173,7 +173,7 @@ if [ -f $HOME/.ssh/id_rsa ]; then
 fi
 
 # Set x server display
-export DISPLAY=10.64.65.133:0
+export DISPLAY=10.251.160.16:0
 # Prompt for passphrase
 export GPG_TTY=$(tty)
 # Prevent zsh opening a new window on git diff for example
@@ -192,4 +192,7 @@ if [ "$USER" = "13lbise" ]; then
 
     cd $HOME/andromeda
     source sourceme
+
+    # Helios stuff
+    export PYTHON310_EXE=/usr/bin/python3
 fi
