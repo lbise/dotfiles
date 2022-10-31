@@ -173,7 +173,7 @@ if [ -f $HOME/.ssh/id_rsa ]; then
 fi
 
 # Set x server display
-export DISPLAY=10.251.160.16:0
+export DISPLAY=CH03MWJ5QLLN3.corp.ads:0
 # Prompt for passphrase
 export GPG_TTY=$(tty)
 # Prevent zsh opening a new window on git diff for example
