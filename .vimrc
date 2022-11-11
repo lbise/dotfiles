@@ -13,7 +13,8 @@ set termguicolors	" Enable 24 bit colors
 set shell=/bin/zsh	" Set shell as zsh
 set number		" Add line number
 set relativenumber	" Add relative line number (number + relative = hybrid)
-
+set noswapfile          " No swap files
+set hidden              " Allow switching buffers without writing
 set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
 set autowrite		" Write buffer on :next, :last etc...
 set autoread		" Read file on outside change
@@ -39,6 +40,8 @@ set wildmode=longest:full,full " tab completion for files/bufferss
 set wildmenu		" Command line completion shows menu
 set display+=lastline	" Display as much as possible of the last line in a window
 set expandtab		" Convert tabs to space
+let g:netrw_liststyle = 3 " Tree style for file browsing
+let g:netrw_banner = 0
 
 if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
