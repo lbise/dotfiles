@@ -12,6 +12,7 @@ function print_help {
     echo ""
     echo "  OPTION:"
     echo "      -l/--list   List indexes"
+    echo "      -u/--user   User to use"
     echo "      -c/--copy   SSH copy key to remote host before connection"
     echo ""
     echo "  ARGS:           Further arguments passed to ssh"
@@ -27,6 +28,11 @@ while [[ $# -gt 0 ]]; do
     ;;
     -l|--list)
     LIST_INDEX=1
+    shift # past argument
+    ;;
+    -u|--user)
+    shift # past argument
+    USER="$1"
     shift # past argument
     ;;
     -h|--help)
