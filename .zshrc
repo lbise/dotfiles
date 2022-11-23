@@ -181,6 +181,8 @@ unset LESS
 
 #### ALIASES ####
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
+# Pass tty variable to vim
+alias vim="TTY=\"$TTY\" vim -X"
 
 if [ "$USER" = "13lbise" ]; then
     MYT="/mnt/t/${USER}"
@@ -188,7 +190,7 @@ if [ "$USER" = "13lbise" ]; then
     WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
     alias andro="cd $HOME/andromeda; source sourceme"
     alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
-    alias vim="vim -X" # So it doesn't hang at start when on SSH
+    #alias vim="vim -X" # So it doesn't hang at start when on SSH
 
     cd $HOME/andromeda
     source sourceme
