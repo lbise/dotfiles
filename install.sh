@@ -50,6 +50,7 @@ function rm_symlinks() {
     $RM_RF ~/.gdbinit
     $RM_RF ~/.gdbinit.d
     $RM_RF ~/.tmux.conf
+    $RM_RF ~/.tmux
     $X_OFF
 }
 
@@ -72,6 +73,7 @@ function ln_symlinks() {
     $LN_SF $DIR/.gdbinit ~/.gdbinit
     $LN_SF $DIR/.gdbinit.d ~/.gdbinit.d
     $LN_SF $DIR/.tmux.conf ~/.tmux.conf
+    $LN_SF $DIR/tmux ~/.tmux
     $X_OFF
 }
 
