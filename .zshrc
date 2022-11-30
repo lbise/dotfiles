@@ -196,5 +196,5 @@ if [ "$USER" = "13lbise" ]; then
     source sourceme
 
     # Helios stuff
-    export PYTHON310_EXE=/usr/bin/python3
+    export PYTHON310_64_EXE=/usr/bin/python3
 fi
