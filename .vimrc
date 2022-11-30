@@ -42,6 +42,7 @@ set display+=lastline	" Display as much as possible of the last line in a window
 set expandtab		" Convert tabs to space
 let g:netrw_liststyle = 3 " Tree style for file browsing
 let g:netrw_banner = 0
+let g:netrw_fastbrowse = 0 " Fix orphan netrw buffers?
 
 if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
