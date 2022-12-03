@@ -109,7 +109,7 @@ function install_zsh() {
     fi
 
     # Change default shell to zsh
-    if [ "$SHELL" != "$(which zsh)" ]; then
+    if [[ "$SHELL" != *"zsh"* ]]; then
         $CHSH_S $(which zsh)
     fi
 }
@@ -243,15 +243,21 @@ function install_ubuntu() {
 ################################################################################
 # MacOs
 ################################################################################
-MACOS_UPDATE="sudo apt update"
-MACOS_INSTALL="sudo apt install -y "
+MACOS_UPDATE="brew update"
+MACOS_UPGRADE="brew upgrade"
+MACOS_INSTALL="brew install"
 
 function install_macos() {
+    PKGS="zsh fzf gpg"
+
     if [ "$WSL_ONLY" = 1 ]; then
         return
     fi
 
     echo "Installing for MacOs..."
+    $MACOS_UPDATE
+    $MACOS_UPGRADE
+    $MACOS_INSTALL $PKGS
 
 	install_common
 }
