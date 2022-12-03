@@ -1,5 +1,4 @@
-#!/bin/env bash
-
+#!/bin/sh
 ## Allow Merge branch commit message longer than 72
 #if [[ ! `cat $1` == 'Merge branch '*  ]] && [[ ! `cat $1` == 'Merge remote-tracking branch'* ]] && [[ ! `cat $1` == 'Revert '* ]]; then
 #	# Check first line does not exceed 72 characters
