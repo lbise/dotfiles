@@ -50,7 +50,9 @@ function rm_symlinks() {
     $RM_RF ~/.gdbinit
     $RM_RF ~/.gdbinit.d
     $RM_RF ~/.tmux.conf
-    $RM_RF ~/.tmux
+	$RM_RF ~/.tmux
+    # For pinentry configuration (passphrase enter in command line)
+    $RM_RF ~/.gnupg/gpg.conf
     $X_OFF
 }
 
@@ -74,7 +76,20 @@ function ln_symlinks() {
     $LN_SF $DIR/.gdbinit.d ~/.gdbinit.d
     $LN_SF $DIR/.tmux.conf ~/.tmux.conf
     $LN_SF $DIR/tmux ~/.tmux
+    # For pinentry configuration (passphrase enter in command line)
+    $LN_SF $DIR/gpg/gpg.conf ~/.gnupg/gpg.conf
     $X_OFF
+}
+
+function install_common() {
+    echo "-------------------------------------------------------------------------"
+    echo "Installing common items..."
+
+    install_zsh
+
+	# Setup symlinks
+    rm_symlinks
+    ln_symlinks
 }
 
 function install_ohmyzsh() {
@@ -153,11 +168,8 @@ function install_keys_sonova() {
         $CHMOD 700 "$GPG_DST_PATH"
     fi
 
-    if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_CONF" ]; then
+    if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PRIV" ]; then
         echo "Installing GPG keys: $GPG_SRC_PRIV -> $GPG_DST_PRIV; $GPG_SRC_PUB -> $GPG_DST_PUB"
-        # For pinentry configuration (passphrase enter in command line)
-        $RM_RF "$GPG_DST_CONF"
-        $LN_SF "$GPG_SRC_CONF" "$GPG_DST_CONF"
 	    $CP "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
 	    $CHMOD 600 "$GPG_DST_PRIV"
 	    $CP "$GPG_SRC_PUB" "$GPG_DST_PUB"
@@ -226,10 +238,7 @@ function install_ubuntu() {
         install_ubuntu_22_04
     fi
 
-    install_zsh
-
-    rm_symlinks
-    ln_symlinks
+	install_common
 }
 ################################################################################
 # MacOs
@@ -244,16 +253,13 @@ function install_macos() {
 
     echo "Installing for MacOs..."
 
-    install_zsh
-
-    rm_symlinks
-    ln_symlinks
+	install_common
 }
 ################################################################################
 # Arch
 ################################################################################
 ARCH_UPDATE="sudo pacman -Syu"
-ARCH_INSTALL="sudo pacman -S "
+ARCH_INSTALL="sudo pacman -S --needed"
 
 function install_arch_common() {
     PKGS="zsh fzf tmux"
@@ -273,13 +279,9 @@ function install_arch() {
     fi
 
     echo "Installing for Arch Linux..."
-
     install_arch_common
 
-    install_zsh
-
-    rm_symlinks
-    ln_symlinks
+	install_common
 }
 ################################################################################
 #
