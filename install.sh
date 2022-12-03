@@ -250,7 +250,39 @@ function install_macos() {
     ln_symlinks
 }
 ################################################################################
+# Arch
+################################################################################
+ARCH_UPDATE="sudo pacman -Syu"
+ARCH_INSTALL="sudo pacman -S "
 
+function install_arch_common() {
+    PKGS="zsh fzf tmux"
+
+    if [ "$WORK_INSTALL" = 1 ]; then
+        echo "Nothing to install for work"
+        #PKGS="$PKGS git-lfs"
+    fi
+
+    $ARCH_UPDATE
+    $ARCH_INSTALL $PKGS
+}
+
+function install_arch() {
+    if [ "$WSL_ONLY" = 1 ]; then
+        return
+    fi
+
+    echo "Installing for Arch Linux..."
+
+    install_arch_common
+
+    install_zsh
+
+    rm_symlinks
+    ln_symlinks
+}
+################################################################################
+#
 echo "#########################################################################"
 echo "Leo's dotfiles install script"
 echo "#########################################################################"
@@ -336,6 +368,9 @@ case "$OS" in
     "Darwin")
 	install_macos
 	;;
+    "Arch Linux")
+    install_arch
+    ;;
     *)
     echo "Unsupported OS: $OS"
     exit 1
