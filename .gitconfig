@@ -14,6 +14,7 @@
 [user]
 	name = Léonard Bise
 	email = leonard.bise@gmail.com
+	signingkey = ED0DFB79FF83B277
 
 [diff]
 	tool = meld
