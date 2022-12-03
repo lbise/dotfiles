@@ -83,7 +83,12 @@ plugins=(
 )
 
 # !! MUST BE BEFORE SOURCE !!
-zstyle :omz:plugins:ssh-agent identities id_ed25519_git_sonova
+if [ "$USER" = "13lbise" ]; then
+	zstyle :omz:plugins:ssh-agent identities id_ed25519_git_sonova
+elif [ "$USER" = "leo" ]; then
+	zstyle :omz:plugins:ssh-agent identities id_rsa
+	export SSH_KEY_PATH="~/.ssh/rsa_id"
+fi
 
 source $ZSH/oh-my-zsh.sh
 
@@ -103,9 +108,6 @@ source $ZSH/oh-my-zsh.sh
 
 # Compilation flags
 # export ARCHFLAGS="-arch x86_64"
-
-# ssh
-export SSH_KEY_PATH="~/.ssh/rsa_id"
 
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh
@@ -161,23 +163,13 @@ compinit
 
 # Add .scripts to PATH
 export PATH=$PATH:~/.scripts
-
-# Start keychain
-#if [ -f $HOME/.ssh/id_rsa-gitlab ]; then
-#	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa-gitlab
-#	source $HOME/.keychain/$HOST-sh
-#fi
-if [ -f $HOME/.ssh/id_rsa ]; then
-	/usr/bin/env keychain -q --nogui $HOME/.ssh/id_rsa
-	source $HOME/.keychain/$HOST-sh
-fi
-
-# Set x server display
-export DISPLAY=CH03MWJ5QLLN3.corp.ads:0
 # Prompt for passphrase
 export GPG_TTY=$(tty)
 # Prevent zsh opening a new window on git diff for example
 unset LESS
+
+#### VARIABLES ####
+DOT="$HOME/gitrepo/dotfiles"
 
 #### ALIASES ####
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
@@ -185,8 +177,9 @@ alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git r
 alias vim="TTY=\"$TTY\" vim -X"
 
 if [ "$USER" = "13lbise" ]; then
+	# Set x server display
+	export DISPLAY=CH03MWJ5QLLN3.corp.ads:0
     MYT="/mnt/t/${USER}"
-    DOT="$HOME/gitrepo/dotfiles"
     WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
     alias andro="cd $HOME/andromeda; source sourceme"
     alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
@@ -197,4 +190,6 @@ if [ "$USER" = "13lbise" ]; then
 
     # Helios stuff
     export PYTHON310_64_EXE=/usr/bin/python3
+elif [ "$USER" = "leo" ]; then
+	export DISPLAY=:0
 fi
