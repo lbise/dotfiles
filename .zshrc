@@ -173,8 +173,6 @@ DOT="$HOME/gitrepo/dotfiles"
 
 #### ALIASES ####
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
-# Pass tty variable to vim
-alias vim="TTY=\"$TTY\" vim -X"
 
 if [ "$USER" = "13lbise" ]; then
 	# Set x server display
