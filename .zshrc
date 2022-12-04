@@ -191,4 +191,5 @@ if [ "$USER" = "13lbise" ]; then
     export PYTHON310_64_EXE=/usr/bin/python3
 elif [ "$USER" = "leo" ]; then
 	export DISPLAY=:0
+	cd $HOME
 fi
