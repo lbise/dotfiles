@@ -248,7 +248,7 @@ MACOS_UPGRADE="brew upgrade"
 MACOS_INSTALL="brew install"
 
 function install_macos() {
-    PKGS="zsh fzf gpg"
+    PKGS="zsh fzf gpg tmux"
 
     if [ "$WSL_ONLY" = 1 ]; then
         return
@@ -269,11 +269,6 @@ ARCH_INSTALL="sudo pacman -S --needed"
 
 function install_arch_common() {
     PKGS="zsh fzf tmux"
-
-    if [ "$WORK_INSTALL" = 1 ]; then
-        echo "Nothing to install for work"
-        #PKGS="$PKGS git-lfs"
-    fi
 
     $ARCH_UPDATE
     $ARCH_INSTALL $PKGS
