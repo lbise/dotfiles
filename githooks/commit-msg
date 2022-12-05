@@ -41,5 +41,5 @@ RE='^[0-9]+$'
 if ! echo "$TICKET" | grep -Eq $RE ; then
     echo "Branch $BRANCH doesn't start by a ticket number! Cannot add Redmine ticket reference" >&2
 else
-    echo -e "\nRedmine: #${TICKET}" >> $1
+    echo "\nRedmine: #${TICKET}" >> $1
 fi
