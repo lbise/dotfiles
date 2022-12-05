@@ -23,9 +23,9 @@ set cursorline		" Highlight cursor
 set ttyfast		" Fast scrolling
 set backspace=indent,eol,start " allow backspacing over everything
 set history=8192	" More history
-set tabstop=8
-set softtabstop=8
-set shiftwidth=8
+set tabstop=4
+set softtabstop=4
+set shiftwidth=4
 set hlsearch
 " smart case-sensitive search
 set ignorecase
