@@ -165,9 +165,6 @@ au BufRead,BufNewFile *.unity set filetype=c
 " Use c syntax for sid files
 au BufRead,BufNewFile *.sid set filetype=sid
 
-let g:colorizer_auto_filetype='css,html,log'
-let g:colorizer_auto_color = 1
-
 " https://www.reddit.com/r/vim/comments/ac9eyh/talk_i_gave_on_going_mouseless_with_vim_tmux/
 " function! Osc52Yank()
 "     let buffer=system('base64 -w0', @0)
