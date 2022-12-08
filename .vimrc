@@ -47,25 +47,6 @@ if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
 endif
 
-" WSL yank support
-let uname = substitute(system('uname'),'\n','','')
-if uname == 'Linux'
-    let lines = readfile("/proc/version")
-    if lines[0] =~ "Microsoft"
-		let s:clip = '/mnt/c/Windows/System32/clip.exe'  " default location
-		if executable(s:clip)
-		    augroup WSLYank
-		        autocmd!
-			"autocmd TextYankPost * call system('echo '.shellescape(join(v:event.regcontents, "\<CR>")).' | '.s:clip)
-			autocmd TextYankPost * call system(s:clip, join(v:event.regcontents, "\<CR>"))
-		    augroup END
-		end
-    else
-        " Setting this under WSL cause registers to get filled with garbage
-        set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
-    endif
-endif
-
 " save read-only files
 command -nargs=0 Sudow w !sudo tee % >/dev/null
 
@@ -167,6 +148,12 @@ au BufRead,BufNewFile *.unity set filetype=c
 " Use c syntax for sid files
 au BufRead,BufNewFile *.sid set filetype=sid
 
+" #############################################################################
+" Clipboard
+" #############################################################################
+" Setting this under Linux cause registers to get filled with garbage
+"set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
+
 " https://www.reddit.com/r/vim/comments/ac9eyh/talk_i_gave_on_going_mouseless_with_vim_tmux/
 " function! Osc52Yank()
 "     let buffer=system('base64 -w0', @0)
@@ -179,7 +166,24 @@ au BufRead,BufNewFile *.sid set filetype=sid
 "     autocmd!
 "     autocmd TextYankPost * if v:event.operator ==# 'y' | call Osc52Yank() | endif
 " augroup END
-"
+
+" WSL yank support
+let uname = substitute(system('uname'),'\n','','')
+if uname == 'Linux'
+    let lines = readfile("/proc/version")
+    if lines[0] =~ "Microsoft"
+		let s:clip = '/mnt/c/Windows/System32/clip.exe'  " default location
+		if executable(s:clip)
+		    augroup WSLYank
+		        autocmd!
+			"autocmd TextYankPost * call system('echo '.shellescape(join(v:event.regcontents, "\<CR>")).' | '.s:clip)
+			autocmd TextYankPost * call system(s:clip, join(v:event.regcontents, "\<CR>"))
+		    augroup END
+		end
+    endif
+endif
+
+" Use osc yank plugin
 autocmd TextYankPost * if v:event.operator is 'y' && v:event.regname is '' | execute 'OSCYankReg "' | endif
 
 " Create ~/.vimsession if needed
