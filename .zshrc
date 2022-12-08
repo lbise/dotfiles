@@ -184,8 +184,10 @@ if [ "$USER" = "13lbise" ]; then
     alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
     #alias vim="vim -X" # So it doesn't hang at start when on SSH
 
-    cd $HOME/andromeda
-    source sourceme
+    if [ -d "$HOME/andromeda" ]; then
+        cd $HOME/andromeda
+        source sourceme
+    fi
 
     # Helios stuff
     export PYTHON310_64_EXE=/usr/bin/python3
