@@ -15,7 +15,6 @@ set number		" Add line number
 set relativenumber	" Add relative line number (number + relative = hybrid)
 set noswapfile          " No swap files
 set hidden              " Allow switching buffers without writing
-set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
 set autowrite		" Write buffer on :next, :last etc...
 set autoread		" Read file on outside change
 set ttimeoutlen=10	" Lower delay on exit insert mode
@@ -61,6 +60,9 @@ if uname == 'Linux'
 			autocmd TextYankPost * call system(s:clip, join(v:event.regcontents, "\<CR>"))
 		    augroup END
 		end
+    else
+        " Setting this under WSL cause registers to get filled with garbage
+        set clipboard=unnamed,unnamedplus " Copy/paste from/to primary and clipboard
     endif
 endif
 
