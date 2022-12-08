@@ -58,3 +58,8 @@ cscope.po.out
 __pycache__
 
 download
+
+githooks/post-checkout
+githooks/post-commit
+githooks/post-merge
+githooks/pre-push
