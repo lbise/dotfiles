@@ -169,17 +169,19 @@ let g:colorizer_auto_filetype='css,html,log'
 let g:colorizer_auto_color = 1
 
 " https://www.reddit.com/r/vim/comments/ac9eyh/talk_i_gave_on_going_mouseless_with_vim_tmux/
-function! Osc52Yank()
-    let buffer=system('base64 -w0', @0)
-    let buffer=substitute(buffer, "\n$", "", "")
-    let buffer='\e]52;c;'.buffer.'\x07'
-    silent exe "!echo -ne ".shellescape(buffer)." > ".shellescape("/dev/tty")
-endfunction
-command! Osc52CopyYank call Osc52Yank()
-augroup Example
-    autocmd!
-    autocmd TextYankPost * if v:event.operator ==# 'y' | call Osc52Yank() | endif
-augroup END
+" function! Osc52Yank()
+"     let buffer=system('base64 -w0', @0)
+"     let buffer=substitute(buffer, "\n$", "", "")
+"     let buffer='\e]52;c;'.buffer.'\x07'
+"     silent exe "!echo -ne ".shellescape(buffer)." > ".shellescape("/dev/tty")
+" endfunction
+" command! Osc52CopyYank call Osc52Yank()
+" augroup Example
+"     autocmd!
+"     autocmd TextYankPost * if v:event.operator ==# 'y' | call Osc52Yank() | endif
+" augroup END
+"
+autocmd TextYankPost * if v:event.operator is 'y' && v:event.regname is '' | execute 'OSCYankReg "' | endif
 
 " Create ~/.vimsession if needed
 silent !mkdir ~/.vimsession > /dev/null 2>&1
