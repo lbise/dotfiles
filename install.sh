@@ -52,7 +52,9 @@ function rm_symlinks() {
     $RM_RF ~/.tmux.conf
 	$RM_RF ~/.tmux
     # For pinentry configuration (passphrase enter in command line)
-    $MKDIR ~/.gnupg
+    if [ ! -d ~/.gnupg ]; then
+        $MKDIR ~/.gnupg
+    fi
     $RM_RF ~/.gnupg/gpg.conf
     $X_OFF
 }
