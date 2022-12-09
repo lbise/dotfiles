@@ -57,6 +57,7 @@ function rm_symlinks() {
         $CHMOD 700 ~/.gnupg
     fi
     $RM_RF ~/.gnupg/gpg.conf
+    $RM_RF ~/.gnupg/gpg-agent.conf
     $X_OFF
 }
 
@@ -82,6 +83,7 @@ function ln_symlinks() {
     $LN_SF $DIR/tmux ~/.tmux
     # For pinentry configuration (passphrase enter in command line)
     $LN_SF $DIR/gpg/gpg.conf ~/.gnupg/gpg.conf
+    $LN_SF $DIR/gpg/gpg-agent.conf ~/.gnupg/gpg-agent.conf
     $X_OFF
 }
 
