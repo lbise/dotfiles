@@ -54,6 +54,7 @@ function rm_symlinks() {
     # For pinentry configuration (passphrase enter in command line)
     if [ ! -d ~/.gnupg ]; then
         $MKDIR ~/.gnupg
+        $CHMOD 700 ~/.gnupg
     fi
     $RM_RF ~/.gnupg/gpg.conf
     $X_OFF
