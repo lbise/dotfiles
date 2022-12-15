@@ -110,7 +110,10 @@ let g:airline#extensions#tabline#enabled = 1
 let g:airline#extensions#branch#enabled = 0
 " Customize sections
 let g:airline_section_y = ""
-"let g:airline_powerline_fonts = 1
+let g:airline_powerline_fonts = 1
+if !exists('g:airline_symbols')
+    let g:airline_symbols = {}
+endif
 
 " ultisnips
 " Trigger configuration. Do not use <tab> if you use https://github.com/Valloric/YouCompleteMe.
