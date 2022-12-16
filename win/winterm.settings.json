@@ -6,10 +6,10 @@
         {
             "command": 
             {
-                "action": "newTab",
-                "index": 0
+                "action": "moveFocus",
+                "direction": "right"
             },
-            "keys": "ctrl+alt+1"
+            "keys": "ctrl+shift+l"
         },
         {
             "command": 
@@ -22,14 +22,10 @@
         {
             "command": 
             {
-                "action": "moveFocus",
-                "direction": "right"
+                "action": "newTab",
+                "index": 0
             },
-            "keys": "ctrl+shift+l"
-        },
-        {
-            "command": "find",
-            "keys": "ctrl+shift+f"
+            "keys": "ctrl+alt+1"
         },
         {
             "command": 
@@ -40,12 +36,16 @@
             "keys": "ctrl+alt+9"
         },
         {
+            "command": "find",
+            "keys": "ctrl+shift+f"
+        },
+        {
             "command": 
             {
-                "action": "newTab",
-                "index": 2
+                "action": "moveFocus",
+                "direction": "down"
             },
-            "keys": "ctrl+alt+3"
+            "keys": "ctrl+shift+j"
         },
         {
             "command": 
@@ -58,10 +58,10 @@
         {
             "command": 
             {
-                "action": "moveFocus",
-                "direction": "down"
+                "action": "newTab",
+                "index": 2
             },
-            "keys": "ctrl+shift+j"
+            "keys": "ctrl+alt+3"
         },
         {
             "command": 
@@ -315,10 +315,10 @@
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "commandline": "wsl -u 13lbise",
+                "commandline": "wsl -u 13lbise -d ubuntu-andromeda-22.04",
                 "font": 
                 {
-                    "face": "Cascadia Code",
+                    "face": "CaskaydiaCove NF Mono",
                     "size": 13
                 },
                 "guid": "{e381fe40-9d15-58b7-99ea-5908cd6561e5}",
@@ -337,10 +337,10 @@
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "commandline": "wsl -u root",
+                "commandline": "wsl -u root -d ubuntu-andromeda-22.04",
                 "font": 
                 {
-                    "face": "Cascadia Code",
+                    "face": "CaskaydiaCove NF Mono",
                     "size": 13
                 },
                 "guid": "{20fa7bc1-04d8-547c-8ef6-6dadb2f5ccc1}",
@@ -358,7 +358,7 @@
                 "commandline": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\bin\\bash.exe --init-file sourceme -i",
                 "font": 
                 {
-                    "face": "Cascadia Code",
+                    "face": "CaskaydiaCove NF Mono",
                     "size": 13
                 },
                 "guid": "{48304432-9bb7-59d7-8dcd-c6121744ab02}",
@@ -373,7 +373,8 @@
                 "colorScheme": "Nord",
                 "font": 
                 {
-                    "face": "Cascadia Code"
+                    "face": "CaskaydiaCove NF Mono",
+                    "size": 13
                 },
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
