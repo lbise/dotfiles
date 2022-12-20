@@ -63,3 +63,5 @@ githooks/post-checkout
 githooks/post-commit
 githooks/post-merge
 githooks/pre-push
+
+vim/plugged

@@ -93,6 +93,9 @@ nnoremap <silent> <Leader>- :exe "resize " . (winheight(0) * 2/3)<CR>
 
 " Do not overwrite yanked stuff
 xnoremap p pgvy
+
+" Browse FZF files
+nnoremap <silent> <Leader><space> :Files<CR>
 " #############################################################################
 " Plugins
 " #############################################################################
@@ -189,3 +192,11 @@ autocmd TextYankPost * if v:event.operator is 'y' && v:event.regname is '' | exe
 
 " Create ~/.vimsession if needed
 silent !mkdir ~/.vimsession > /dev/null 2>&1
+
+" #############################################################################
+" Plugins
+" #############################################################################
+call plug#begin()
+Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
+Plug 'junegunn/fzf.vim'
+call plug#end()
