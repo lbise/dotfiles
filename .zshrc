@@ -13,14 +13,14 @@ export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="candy"
 
 # powerlevel9k config
-POWERLEVEL9K_PROMPT_ON_NEWLINE=true
-POWERLEVEL9K_SHORTEN_DIR_LENGTH=2
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(dir nvm vcs)
-#POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status history time)
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=()
-#POWERLEVEL9K_MODE='awesome-fontconfig'
-# Use fonts from https://github.com/ryanoasis/nerd-fonts
-POWERLEVEL9K_MODE='nerdfont-complete'
+#POWERLEVEL9K_PROMPT_ON_NEWLINE=true
+#POWERLEVEL9K_SHORTEN_DIR_LENGTH=2
+#POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(dir nvm vcs)
+##POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status history time)
+#POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=()
+##POWERLEVEL9K_MODE='awesome-fontconfig'
+## Use fonts from https://github.com/ryanoasis/nerd-fonts
+#POWERLEVEL9K_MODE='nerdfont-complete'
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -169,6 +169,9 @@ export GPG_TTY=$(tty)
 # Prevent zsh opening a new window on git diff for example
 unset LESS
 
+#### BINDINGS ####
+bindkey -s ^f "tmux-sessionizer\n"
+
 #### VARIABLES ####
 DOT="$HOME/gitrepo/dotfiles"
 
@@ -183,10 +186,12 @@ if [ "$USER" = "13lbise" ]; then
     alias andro="cd $HOME/andromeda; source sourceme"
     alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
     #alias vim="vim -X" # So it doesn't hang at start when on SSH
-
+    CURRENT_DIR=$PWD
     if [ -d "$HOME/andromeda" ]; then
+        # Sourceme then go back to pwd
         cd $HOME/andromeda
         source sourceme
+        cd $CURRENT_DIR
     fi
 
     # Helios stuff
