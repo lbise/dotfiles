@@ -108,6 +108,8 @@ colorscheme nord
 let g:airline#extensions#tabline#enabled = 1
 " Disable branch name
 let g:airline#extensions#branch#enabled = 0
+" Disable whitespace extension
+let g:airline#extensions#whitespace#enabled = 0
 " Customize sections
 let g:airline_section_y = ""
 let g:airline_powerline_fonts = 1
@@ -198,4 +200,5 @@ silent !mkdir ~/.vimsession > /dev/null 2>&1
 call plug#begin()
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
+Plug 'vim-airline/vim-airline'
 call plug#end()
