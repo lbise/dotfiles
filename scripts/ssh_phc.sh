@@ -2,8 +2,8 @@
 USER="13lbise"
 OPTS="-X"
 
-INDEX_LIST=("ch03wx5vwltn3" "ch03wxjtwltn3" "ch03wx6xd2cf3" "ch03ww5027")
-COMMENT_LIST=("PEVB #9 Leo" "PEVB Christophe" "EBOARD Alessandro" "UBOARD Standalone")
+INDEX_LIST=("ch03wxjtwltn3" "ch03pevb09" "ch03wx6xd2cf3" "ch03ww5027")
+COMMENT_LIST=("PEVB Leo" "PEVB #9 Christophe" "EBOARD Alessandro" "UBOARD Standalone")
 
 function print_help {
 	echo "Usage: $0 [OPTION] INDEX [ARGS...]"
@@ -70,19 +70,8 @@ fi
 INDEX=$1
 shift # consume argument
 
-if [ "$INDEX" = 0 ]; then
-    # pevb Leo Nb 9
-    MACHINE="ch03wx5vwltn3"
-elif [ "$INDEX" = 1 ]; then
-    # pevb Christophe
-    MACHINE="ch03wxjtwltn3"
-elif [ "$INDEX" = 2 ]; then
-    # Alessandro's old eboard
-    MACHINE="ch03wx6xd2cf3"
-elif [ "$INDEX" = 3 ]; then
-    # uboard standalone
-    MACHINE="ch03ww5027"
-else
+MACHINE=${INDEX_LIST[$INDEX]}
+if [ "$MACHINE" == "" ]; then
     echo "Invalid index!"
     exit
 fi
