@@ -1,44 +1,43 @@
 " #############################################################################
 " Syntax and indentation
 " #############################################################################
-syntax on		" Enable syntax highlighting
-set showmatch		" Show matching braces when text indicator is over them
-filetype plugin indent on " enable file type detection
+syntax on		                            " Enable syntax highlighting
+set showmatch		                        " Show matching braces
+filetype plugin indent on                   " enable file type detection
 set autoindent
 
 " #############################################################################
 " Basic config
 " #############################################################################
-set termguicolors	" Enable 24 bit colors
-set shell=/bin/zsh	" Set shell as zsh
-set number		" Add line number
-set relativenumber	" Add relative line number (number + relative = hybrid)
-set noswapfile          " No swap files
-set hidden              " Allow switching buffers without writing
-set autowrite		" Write buffer on :next, :last etc...
-set autoread		" Read file on outside change
-set ttimeoutlen=10	" Lower delay on exit insert mode
-set cursorline		" Highlight cursor
-set ttyfast		" Fast scrolling
-set backspace=indent,eol,start " allow backspacing over everything
-set history=8192	" More history
+set termguicolors	                        " Enable 24 bit colors
+set shell=/bin/zsh	                        " Set shell as zsh
+set number		                            " Add line number
+set relativenumber	                        " Add relative line number
+set noswapfile                              " No swap files
+set hidden                                  " Switch buffers without writing
+set autowrite		                        " Write buffer on :next, :last etc
+set autoread		                        " Read file on outside change
+set ttimeoutlen=10	                        " Lower delay on exit insert mode
+set cursorline		                        " Highlight cursor
+set ttyfast		                            " Fast scrolling
+set backspace=indent,eol,start              " Allow backspacing over everything
+set history=8192	                        " More history
 set tabstop=4
 set softtabstop=4
 set shiftwidth=4
+set expandtab		                        " Convert tabs to space
 set hlsearch
-" smart case-sensitive search
 set ignorecase
-set smartcase
-set splitright		" When splitting open window to the right
-set splitbelow		" When splitting open window below
+set smartcase                               " smart case-sensitive search
+set splitright		                        " Split window to the right
+set splitbelow		                        " Split window below
 set laststatus=2
-set noshowmode		" Hide the default mode text
-set incsearch		" Display search results as search string is typed
-set ruler		    " Show the line and column number of the cursor position
-set wildmode=longest:full,full " tab completion for files/bufferss
-set wildmenu		" Command line completion shows menu
-set display+=lastline	" Display as much as possible of the last line in a window
-set expandtab		" Convert tabs to space
+set noshowmode		                        " Hide the default mode text
+set incsearch		                        " Search results as search is typed
+set ruler
+set wildmode=longest:full,full              " Tab completion for files/buffers
+set wildmenu		                        " Command line completion menu
+set display+=lastline
 let g:netrw_banner = 0
 
 if &listchars ==# 'eol:$' " Change setlist displayed char
