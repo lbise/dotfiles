@@ -2,7 +2,7 @@
 USER="13lbise"
 OPTS="-X"
 
-INDEX_LIST=("ch03wxjtwltn3" "ch03pevb09" "ch03wx6xd2cf3" "ch03ww5027")
+INDEX_LIST=("ch03wxjtwltn3" "ch03wxpevb09" "ch03wx6xd2cf3" "ch03ww5027")
 COMMENT_LIST=("PEVB Leo" "PEVB #9 Christophe" "EBOARD Alessandro" "UBOARD Standalone")
 
 function print_help {
