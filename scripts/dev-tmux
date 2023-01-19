@@ -1,4 +1,6 @@
 #!/usr/bin/bash
-cd ~/gitrepo/fwv6-main
-gnome-terminal -- dev-tmux-join-session
-dev-tmux-create-session
+# Start vim in main window
+tmux send-keys 'vim' Enter
+tmux rename-window vim
+tmux new-window -n dev
+tmux new-window -n exec
