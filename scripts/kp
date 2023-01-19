@@ -4,9 +4,14 @@
 # show output of "ps -ef", use [tab] to select one or multiple entries
 # press [enter] to kill selected processes and go back to the process list.
 # or press [escape] to go back to the process list. Press [escape] twice to exit completely.
-pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+if [ "$UID" != "0" ]; then
+    pid=$(ps -f -u $UID | sed 1d | fzf -m | awk '{print $2}')
+else
+    pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+fi
 
-if [ "x$pid" != "x" ]; then
+if [ "x$pid" != "x" ]
+then
     echo "Killing $pid"
     echo $pid | xargs kill -${1:-9}
 fi
