@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 # Start vim in main window
+tmux new-window -n vim
 tmux send-keys 'vim' Enter
-tmux rename-window vim
 tmux new-window -n dev
 tmux new-window -n exec
+tmux select-window -t vim

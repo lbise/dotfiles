@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
+directories="$HOME/gitrepo $HOME/"
+script=""
+if [ "$USER" == "13lbise" ]; then
+    # Work user
+    directories="$HOME/andromeda $directories"
+    # Run script to setup new session
+    script="dev-tmux"
+fi
+
+
 if [[ $# -eq 1 ]]; then
     selected=$1
 else
-    directories="$HOME/gitrepo $HOME/"
-    if [ "$USER" == "13lbise" ]; then
-        directories="$HOME/andromeda $directories"
-    fi
     selected=$(find $directories -mindepth 1 -maxdepth 1 -type d -not -path "*/.*" | fzf)
 fi
 
@@ -13,29 +19,19 @@ if [[ -z $selected ]]; then
     exit 0
 fi
 
-# Create script to CD into directory upon creating session
-#tmpfile="/tmp/tmux-sessionizer.$USER"
-#chmod +x $tmpfile
-#echo "cd $selected" > $tmpfile
-
 selected_name=$(basename "$selected" | tr . _)
 tmux_running=$(pgrep tmux)
 
-echo $selected
-
 if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
-    echo "create new session s"
-    tmux new-session -s $selected_name -c $selected
+    tmux new-session -s $selected_name -c $selected $script
     exit 0
 fi
 
 if ! tmux has-session -t=$selected_name 2> /dev/null; then
-    echo "create new session ds"
-    tmux new-session -ds $selected_name -c $selected
+    tmux new-session -ds $selected_name -c $selected $script
 fi
 
-echo $selected_name
-echo $selected
+# Switch or attach to the session
 if [ -z $TMUX ]; then
     # From outside tmux
     tmux attach -t $selected_name
