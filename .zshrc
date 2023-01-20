@@ -168,12 +168,18 @@ export PATH=$PATH:~/.scripts
 export GPG_TTY=$(tty)
 # Prevent zsh opening a new window on git diff for example
 unset LESS
-# FZF nord theme https://github.com/ianchesal/nord-fzf
+
+#### FZF ####
+# Use ripgrep for fzf, ignore .git folder, ignore some file extensions
+export FZF_DEFAULT_COMMAND='rg --files --no-ignore-vcs --hidden -g "!.git" -g "!*.{so,dll}"'
+# Ignore case, multi choice
+export FZF_DEFAULT_OPTS="-i -m --border --height 40%"
+# FZF nord theme
+# See https://github.com/junegunn/fzf/blob/master/ADVANCED.md?ref=morioh.com&utm_source=morioh.com#color-themes
 export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS'
-    --color=fg:#e5e9f0,bg:#3b4252,hl:#81a1c1
-    --color=fg+:#e5e9f0,bg+:#3b4252,hl+:#81a1c1
-    --color=info:#eacb8a,prompt:#bf6069,pointer:#b48dac
-    --color=marker:#a3be8b,spinner:#b48dac,header:#a3be8b'
+    --color=bg+:#3B4252,bg:#2E3440,spinner:#81A1C1,hl:#616E88,fg:#D8DEE9
+    --color=header:#616E88,info:#81A1C1,pointer:#81A1C1,marker:#81A1C1
+    --color=fg+:#D8DEE9,prompt:#81A1C1,hl+:#81A1C1'
 
 #### BINDINGS ####
 bindkey -s ^f "^utmux-sessionizer\n"
