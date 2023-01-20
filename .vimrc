@@ -53,12 +53,6 @@ command -nargs=0 Sudow w !sudo tee % >/dev/null
 " Key mappings
 let mapleader = " "
 
-" You shall learn using vim properly
-noremap <Up> <Nop>
-noremap <Down> <Nop>
-noremap <Left> <Nop>
-noremap <Right> <Nop>
-
 map <f5> :Obsession ~/.vimsession/lbise.vim<CR>
 map <f6> :source ~/.vimsession/lbise.vim<CR>
 
@@ -194,6 +188,9 @@ autocmd TextYankPost * if v:event.operator is 'y' && v:event.regname is '' | exe
 " Create ~/.vimsession if needed
 silent !mkdir ~/.vimsession > /dev/null 2>&1
 
+" Make Rg and Ag not match on file names
+command! -bang -nargs=* Rg call fzf#vim#grep("rg --column --line-number --no-heading --color=always --smart-case ".shellescape(<q-args>), 1, {'options': '--delimiter : --nth 4..'}, <bang>0)
+command! -bang -nargs=* Ag call fzf#vim#ag(<q-args>, {'options': '--delimiter : --nth 4..'}, <bang>0)
 " #############################################################################
 " Plugins
 " #############################################################################
