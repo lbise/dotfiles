@@ -81,7 +81,6 @@
 	# Show branch names with git log
 	decorate = short
 [pull]
-	ff = only
 	rebase = true
 [mergetool]
 	keepBackup = false

@@ -68,7 +68,7 @@
 	# Show branch names with git log
 	decorate = short
 [pull]
-	ff = only
+	rebase = true
 [credential]
 	helper = /home/leo/.scripts/git-credential-netrc -f ~/.netrc.gpg -v
 [commit]
