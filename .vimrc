@@ -89,8 +89,6 @@ xnoremap p pgvy
 
 " Browse FZF files
 nnoremap <silent> <Leader><space> :Files<CR>
-" Change session
-nnoremap <silent> <Leader>f :!tmux-sessionizer<CR><CR>
 " #############################################################################
 " Plugins
 " #############################################################################
