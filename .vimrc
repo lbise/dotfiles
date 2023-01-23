@@ -87,8 +87,10 @@ nnoremap <silent> <Leader>- :exe "resize " . (winheight(0) * 2/3)<CR>
 " Do not overwrite yanked stuff
 xnoremap p pgvy
 
-" Browse FZF files
+" Search files
 nnoremap <silent> <Leader><space> :Files<CR>
+" Search files content
+nnoremap <silent> <Leader>f :Rg<CR>
 " #############################################################################
 " Plugins
 " #############################################################################
