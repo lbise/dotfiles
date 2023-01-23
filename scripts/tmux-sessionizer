@@ -12,7 +12,7 @@ fi
 if [[ $# -eq 1 ]]; then
     selected=$1
 else
-    selected=$(find $directories -mindepth 1 -maxdepth 1 -type d -not -path "*/.*" | echo -e "$HOME\n$(</dev/stdin)" | fzf)
+    selected=$(find $directories -mindepth 1 -maxdepth 1 -type d -not -path "*/.*" | echo -e "$HOME\n$(</dev/stdin)" | fzf-tmux -p -w 35% -h 38% --reverse)
 fi
 
 if [[ -z $selected ]]; then
