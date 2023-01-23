@@ -182,7 +182,9 @@ export FZF_DEFAULT_OPTS=$FZF_DEFAULT_OPTS'
     --color=fg+:#D8DEE9,prompt:#81A1C1,hl+:#81A1C1'
 
 #### BINDINGS ####
-bindkey -s ^f "^utmux-sessionizer\n"
+# ctrl + space starts sessionizer. If we are running in tmux this will not be
+# executed, but rather the tmux binding since ctrl + space is tmux prefix
+bindkey -s '^@' "^utmux-sessionizer\n"
 
 #### VARIABLES ####
 DOT="$HOME/gitrepo/dotfiles"
