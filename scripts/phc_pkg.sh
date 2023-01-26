@@ -2,13 +2,19 @@
 REPO="/mnt/ch03pool/murten_mirror/shannon/linux/packages"
 
 if [ -z "$1" ]; then
-	echo "You must specify an input file"
+    echo "Usage: $0 [-f] input"
 	exit 1
 fi
 
-INPUT=$1
+FORCE=0
+if [ "$1" = "-f" ]; then
+    echo "Use the force!"
+    FORCE=1
+    shift
+fi
 
-if [ ! -f "$INPUT" ]; then
+INPUT="$1"
+if [ ! -f "$INPUT" ] && [ ! -d "$INPUT" ]; then
 	echo "$INPUT does not exist!"
 	exit 1
 fi
@@ -18,29 +24,27 @@ if [ ! -d "$REPO" ]; then
 	exit 1
 fi
 
-MD5=($(md5sum $INPUT))
-OUTPUT="$REPO/$MD5"
-
-#if [ -f "$OUTPUT" ]; then
-#	echo "$OUTPUT already exist!"
-#	exit 1
-#fi
-
-if [ "${INPUT: -3}" != ".7z" ]; then
-	echo "File is not a 7z!"
-	exit 1
+DO7Z=1
+if [[ $INPUT == *.7z ]]; then
+    echo "Already an archive"
+    DO7Z=0
 fi
 
-echo "Packaging $INPUT ($MD5)"
+if [ $DO7Z = 1 ]; then
+    ARCHIVE=$(basename -- "$INPUT")
+    ARCHIVE="${ARCHIVE%.*}.7z"
 
-exit 1
+    if [ $FORCE = 0 ] && [ -f "$ARCHIVE" ]; then
+        echo "$ARCHIVE already exists!"
+        exit 1
+    fi
 
-cp $INPUT $OUTPUT
+    echo "Creating archive: $ARCHIVE"
+    7z a $ARCHIVE $INPUT
+fi
 
-INPUT_PATH=$(realpath $INPUT)
-echo "$INPUT_PATH"
-INPUT_PATH=$(basename "${INPUT}")
-echo "$INPUT_PATH"
-#echo "Real path: $INPUT_PATH"
+MD5=($(md5sum $ARCHIVE))
+OUTPUT="$REPO/$MD5"
+echo "Copying -> $OUTPUT"
 
-#echo "cp $INPUT $(basename $INPUT)/$MD5"
+cp $ARCHIVE $OUTPUT
