@@ -1,8 +1,8 @@
 #!/bin/env bash
-REPO="/mnt/ch03pool/murten_mirror/shannon/linux/packages"
-
 if [ -z "$1" ]; then
     echo "Usage: $0 [-f] input"
+    echo "\t-f: Force overwrite of output when creating archive locally"
+    echo "\t-w: Output to windows repository"
 	exit 1
 fi
 
@@ -12,6 +12,15 @@ if [ "$1" = "-f" ]; then
     FORCE=1
     shift
 fi
+
+if [ "$1" = "-w" ]; then
+    shift
+    REPO="/mnt/ch03pool/murten_mirror/shannon/packages"
+else
+    REPO="/mnt/ch03pool/murten_mirror/shannon/linux/packages"
+fi
+
+echo "Target repository: $REPO"
 
 INPUT="$1"
 if [ ! -f "$INPUT" ] && [ ! -d "$INPUT" ]; then
@@ -28,6 +37,7 @@ DO7Z=1
 if [[ $INPUT == *.7z ]]; then
     echo "Already an archive"
     DO7Z=0
+    ARCHIVE="$INPUT"
 fi
 
 if [ $DO7Z = 1 ]; then
