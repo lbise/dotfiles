@@ -45,6 +45,6 @@ if [ "$USER" = "13lbise" ] && [ ! -d "$ANDROMEDA" ]; then
     fi
 
     if [ "$env" != "none" ]; then
-        c e $env
+        python3 $HOME/andromeda/swcmp.py extract $env
     fi
 fi
