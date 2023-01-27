@@ -17,6 +17,7 @@ X_ON="set -x"
 X_OFF="set +x"
 CHMOD="chmod"
 CP="cp"
+MV="mv"
 MKDIR="mkdir"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
@@ -157,9 +158,9 @@ function install_keys_sonova() {
 
     if [ ! -f "$SSH_DST_PRIV" ] || [ ! -f "$SSH_DST_PUB" ]; then
         echo "Installing SSH keys: $SSH_SRC_PRIV -> $SSH_DST_PRIV; $SSH_SRC_PUB -> $SSH_DST_PUB"
-	    $CP "$SSH_SRC_PRIV" "$SSH_DST_PATH"
+	    $MV "$SSH_SRC_PRIV" "$SSH_DST_PATH"
 	    $CHMOD 600 "$SSH_DST_PRIV"
-	    $CP "$SSH_SRC_PUB" "$SSH_DST_PATH"
+	    $MV "$SSH_SRC_PUB" "$SSH_DST_PATH"
 	    $CHMOD 644 "$SSH_DST_PUB"
     fi
 
@@ -176,9 +177,9 @@ function install_keys_sonova() {
 
     if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PRIV" ]; then
         echo "Installing GPG keys: $GPG_SRC_PRIV -> $GPG_DST_PRIV; $GPG_SRC_PUB -> $GPG_DST_PUB"
-	    $CP "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
+	    $MV "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
 	    $CHMOD 600 "$GPG_DST_PRIV"
-	    $CP "$GPG_SRC_PUB" "$GPG_DST_PUB"
+	    $MV "$GPG_SRC_PUB" "$GPG_DST_PUB"
 	    $CHMOD 644 "$GPG_DST_PUB"
     fi
 }
@@ -354,6 +355,7 @@ if [ $TEST_MODE = 1 ] || [ $LINK_ONLY = 1 ]; then
     X_OFF=""
     CHMOD="echo test: ${CHMOD}"
     CP="echo test: ${CP}"
+    MV="echo test: ${MV}"
     MKDIR="echo test: ${MKDIR}"
 fi
 
