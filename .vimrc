@@ -67,7 +67,7 @@ map <C-Left> :bn<CR>
 map <C-Right> :bp<CR>
 map <C-h> :bn<CR>
 map <C-l> :bp<CR>
-nnoremap <C-j> :BD<CR>
+nnoremap <C-j> :Bd<CR>
 
 " Clear search highlights
 nnoremap <silent> <Leader><Esc> <Esc>:nohlsearch<CR><Esc>
@@ -210,4 +210,8 @@ Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 Plug 'vim-airline/vim-airline'
 Plug 'justinmk/vim-dirvish'
+Plug 'tpope/vim-fugitive'
+Plug 'ojroques/vim-oscyank'
+Plug 'moll/vim-bbye'
+Plug 'tpope/vim-obsession'
 call plug#end()
