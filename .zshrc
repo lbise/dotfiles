@@ -194,13 +194,10 @@ DOT="$HOME/gitrepo/dotfiles"
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
 
 if [ "$USER" = "13lbise" ]; then
-	# Set x server display
-	export DISPLAY=CH03MWJ5QLLN3.corp.ads:0
     MYT="/mnt/t/${USER}"
     WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
     alias andro="cd $HOME/andromeda; source sourceme"
     alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
-    #alias vim="vim -X" # So it doesn't hang at start when on SSH
     CURRENT_DIR=$PWD
     if [ -d "$HOME/andromeda" ]; then
         # Sourceme then go back to pwd
@@ -212,6 +209,12 @@ if [ "$USER" = "13lbise" ]; then
     # Helios stuff
     export PYTHON310_64_EXE=/usr/bin/python3
 elif [ "$USER" = "leo" ]; then
-	export DISPLAY=:0
 	cd $HOME
+fi
+
+if [[ -n "$IS_WSL" || -n "$WSL_DISTRO_NAME" ]]; then
+    # Running WSL
+    echo "- WSL detected"
+    export DISPLAY=$(awk '/nameserver / {print $2; exit}' /etc/resolv.conf 2>/dev/null):0
+    echo "    DISPLAY=$DISPLAY"
 fi
