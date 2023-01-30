@@ -19,33 +19,11 @@
 	email = leonard.bise@sonova.com
 	signingkey = 74C8AEB4E19420A7
 
-[diff]
-	tool = kdiff3
-#	tool = meld
-
 [difftool]
 	prompt = false
 
-[difftool "meld"]
-	cmd = meld "$LOCAL" "$REMOTE"
-
-[difftool "kdiff3"]
-	keepBackup = false
-	trustExitCode = false
-
 [merge]
-	tool = kdiff3
-#	tool = meld
-
-[mergetool "meld"]
-	# $MERGED is the partially merged file with the merge conflict information in it
-	# $BASE is the shared commit ancestor of $LOCAL and $REMOTE, this is to say the file as it was when the branch containing $REMOTE was originally created
-	cmd = meld "$LOCAL" "$MERGED" "$REMOTE" --output "$MERGED"
-	cmd = meld "$LOCAL" "$BASE" "$REMOTE" --output "$MERGED"
-
-[mergetool "kdiff3"]
-	keepBackup = false
-	trustExitCode = false
+	tool = vimdiff2
 
 [grep]
 	extendRegexp = true
@@ -84,6 +62,7 @@
 	rebase = true
 [mergetool]
 	keepBackup = false
+	prompt = false
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f

@@ -16,23 +16,11 @@
 	email = leonard.bise@gmail.com
 	signingkey = ED0DFB79FF83B277
 
-[diff]
-	tool = meld
-
 [difftool]
 	prompt = false
 
-[difftool "meld"]
-	cmd = meld "$LOCAL" "$REMOTE"
-
 [merge]
-	tool = meld
-
-[mergetool "meld"]
-	# $MERGED is the partially merged file with the merge conflict information in it
-	# $BASE is the shared commit ancestor of $LOCAL and $REMOTE, this is to say the file as it was when the branch containing $REMOTE was originally created
-	cmd = meld "$LOCAL" "$MERGED" "$REMOTE" --output "$MERGED"
-	cmd = meld "$LOCAL" "$BASE" "$REMOTE" --output "$MERGED"
+	tool = vimdiff2
 
 [grep]
 	extendRegexp = true
