@@ -2,8 +2,8 @@
 USER="13lbise"
 OPTS="-X"
 
-INDEX_LIST=("ch03wxpevb12" "ch03wxpevb09" "ch03wx6xd2cf3" "ch03wx5027")
-COMMENT_LIST=("PEVB #12 Leo" "PEVB #9 Christophe" "EBOARD Alessandro" "UBOARD Standalone")
+INDEX_LIST=("ch03wxpevb12" "ch03wxpevb09" "ch03wx6xd2cf3" "ch03wx5027" "ch03wxeb01")
+COMMENT_LIST=("PEVB #12 Leo" "PEVB #9 Christophe" "EBOARD Alessandro" "UBOARD Standalone" "EBOARD SoC")
 
 function print_help {
 	echo "Usage: $0 [OPTION] INDEX [ARGS...]"
