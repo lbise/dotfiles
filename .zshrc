@@ -217,4 +217,7 @@ if [[ -n "$IS_WSL" || -n "$WSL_DISTRO_NAME" ]]; then
     echo "- WSL detected"
     export DISPLAY=$(awk '/nameserver / {print $2; exit}' /etc/resolv.conf 2>/dev/null):0
     echo "    DISPLAY=$DISPLAY"
+    if [[ $PWD == *"/mnt/c"* ]]; then
+        cd $HOME
+    fi
 fi
