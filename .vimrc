@@ -214,4 +214,5 @@ Plug 'tpope/vim-fugitive'
 Plug 'ojroques/vim-oscyank'
 Plug 'moll/vim-bbye'
 Plug 'tpope/vim-obsession'
+Plug 'ludovicchabant/vim-gutentags'
 call plug#end()
