@@ -215,4 +215,5 @@ Plug 'ojroques/vim-oscyank'
 Plug 'moll/vim-bbye'
 Plug 'tpope/vim-obsession'
 Plug 'ludovicchabant/vim-gutentags'
+Plug 'pixelneo/vim-python-docstring'
 call plug#end()
