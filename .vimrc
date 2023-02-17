@@ -44,6 +44,11 @@ if &listchars ==# 'eol:$' " Change setlist displayed char
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
 endif
 
+if executable('rg')
+    set grepprg=rg\ --no-heading\ --vimgrep\ --smart-case
+    set grepformat=%f:%l:%c:%m
+endif
+
 " save read-only files
 command -nargs=0 Sudow w !sudo tee % >/dev/null
 
