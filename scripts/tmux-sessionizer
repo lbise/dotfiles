@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 directories="$HOME/gitrepo $HOME/"
-script=""
+script="dev-tmux"
 if [ "$USER" == "13lbise" ]; then
     # Work user
     directories="$HOME/andromeda $directories"
-    # Run script to setup new session
-    script="dev-tmux"
 fi
-
 
 if [[ $# -eq 1 ]]; then
     selected=$1
