@@ -96,6 +96,10 @@ xnoremap p pgvy
 nnoremap <silent> <Leader><space> :Files<CR>
 " Search files content
 nnoremap <silent> <Leader>f :Rg<CR>
+
+" python docstring
+nnoremap <silent> <Leader>ss :Docstring<CR>
+
 " #############################################################################
 " Plugins
 " #############################################################################
