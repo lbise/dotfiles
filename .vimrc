@@ -395,4 +395,5 @@ Plug 'moll/vim-bbye'
 Plug 'tpope/vim-obsession'
 Plug 'ludovicchabant/vim-gutentags'
 Plug 'pixelneo/vim-python-docstring'
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
 call plug#end()
