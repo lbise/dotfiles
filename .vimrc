@@ -49,8 +49,10 @@ if executable('rg')
     set grepformat=%f:%l:%c:%m
 endif
 
-" save read-only files
-command -nargs=0 Sudow w !sudo tee % >/dev/null
+" Save using sudo
+command -nargs=0 SaveAsRoot :execute ':silent w !sudo tee % > /dev/null' | :edit!
+cnoreabbrev sudow SaveAsRoot
+cmap w!! :SaveAsRoot<CR>
 
 " #############################################################################
 " Mappings
