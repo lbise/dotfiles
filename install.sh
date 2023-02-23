@@ -221,7 +221,7 @@ function install_ubuntu_20_04() {
 }
 
 function install_ubuntu_common() {
-    PKGS="zsh fzf ripgrep silversearcher-ag nodejs"
+    PKGS="zsh fzf ripgrep silversearcher-ag"
     if [ "$WORK_INSTALL" = 1 ]; then
         PKGS="$PKGS git-lfs"
     fi
