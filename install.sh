@@ -51,7 +51,7 @@ function rm_symlinks() {
     $RM_RF ~/.gdbinit
     $RM_RF ~/.gdbinit.d
     $RM_RF ~/.tmux.conf
-	$RM_RF ~/.tmux
+    $RM_RF ~/.tmux
     # For pinentry configuration (passphrase enter in command line)
     if [ ! -d ~/.gnupg ]; then
         $MKDIR ~/.gnupg
@@ -100,7 +100,7 @@ function install_common() {
 }
 
 function install_ohmyzsh() {
-	sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 }
 
 function install_zsh() {
@@ -152,16 +152,16 @@ function install_keys_sonova() {
 
     if [[ ! -d "$SSH_DST_PATH" ]]; then
         echo "Creating $SSH_DST_PATH"
-		$MKDIR "$SSH_DST_PATH"
+        $MKDIR "$SSH_DST_PATH"
         $CHMOD 700 "$SSH_DST_PATH"
     fi
 
     if [ ! -f "$SSH_DST_PRIV" ] || [ ! -f "$SSH_DST_PUB" ]; then
         echo "Installing SSH keys: $SSH_SRC_PRIV -> $SSH_DST_PRIV; $SSH_SRC_PUB -> $SSH_DST_PUB"
-	    $MV "$SSH_SRC_PRIV" "$SSH_DST_PATH"
-	    $CHMOD 600 "$SSH_DST_PRIV"
-	    $MV "$SSH_SRC_PUB" "$SSH_DST_PATH"
-	    $CHMOD 644 "$SSH_DST_PUB"
+        $MV "$SSH_SRC_PRIV" "$SSH_DST_PATH"
+        $CHMOD 600 "$SSH_DST_PRIV"
+        $MV "$SSH_SRC_PUB" "$SSH_DST_PATH"
+        $CHMOD 644 "$SSH_DST_PUB"
     fi
 
     if [ ! -f "$GPG_SRC_PRIV" ] || [ ! -f "$GPG_SRC_PUB" ]; then
@@ -171,16 +171,16 @@ function install_keys_sonova() {
 
     if [[ ! -d "$GPG_DST_PATH" ]]; then
         echo "Creating $GPG_DST_PATH"
-		$MKDIR "$GPG_DST_PATH"
+        $MKDIR "$GPG_DST_PATH"
         $CHMOD 700 "$GPG_DST_PATH"
     fi
 
     if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PRIV" ]; then
         echo "Installing GPG keys: $GPG_SRC_PRIV -> $GPG_DST_PRIV; $GPG_SRC_PUB -> $GPG_DST_PUB"
-	    $MV "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
-	    $CHMOD 600 "$GPG_DST_PRIV"
-	    $MV "$GPG_SRC_PUB" "$GPG_DST_PUB"
-	    $CHMOD 644 "$GPG_DST_PUB"
+        $MV "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
+        $CHMOD 600 "$GPG_DST_PRIV"
+        $MV "$GPG_SRC_PUB" "$GPG_DST_PUB"
+        $CHMOD 644 "$GPG_DST_PUB"
     fi
 }
 
@@ -245,7 +245,7 @@ function install_ubuntu() {
         install_ubuntu_22_04
     fi
 
-	install_common
+    install_common
 }
 ################################################################################
 # MacOs
@@ -266,7 +266,7 @@ function install_macos() {
     $MACOS_UPGRADE
     $MACOS_INSTALL $PKGS
 
-	install_common
+    install_common
 }
 ################################################################################
 # Arch
@@ -289,7 +289,7 @@ function install_arch() {
     echo "Installing for Arch Linux..."
     install_arch_common
 
-	install_common
+    install_common
 }
 ################################################################################
 #
@@ -377,8 +377,8 @@ case "$OS" in
     install_ubuntu
     ;;
     "Darwin")
-	install_macos
-	;;
+    install_macos
+    ;;
     "Arch Linux")
     install_arch
     ;;
