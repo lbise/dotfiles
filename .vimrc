@@ -154,6 +154,7 @@ let g:coc_global_extensions = [
             \ 'coc-pairs',
             \ 'coc-snippets',
             \ 'coc-json',
+            \ 'coc-sh',
             \ ]
 
 " May need for Vim (not Neovim) since coc.nvim calculates byte offset by count
