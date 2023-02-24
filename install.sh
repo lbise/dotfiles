@@ -88,13 +88,43 @@ function ln_symlinks() {
     $X_OFF
 }
 
+function install_nodejs() {
+    # Check version, need >= 14.14
+    VERSION=$(node -v)
+    # Format v18.14.0
+    if [[ $VERSION =~ v([0-9]+).([0-9]+) ]]; then
+        MAJOR=${BASH_REMATCH[1]}
+        MINOR=${BASH_REMATCH[2]}
+        if [ "$MAJOR" -lt "14" ]; then
+            UPDATE=1
+        elif [ "$MAJOR" -eq "14" ] && [ "$MINOR" -lt "14" ]; then
+            UPDATE=1
+        fi
+    else
+        UPDATE=1
+    fi
+
+    if [ "$UPDATE" = "1" ]; then
+        # --force prevents prompt to ask to install nodejs
+        curl -sL install-node.vercel.app/lts | sudo bash -s -- --force
+    else
+        echo "nodejs $VERSION already installed"
+    fi
+
+    exit
+
+}
+
 function install_common() {
     echo "-------------------------------------------------------------------------"
     echo "Installing common items..."
 
     install_zsh
 
-	# Setup symlinks
+    # Required for vim-coc (>= 14.14)
+    install_nodejs
+
+    # Setup symlinks
     rm_symlinks
     ln_symlinks
 }
