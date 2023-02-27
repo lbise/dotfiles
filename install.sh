@@ -110,9 +110,6 @@ function install_nodejs() {
     else
         echo "nodejs $VERSION already installed"
     fi
-
-    exit
-
 }
 
 function install_common() {
