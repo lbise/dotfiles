@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+    # Allow sudo x11 applications
+    HOME_FOLDER=$HOME
+    sudo xauth add $(xauth -f $HOME_FOLDER/.Xauthority list|tail -1)
+fi
