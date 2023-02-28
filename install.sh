@@ -89,19 +89,21 @@ function ln_symlinks() {
 }
 
 function install_nodejs() {
-    # Check version, need >= 14.14
-    VERSION=$(node -v)
-    # Format v18.14.0
-    if [[ $VERSION =~ v([0-9]+).([0-9]+) ]]; then
-        MAJOR=${BASH_REMATCH[1]}
-        MINOR=${BASH_REMATCH[2]}
-        if [ "$MAJOR" -lt "14" ]; then
-            UPDATE=1
-        elif [ "$MAJOR" -eq "14" ] && [ "$MINOR" -lt "14" ]; then
-            UPDATE=1
-        fi
-    else
+    if ! command -v node &> /dev/null; then
         UPDATE=1
+    else
+        # Check version, need >= 14.14
+        VERSION=$(node -v)
+        # Format v18.14.0
+        if [[ $VERSION =~ v([0-9]+).([0-9]+) ]]; then
+            MAJOR=${BASH_REMATCH[1]}
+            MINOR=${BASH_REMATCH[2]}
+            if [ "$MAJOR" -lt "14" ]; then
+                UPDATE=1
+            elif [ "$MAJOR" -eq "14" ] && [ "$MINOR" -lt "14" ]; then
+                UPDATE=1
+            fi
+        fi
     fi
 
     if [ "$UPDATE" = "1" ]; then
