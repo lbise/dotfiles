@@ -208,8 +208,6 @@ if [ "$USER" = "13lbise" ]; then
 
     # Helios stuff
     export PYTHON310_64_EXE=/usr/bin/python3
-elif [ "$USER" = "leo" ]; then
-	cd $HOME
 fi
 
 if [[ -n "$IS_WSL" || -n "$WSL_DISTRO_NAME" ]]; then
