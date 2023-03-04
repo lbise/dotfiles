@@ -14,14 +14,6 @@
         {
             "command": 
             {
-                "action": "switchToTab",
-                "index": 6
-            },
-            "keys": "ctrl+shift+7"
-        },
-        {
-            "command": 
-            {
                 "action": "newTab",
                 "index": 0
             },
@@ -30,10 +22,34 @@
         {
             "command": 
             {
+                "action": "switchToTab",
+                "index": 6
+            },
+            "keys": "ctrl+shift+7"
+        },
+        {
+            "command": 
+            {
+                "action": "switchToTab",
+                "index": 2
+            },
+            "keys": "ctrl+shift+3"
+        },
+        {
+            "command": 
+            {
                 "action": "newTab",
                 "index": 8
             },
             "keys": "ctrl+alt+9"
+        },
+        {
+            "command": 
+            {
+                "action": "resizePane",
+                "direction": "left"
+            },
+            "keys": "alt+shift+h"
         },
         {
             "command": "find",
@@ -50,14 +66,6 @@
         {
             "command": 
             {
-                "action": "switchToTab",
-                "index": 7
-            },
-            "keys": "ctrl+shift+8"
-        },
-        {
-            "command": 
-            {
                 "action": "newTab",
                 "index": 2
             },
@@ -66,10 +74,26 @@
         {
             "command": 
             {
+                "action": "switchToTab",
+                "index": 7
+            },
+            "keys": "ctrl+shift+8"
+        },
+        {
+            "command": 
+            {
                 "action": "moveFocus",
                 "direction": "left"
             },
             "keys": "ctrl+shift+h"
+        },
+        {
+            "command": 
+            {
+                "action": "switchToTab",
+                "index": 8
+            },
+            "keys": "ctrl+shift+9"
         },
         {
             "command": "togglePaneZoom",
@@ -83,6 +107,14 @@
                 "splitMode": "duplicate"
             },
             "keys": "ctrl+shift+w"
+        },
+        {
+            "command": 
+            {
+                "action": "resizePane",
+                "direction": "right"
+            },
+            "keys": "alt+shift+l"
         },
         {
             "command": 
@@ -121,14 +153,6 @@
             "command": 
             {
                 "action": "switchToTab",
-                "index": 8
-            },
-            "keys": "ctrl+shift+9"
-        },
-        {
-            "command": 
-            {
-                "action": "switchToTab",
                 "index": 5
             },
             "keys": "ctrl+shift+6"
@@ -148,14 +172,6 @@
         {
             "command": 
             {
-                "action": "resizePane",
-                "direction": "left"
-            },
-            "keys": "alt+shift+h"
-        },
-        {
-            "command": 
-            {
                 "action": "newTab",
                 "index": 3
             },
@@ -168,14 +184,6 @@
                 "direction": "down"
             },
             "keys": "alt+shift+j"
-        },
-        {
-            "command": 
-            {
-                "action": "resizePane",
-                "direction": "right"
-            },
-            "keys": "alt+shift+l"
         },
         {
             "command": "unbound",
@@ -200,14 +208,6 @@
         {
             "command": "unbound",
             "keys": "ctrl+shift+home"
-        },
-        {
-            "command": 
-            {
-                "action": "switchToTab",
-                "index": 2
-            },
-            "keys": "ctrl+shift+3"
         },
         {
             "command": 
@@ -249,6 +249,10 @@
             "keys": "ctrl+shift+5"
         },
         {
+            "command": "scrollToBottom",
+            "keys": "ctrl+end"
+        },
+        {
             "command": 
             {
                 "action": "newTab",
@@ -288,10 +292,6 @@
             "keys": "ctrl+up"
         },
         {
-            "command": "scrollToBottom",
-            "keys": "ctrl+end"
-        },
-        {
             "command": "scrollToTop",
             "keys": "ctrl+home"
         }
@@ -311,15 +311,15 @@
             {
                 "backgroundImage": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "backgroundImageAlignment": "bottomRight",
-                "backgroundImageOpacity": 0.40000000000000002,
+                "backgroundImageOpacity": 0.4,
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "commandline": "wsl -u 13lbise -d ubuntu-andromeda-22.04",
+                "commandline": "wsl",
                 "font": 
                 {
                     "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "size": 13.0
                 },
                 "guid": "{e381fe40-9d15-58b7-99ea-5908cd6561e5}",
                 "hidden": false,
@@ -333,15 +333,15 @@
             {
                 "backgroundImage": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "backgroundImageAlignment": "bottomRight",
-                "backgroundImageOpacity": 0.40000000000000002,
+                "backgroundImageOpacity": 0.4,
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "commandline": "wsl -u root -d ubuntu-andromeda-22.04",
+                "commandline": "wsl -u root",
                 "font": 
                 {
                     "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "size": 13.0
                 },
                 "guid": "{20fa7bc1-04d8-547c-8ef6-6dadb2f5ccc1}",
                 "hidden": false,
@@ -359,7 +359,7 @@
                 "font": 
                 {
                     "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "size": 13.0
                 },
                 "guid": "{48304432-9bb7-59d7-8dcd-c6121744ab02}",
                 "icon": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\mingw64\\share\\git\\git-for-windows.ico",
@@ -374,7 +374,7 @@
                 "font": 
                 {
                     "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "size": 13.0
                 },
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
@@ -602,6 +602,29 @@
             "yellow": "#C4A000"
         },
         {
+            "background": "#300A24",
+            "black": "#171421",
+            "blue": "#0037DA",
+            "brightBlack": "#767676",
+            "brightBlue": "#08458F",
+            "brightCyan": "#2C9FB3",
+            "brightGreen": "#26A269",
+            "brightPurple": "#A347BA",
+            "brightRed": "#C01C28",
+            "brightWhite": "#F2F2F2",
+            "brightYellow": "#A2734C",
+            "cursorColor": "#FFFFFF",
+            "cyan": "#3A96DD",
+            "foreground": "#FFFFFF",
+            "green": "#26A269",
+            "name": "Ubuntu-22.04-ColorScheme",
+            "purple": "#881798",
+            "red": "#C21A23",
+            "selectionBackground": "#FFFFFF",
+            "white": "#CCCCCC",
+            "yellow": "#A2734C"
+        },
+        {
             "background": "#000000",
             "black": "#000000",
             "blue": "#000080",
@@ -626,6 +649,7 @@
         }
     ],
     "theme": "dark",
+    "themes": [],
     "trimBlockSelection": true,
     "wordDelimiters": " ()\"':,;<>~!@#$%^&*|+=[]{}~?\u2502"
 }
