@@ -150,29 +150,23 @@ function install_zsh() {
     fi
 }
 
-function install_keys_sonova() {
+function install_ssh_keys() {
     echo "-------------------------------------------------------------------------"
-    echo "Installing keys..."
+    echo "Installing SSH keys..."
 
-    SSH_NAME="id_ed25519_git_sonova"
+    if [ -z "$1" ]; then
+        echo "You must provide the key name: $0 <ssh_key_name>"
+        return
+    fi
+
+    SSH_NAME="$1"
+
     SSH_SRC_PATH="$KEYS_SSH_DIR"
     SSH_DST_PATH="$HOME/.ssh"
     SSH_SRC_PRIV="$SSH_SRC_PATH/$SSH_NAME"
     SSH_SRC_PUB="$SSH_SRC_PATH/$SSH_NAME.pub"
     SSH_DST_PRIV="$SSH_DST_PATH/$SSH_NAME"
     SSH_DST_PUB="$SSH_DST_PATH/$SSH_NAME.pub"
-
-    GPG_SRC_PATH="$KEYS_GPG_DIR"
-    GPG_DST_PATH="$HOME/.gnupg"
-    GPG_PRIV_NAME="sonova_private.pgp"
-    GPG_PUB_NAME="sonova_public.pgp"
-    GPG_CONF_NAME="gpg.conf"
-    GPG_SRC_PRIV="$GPG_SRC_PATH/$GPG_PRIV_NAME"
-    GPG_SRC_PUB="$GPG_SRC_PATH/$GPG_PUB_NAME"
-    GPG_SRC_CONF="$DIR/gpg/$GPG_CONF_NAME"
-    GPG_DST_PRIV="$GPG_DST_PATH/$GPG_PRIV_NAME"
-    GPG_DST_PUB="$GPG_DST_PATH/$GPG_PUB_NAME"
-    GPG_DST_CONF="$GPG_DST_PATH/$GPG_CONF_NAME"
 
     if [ ! -f "$SSH_SRC_PRIV" ] || [ ! -f "$SSH_SRC_PUB" ]; then
         echo "Cannot find SSH keys: $SSH_SRC_PRIV $SSH_SRC_PUB. Skipping..."
@@ -192,6 +186,28 @@ function install_keys_sonova() {
         $MV "$SSH_SRC_PUB" "$SSH_DST_PATH"
         $CHMOD 644 "$SSH_DST_PUB"
     fi
+}
+
+function install_gpg_keys() {
+    echo "-------------------------------------------------------------------------"
+    echo "Installing SSH keys..."
+
+    if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "You must provide the key names: $0 <private_key> <public_key>"
+        return
+    fi
+
+    GPG_PRIV_NAME="$1"
+    GPG_PUB_NAME="$2"
+    GPG_SRC_PATH="$KEYS_GPG_DIR"
+    GPG_DST_PATH="$HOME/.gnupg"
+    GPG_CONF_NAME="gpg.conf"
+    GPG_SRC_PRIV="$GPG_SRC_PATH/$GPG_PRIV_NAME"
+    GPG_SRC_PUB="$GPG_SRC_PATH/$GPG_PUB_NAME"
+    GPG_SRC_CONF="$DIR/gpg/$GPG_CONF_NAME"
+    GPG_DST_PRIV="$GPG_DST_PATH/$GPG_PRIV_NAME"
+    GPG_DST_PUB="$GPG_DST_PATH/$GPG_PUB_NAME"
+    GPG_DST_CONF="$GPG_DST_PATH/$GPG_CONF_NAME"
 
     if [ ! -f "$GPG_SRC_PRIV" ] || [ ! -f "$GPG_SRC_PUB" ]; then
         echo "Cannot find GPG keys: $GPG_SRC_PRIV $GPG_SRC_PUB. Skipping..."
@@ -204,13 +220,33 @@ function install_keys_sonova() {
         $CHMOD 700 "$GPG_DST_PATH"
     fi
 
-    if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PRIV" ]; then
+    if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PUB" ]; then
         echo "Installing GPG keys: $GPG_SRC_PRIV -> $GPG_DST_PRIV; $GPG_SRC_PUB -> $GPG_DST_PUB"
         $MV "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
         $CHMOD 600 "$GPG_DST_PRIV"
         $MV "$GPG_SRC_PUB" "$GPG_DST_PUB"
         $CHMOD 644 "$GPG_DST_PUB"
+        gpg --import "$GPG_DST_PRIV"
     fi
+}
+
+function install_keys() {
+    echo $USER
+    if [ "$USER" = "13lbise" ]; then
+        SSH_NAME="id_ed25519_git_sonova"
+        GPG_PRIV_NAME="sonova_private.pgp"
+        GPG_PUB_NAME="sonova_public.pgp"
+    elif [ "$USER" = "leo" ]; then
+        SSH_NAME="id_rsa"
+        GPG_PRIV_NAME="private.pgp"
+        GPG_PUB_NAME="public.pgp"
+    else
+        echo "Cannot determine key names"
+        return
+    fi
+
+    install_ssh_keys $SSH_NAME
+    install_gpg_keys $GPG_PRIV_NAME $GPG_PUB_NAME
 }
 
 function install_work() {
@@ -219,7 +255,6 @@ function install_work() {
     fi
 
     echo "Work specific install..."
-    install_keys_sonova
 }
 
 function install_for_wsl() {
@@ -416,6 +451,8 @@ case "$OS" in
     exit 1
     ;;
 esac
+
+install_keys
 
 if [ "$WORK_INSTALL" = 1 ]; then
     install_work
