@@ -135,7 +135,7 @@ function install_ohmyzsh() {
 function install_zsh() {
     echo "-------------------------------------------------------------------------"
     echo "Installing zsh..."
-    if [ -z "$ZSH" ]; then
+    if [ -z "$ZSH" ] || [ ! -d "$HOME/.oh-my-zsh" ]; then
         $ZSH_INSTALL
     fi
 
