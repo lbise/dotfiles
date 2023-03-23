@@ -33,9 +33,6 @@ set hidden
 " Write buffer on :next, :last etc
 set autowrite
 
-" Read file on outside change
-set autoread
-
 " Lower delay on exit insert mode
 set ttimeoutlen=10
 
@@ -90,7 +87,7 @@ set incsearch
 set ruler
 
 " Tab completion for files/buffers
-set wildmode=list:longest,full
+set wildmode=list:full
 
 " Command line completion menu
 set wildmenu
