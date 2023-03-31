@@ -120,12 +120,12 @@ function install_common() {
 
     install_zsh
 
-    # Required for vim-coc (>= 14.14)
-    install_nodejs
-
     # Setup symlinks
     rm_symlinks
     ln_symlinks
+
+    # Required for vim-coc (>= 14.14)
+    install_nodejs
 }
 
 function install_ohmyzsh() {
@@ -135,7 +135,7 @@ function install_ohmyzsh() {
 function install_zsh() {
     echo "-------------------------------------------------------------------------"
     echo "Installing zsh..."
-    if [ -z "$ZSH" ] || [ ! -d "$HOME/.oh-my-zsh" ]; then
+    if [ ! -d "$HOME/.oh-my-zsh" ]; then
         $ZSH_INSTALL
     fi
 
@@ -285,7 +285,8 @@ function install_ubuntu_20_04() {
 }
 
 function install_ubuntu_common() {
-    PKGS="zsh fzf ripgrep silversearcher-ag"
+    # gzip needed for nodejs installation
+    PKGS="zsh fzf ripgrep gzip"
     if [ "$WORK_INSTALL" = 1 ]; then
         PKGS="$PKGS git-lfs"
     fi
