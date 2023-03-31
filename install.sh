@@ -181,9 +181,9 @@ function install_ssh_keys() {
 
     if [ ! -f "$SSH_DST_PRIV" ] || [ ! -f "$SSH_DST_PUB" ]; then
         echo "Installing SSH keys: $SSH_SRC_PRIV -> $SSH_DST_PRIV; $SSH_SRC_PUB -> $SSH_DST_PUB"
-        $MV "$SSH_SRC_PRIV" "$SSH_DST_PATH"
+        $CP "$SSH_SRC_PRIV" "$SSH_DST_PATH"
         $CHMOD 600 "$SSH_DST_PRIV"
-        $MV "$SSH_SRC_PUB" "$SSH_DST_PATH"
+        $CP "$SSH_SRC_PUB" "$SSH_DST_PATH"
         $CHMOD 644 "$SSH_DST_PUB"
     fi
 }
@@ -222,16 +222,15 @@ function install_gpg_keys() {
 
     if [ ! -f "$GPG_DST_PRIV" ] || [ ! -f "$GPG_DST_PUB" ]; then
         echo "Installing GPG keys: $GPG_SRC_PRIV -> $GPG_DST_PRIV; $GPG_SRC_PUB -> $GPG_DST_PUB"
-        $MV "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
+        $CP "$GPG_SRC_PRIV" "$GPG_DST_PRIV"
         $CHMOD 600 "$GPG_DST_PRIV"
-        $MV "$GPG_SRC_PUB" "$GPG_DST_PUB"
+        $CP "$GPG_SRC_PUB" "$GPG_DST_PUB"
         $CHMOD 644 "$GPG_DST_PUB"
         gpg --import "$GPG_DST_PRIV"
     fi
 }
 
 function install_keys() {
-    echo $USER
     if [ "$USER" = "13lbise" ]; then
         SSH_NAME="id_ed25519_git_sonova"
         GPG_PRIV_NAME="sonova_private.pgp"
@@ -247,6 +246,17 @@ function install_keys() {
 
     install_ssh_keys $SSH_NAME
     install_gpg_keys $GPG_PRIV_NAME $GPG_PUB_NAME
+
+    # Delete keys if they are not on one drive
+    if [ "$KEYS_SSH_DIR" != "$ONEDRIVE_PATH/.ssh" ]; then
+        RM "$KEYS_SSH_DIR/$SSH_NAME.pub"
+        RM "$KEYS_SSH_DIR/$SSH_NAME"
+    fi
+
+    if [ "$KEYS_GPG_DIR" != "$ONEDRIVE_PATH/.gnupg" ]; then
+        RM "$KEYS_GPG_DIR/$GPG_PUB_NAME"
+        RM "$KEYS_GPG_DIR/$GPG_PRIV_NAME"
+    fi
 }
 
 function install_work() {
