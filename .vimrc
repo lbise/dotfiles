@@ -1,8 +1,13 @@
 "###############################################################################
 " Leo's vimrc config
+" Many things taken from https://github.com/dwmkerr/dotfiles/blob/main/vim/vimrc
+" and vim sensible plugin
 "###############################################################################
 " Enable syntax highlighting
 syntax on
+
+" Disable vi compatiblity
+set nocompatible
 
 " Show matching braces
 set showmatch
@@ -34,10 +39,12 @@ set hidden
 set autowrite
 
 " Lower delay on exit insert mode
-set ttimeoutlen=10
+set ttimeout
+set ttimeoutlen=100
 
-" Highlight cursor
-set cursorline
+" When in insert mode, highlight the current line.
+:autocmd InsertEnter * set cul
+:autocmd InsertLeave * set nocul
 
 " Fast scrolling
 set ttyfast
@@ -98,10 +105,18 @@ set wildignore+=*.svn,*.git,*.swp,*.pyc,*.class,*/__pycache__/*
 set display+=lastline
 let g:netrw_banner = 0
 
+" Always show 1 line above/below curosor
+set scrolloff=1
+
 " Turn off all sound on errors
 set noerrorbells
 set novisualbell
 set vb t_vb=
+
+" Saving options in session and view files causes more problems than it
+" solves, so disable it.
+set sessionoptions-=options
+set viewoptions-=options
 
 " Change setlist displayed char
 if &listchars ==# 'eol:$'
@@ -118,10 +133,41 @@ endif
 command! -bang -nargs=* Rg call fzf#vim#grep("rg --column --line-number --no-heading --color=always --smart-case ".shellescape(<q-args>), 1, {'options': '--delimiter : --nth 4..'}, <bang>0)
 command! -bang -nargs=* Ag call fzf#vim#ag(<q-args>, {'options': '--delimiter : --nth 4..'}, <bang>0)
 
+" Delete comment character when joining commented lines.
+if v:version > 703 || v:version == 703 && has("patch541")
+    set formatoptions+=j
+endif
+
 " Save using sudo
 command -nargs=0 SaveAsRoot :execute ':silent w !sudo tee % > /dev/null' | :edit!
 cnoreabbrev sudow SaveAsRoot
 cmap w!! :SaveAsRoot<CR>
+
+"###############################################################################
+" Language settings
+"###############################################################################
+" All languages - no autocommenting on newlines, 4 spaces soft tabs + expand
+au FileType * set fo-=c fo-=r fo-=o sw=4 sts=4 et
+
+" Language specific indentation.
+au FileType html           setl sw=2 sts=2 et
+au FileType javascript     setl sw=2 sts=2 et
+au FileType javascript.jsx setl sw=2 sts=2 et
+au FileType typescript     setl sw=2 sts=2 et
+au FileType typescript.tsx setl sw=2 sts=2 et
+au FileType json           setl sw=2 sts=2 et
+au FileType ruby           setl sw=2 sts=2 et
+au FileType yaml           setl sw=2 sts=2 et
+au FileType terraform      setl sw=2 sts=2 et
+au FileType make           set noexpandtab shiftwidth=8 softtabstop=0 " makefiles must use tabs
+au FileType sshconfig      setl sw=2 sts=2 etc
+
+" Enable spellchecking on git commit
+autocmd FileType gitcommit setlocal spell
+
+" Use c syntax for andromeda files
+au BufRead,BufNewFile *.unity set filetype=c
+au BufRead,BufNewFile *.sid set filetype=c
 
 "###############################################################################
 " Mappings
@@ -417,18 +463,18 @@ autocmd InsertEnter * match ExtraWhitespace /\s\+\%#\@<!$/
 autocmd InsertLeave * match ExtraWhitespace /\s\+$/
 autocmd BufWinLeave * call clearmatches()
 
-" Toggle between relative / norelative when changing window
-" HAVE TO BE AFTER COLORSCHEME
-augroup numbertoggle
-  autocmd!
-  autocmd BufEnter,FocusGained,InsertLeave * set relativenumber
-  autocmd BufLeave,FocusLost,InsertEnter   * set norelativenumber
-augroup END
-
-" Use c syntax for unity files
-au BufRead,BufNewFile *.unity set filetype=c
-" Use c syntax for sid files
-au BufRead,BufNewFile *.sid set filetype=sid
+" This group of autocommands automatically toggles to use normal line
+" numbers on insert mode and hybrid on visual. It also handles switching
+" if we lose or gain focus.
+" We put these autocommands in an autocommand group so that we can turn off
+" this behaviour in its entirity if we need to (such as when we enter focus
+" mode).
+augroup auto_toggle_relative_linenumbers
+    autocmd FocusLost * :set number norelativenumber
+    autocmd FocusGained * :set number relativenumber
+    autocmd InsertEnter * :set number norelativenumber
+    autocmd InsertLeave * :set number relativenumber
+augroup end
 
 " Create ~/.vimsession if needed
 silent !mkdir ~/.vimsession > /dev/null 2>&1
