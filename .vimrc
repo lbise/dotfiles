@@ -91,10 +91,8 @@ set noshowmode
 " Search results as search is typed
 set incsearch
 
+" Enable ruler
 set ruler
-
-" Tab completion for files/buffers
-set wildmode=list:full
 
 " Command line completion menu
 set wildmenu
@@ -310,6 +308,14 @@ nnoremap N Nzz
     " diagnostics appear/become resolved
     set signcolumn=yes
 
+    " Important: This took a while to get right - the documentation for
+    " COC suggests some tab options that use tab/s-tab to cycle through
+    " results. The behaviour below, from:
+    " https://stackoverflow.com/questions/63337283/how-to-select-first-item-in-popup-menu-and-close-menu-in-a-single-keybind-for-au
+    " is essentially 'what you'd get in VS Code'. Tab selects the first
+    " item in the list. Then use C-P,C-N (prev/next) to cycle.
+    inoremap <expr> <TAB> pumvisible() ? "\<C-y>" : "\<C-g>u\<TAB>"
+
     " Use tab for trigger completion with characters ahead and navigate
     " NOTE: There's always complete item selected by default, you may want to enable
     " no select by `"suggest.noselect": true` in your configuration file
@@ -319,17 +325,17 @@ nnoremap N Nzz
     "      \ coc#pum#visible() ? coc#pum#next(1) :
     "      \ CheckBackspace() ? "\<Tab>" :
     "      \ coc#refresh()
-    inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
+    "inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
 
     " Make <CR> to accept selected completion item or notify coc.nvim to format
     " <C-g>u breaks current undo, please make your own choice
-    inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
-                                  \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+    "inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
+    "                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
 
-    function! CheckBackspace() abort
-      let col = col('.') - 1
-      return !col || getline('.')[col - 1]  =~# '\s'
-    endfunction
+    "function! CheckBackspace() abort
+    "  let col = col('.') - 1
+    "  return !col || getline('.')[col - 1]  =~# '\s'
+    "endfunction
 
     " Use <c-space> to trigger completion
     "if has('nvim')
@@ -350,15 +356,15 @@ nnoremap N Nzz
     nmap <silent> gr <Plug>(coc-references)
 
     " Use K to show documentation in preview window
-    "nnoremap <silent> K :call ShowDocumentation()<CR>
-    "
-    "function! ShowDocumentation()
-    "  if CocAction('hasProvider', 'hover')
-    "    call CocActionAsync('doHover')
-    "  else
-    "    call feedkeys('K', 'in')
-    "  endif
-    "endfunction
+    nnoremap <silent> K :call ShowDocumentation()<CR>
+
+    function! ShowDocumentation()
+      if CocAction('hasProvider', 'hover')
+        call CocActionAsync('doHover')
+      else
+        call feedkeys('K', 'in')
+      endif
+    endfunction
 
     " Highlight the symbol and its references when holding the cursor
     autocmd CursorHold * silent call CocActionAsync('highlight')
@@ -367,8 +373,8 @@ nnoremap N Nzz
     nmap <F2> <Plug>(coc-rename)
 
     " Formatting selected code
-    "xmap <leader>f  <Plug>(coc-format-selected)
-    "nmap <leader>f  <Plug>(coc-format-selected)
+    xmap <leader>F  <Plug>(coc-format-selected)
+    nmap <leader>F  <Plug>(coc-format-selected)
 
     augroup mygroup
       autocmd!
