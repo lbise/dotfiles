@@ -1,0 +1,9 @@
+select inside parenthesis
+
+vi( : Do not select parenthesis
+va( : Select parenthesis
+
+o in visual mode: Move cursor to begining/end of selection
+
+>4j: Indent code by 4 on the right
+<4j: Indent code by 4 on the left
