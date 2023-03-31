@@ -287,7 +287,7 @@ nnoremap N Nzz
     let g:coc_global_extensions = [
                 "\ 'coc-clangd',
                 \ 'coc-pyright',
-                \ 'coc-pairs',
+                "\ 'coc-pairs',
                 \ 'coc-snippets',
                 \ 'coc-json',
                 \ 'coc-sh',
