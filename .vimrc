@@ -258,9 +258,14 @@ nnoremap <leader>O O<Esc>0"_D
     " Customize sections
     let g:airline_section_y = ""
     let g:airline_powerline_fonts = 1
-    if !exists('g:airline_symbols')
-        let g:airline_symbols = {}
-    endif
+    " Disable some stuff"
+    let g:airline#extensions#coc#enabled = 0
+    " enable/disable showing a summary of changed hunks under source control. >
+    let g:airline#extensions#hunks#enabled = 0
+
+    "if !exists('g:airline_symbols')
+    "    let g:airline_symbols = {}
+    "endif
 
     "***************************************************************************
     " ultisnips
@@ -435,7 +440,7 @@ nnoremap <leader>O O<Esc>0"_D
     " Add (Neo)Vim's native statusline support
     " NOTE: Please see `:h coc-status` for integrations with external plugins that
     " provide custom statusline: lightline.vim, vim-airline
-    set statusline^=%{coc#status()}%{get(b:,'coc_current_function','')}
+    "set statusline^=%{coc#status()}%{get(b:,'coc_current_function','')}
 
     " Mappings for CoCList
     " Show all diagnostics
