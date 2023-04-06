@@ -1,3 +1,6 @@
 {
-    "suggest.noselect": false
+    "suggest.noselect": false,
+    "python.formatting.provider": "yapf",
+    "python.formatting.autopep8Path": "/home/13lbise/.local/bin/autopep8",
+    "python.formatting.yapfPath": "/home/13lbise/.local/bin/yapf"
 }
