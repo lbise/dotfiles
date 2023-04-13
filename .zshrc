@@ -45,7 +45,11 @@ ZSH_THEME="candy"
 # DISABLE_LS_COLORS="true"
 
 # Uncomment the following line to disable auto-setting terminal title.
-# DISABLE_AUTO_TITLE="true"
+DISABLE_AUTO_TITLE="true"
+# DISABLE_AUTO_TITLE must be set to true for this function to work
+function set_terminal_title() {
+  echo -en "\e]2;$@\a"
+}
 
 # Uncomment the following line to enable command auto-correction.
 # ENABLE_CORRECTION="true"
@@ -219,3 +223,19 @@ if [[ -n "$IS_WSL" || -n "$WSL_DISTRO_NAME" ]]; then
         cd $HOME
     fi
 fi
+
+#### MISC ####
+# Set window title
+if [ $HOST = "CH03MWJ5QLLN3" ]; then
+    HOSTNAME="WSL"
+else
+    HOSTNAME=$HOST
+fi
+
+TITLE="$HOSTNAME : ${PWD##*/}"
+set_terminal_title $TITLE
+
+function chpwd () {
+    TITLE="$HOSTNAME : ${PWD##*/}"
+    set_terminal_title $TITLE
+}
