@@ -249,13 +249,13 @@ function install_keys() {
 
     # Delete keys if they are not on one drive
     if [ "$KEYS_SSH_DIR" != "$ONEDRIVE_PATH/.ssh" ]; then
-        RM "$KEYS_SSH_DIR/$SSH_NAME.pub"
-        RM "$KEYS_SSH_DIR/$SSH_NAME"
+        $RM_RF "$KEYS_SSH_DIR/$SSH_NAME.pub"
+        $RM_RF "$KEYS_SSH_DIR/$SSH_NAME"
     fi
 
     if [ "$KEYS_GPG_DIR" != "$ONEDRIVE_PATH/.gnupg" ]; then
-        RM "$KEYS_GPG_DIR/$GPG_PUB_NAME"
-        RM "$KEYS_GPG_DIR/$GPG_PRIV_NAME"
+        $RM_RF "$KEYS_GPG_DIR/$GPG_PUB_NAME"
+        $RM_RF "$KEYS_GPG_DIR/$GPG_PRIV_NAME"
     fi
 }
 
