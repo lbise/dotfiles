@@ -6,10 +6,10 @@
         {
             "command": 
             {
-                "action": "newTab",
-                "index": 0
+                "action": "moveFocus",
+                "direction": "right"
             },
-            "keys": "ctrl+alt+1"
+            "keys": "ctrl+shift+l"
         },
         {
             "command": 
@@ -22,14 +22,10 @@
         {
             "command": 
             {
-                "action": "moveFocus",
-                "direction": "right"
+                "action": "newTab",
+                "index": 0
             },
-            "keys": "ctrl+shift+l"
-        },
-        {
-            "command": "find",
-            "keys": "ctrl+shift+f"
+            "keys": "ctrl+alt+1"
         },
         {
             "command": 
@@ -40,12 +36,16 @@
             "keys": "ctrl+alt+9"
         },
         {
+            "command": "find",
+            "keys": "ctrl+shift+f"
+        },
+        {
             "command": 
             {
-                "action": "newTab",
-                "index": 2
+                "action": "moveFocus",
+                "direction": "down"
             },
-            "keys": "ctrl+alt+3"
+            "keys": "ctrl+shift+j"
         },
         {
             "command": 
@@ -58,10 +58,10 @@
         {
             "command": 
             {
-                "action": "moveFocus",
-                "direction": "down"
+                "action": "newTab",
+                "index": 2
             },
-            "keys": "ctrl+shift+j"
+            "keys": "ctrl+alt+3"
         },
         {
             "command": 
@@ -357,7 +357,7 @@
             {
                 "bellStyle": "none",
                 "colorScheme": "Nord",
-                "commandline": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\bin\\bash.exe --init-file sourceme -i",
+                "commandline": "C:\\Shannon\\_tools\\PortableGit-2.38.1-64-bit\\bin\\bash.exe --init-file sourceme -i",
                 "font": 
                 {
                     "face": "CaskaydiaCove NF Mono",
