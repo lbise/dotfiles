@@ -39,6 +39,7 @@ if [ "$USER" = "13lbise" ] && [ ! -d "$ANDROMEDA" ]; then
     git clone $ANDROMEDA_REPO andromeda
     cd andromeda
     source sourceme
+    ./infrastructure/scripts/bash/install_andromeda_linux.sh
     read -p "What env do you want to extract? (Enter for default, none for none):" env
     if [ "$env" = "" ]; then
         env="to4"
