@@ -116,6 +116,9 @@ set vb t_vb=
 set sessionoptions-=options
 set viewoptions-=options
 
+" Set the window's title, reflecting the file currently being edited
+set title
+
 " Change setlist displayed char
 if &listchars ==# 'eol:$'
 	set listchars=tab:>\ ,trail:-,extends:>,precedes:<,nbsp:+
