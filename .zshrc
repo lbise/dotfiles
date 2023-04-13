@@ -48,7 +48,7 @@ ZSH_THEME="candy"
 DISABLE_AUTO_TITLE="true"
 # DISABLE_AUTO_TITLE must be set to true for this function to work
 function set_terminal_title() {
-  echo -en "\e]2;$@\a"
+    echo -en "\e]2;$@\a"
 }
 
 # Uncomment the following line to enable command auto-correction.

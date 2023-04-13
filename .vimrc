@@ -292,6 +292,11 @@ nnoremap <leader>O O<Esc>0"_D
     let g:dirvish_mode = ':sort ,^.*[\/],'
 
     "***************************************************************************
+    " dirvish
+    "***************************************************************************
+    map <F9> :Fern . -drawer -toggle<CR>
+
+    "***************************************************************************
     " coc config
     " See https://github.com/neoclide/coc.nvim
     "***************************************************************************
@@ -536,4 +541,5 @@ Plug 'ludovicchabant/vim-gutentags'
 Plug 'pixelneo/vim-python-docstring'
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'airblade/vim-gitgutter'
+Plug 'lambdalisue/fern.vim'
 call plug#end()
