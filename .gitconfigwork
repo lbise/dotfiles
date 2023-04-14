@@ -78,3 +78,14 @@
 	helper = /home/13lbise/.scripts/git-credential-netrc -f ~/.netrc.gpg -v
 [commit]
 	gpgsign = true
+[safe]
+	directory = *
+[rerere]
+	enabled = true
+[tag]
+	gpgsign = true
+[remote "origin"]
+	prune = true
+[fetch]
+	prune = true
+	pruneTags = true
