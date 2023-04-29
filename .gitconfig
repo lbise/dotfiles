@@ -60,4 +60,6 @@
 [credential]
 	helper = /home/leo/.scripts/git-credential-netrc -f ~/.netrc.gpg -v
 [commit]
-	gpgsign = true
+    gpgsign = true
+[safe]
+	directory = *
