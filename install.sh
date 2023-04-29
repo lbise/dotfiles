@@ -22,6 +22,7 @@ MKDIR="mkdir"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
+COMMON_PACKAGES="zsh fzf ripgrep gzip tmux"
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
@@ -285,7 +286,7 @@ UBUNTU_UPDATE="sudo apt update"
 UBUNTU_INSTALL="sudo apt install -y "
 
 function install_ubuntu_22_04() {
-    PKGS="exuberant-ctags"
+    PKGS="universal-ctags"
     $UBUNTU_INSTALL $PKGS
 }
 
@@ -296,7 +297,7 @@ function install_ubuntu_20_04() {
 
 function install_ubuntu_common() {
     # gzip needed for nodejs installation
-    PKGS="zsh fzf ripgrep gzip"
+    PKGS=$COMMON_PACKAGES
     if [ "$WORK_INSTALL" = 1 ]; then
         PKGS="$PKGS git-lfs"
     fi
@@ -330,7 +331,7 @@ MACOS_UPGRADE="brew upgrade"
 MACOS_INSTALL="brew install"
 
 function install_macos() {
-    PKGS="zsh fzf gpg tmux"
+    PKGS="$COMMON_PACKAGES gpg universal-ctags"
 
     if [ "$WSL_ONLY" = 1 ]; then
         return
@@ -350,7 +351,7 @@ ARCH_UPDATE="sudo pacman -Syu"
 ARCH_INSTALL="sudo pacman -S --needed"
 
 function install_arch_common() {
-    PKGS="zsh fzf tmux"
+    PKGS="$COMMON_PACKAGES ctags"
 
     $ARCH_UPDATE
     $ARCH_INSTALL $PKGS
