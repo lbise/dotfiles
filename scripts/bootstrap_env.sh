@@ -17,8 +17,9 @@ fi
 
 if [ ! -d "$GITREPO" ]; then
     mkdir "$GITREPO"
-    cd $GITREPO
 fi
+
+cd $GITREPO
 
 if [ ! -d "$DOTFILES" ]; then
     git clone $DOTFILES_REPO
