@@ -1,6 +1,6 @@
 #!/bin/env bash
 GITREPO="$HOME/gitrepo"
-DOTFILES="$GITREPO/dotfiles"
+DOTFILES="$GITREPO/leo_dotfiles"
 #DOTFILES_REPO="https://github.com/lbise/dotfiles.git"
 DOTFILES_REPO="https://ch03git.phonak.com/13lbise/leo_dotfiles"
 
