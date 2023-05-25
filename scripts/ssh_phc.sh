@@ -2,8 +2,8 @@
 USER="13lbise"
 OPTS="-X"
 
-INDEX_LIST=("ch03wxpevb12" "ch03wxpevb09" "ch03wx6xd2cf3" "ch03wx5027" "ch03wxeb01" "ch03wxgntxpp3" "ch03wxfpga11" "ch03wxfpga10" "ch03wxfpga13" "ch03wx5034")
-COMMENT_LIST=("PEVB #12 Leo" "PEVB #9 Christophe" "EBOARD Alessandro" "UBOARD Standalone" "EBOARD SoC" "EBOARD Pascal" "PEB #11 Christophe" "PEB #10 Dimitri" "PEB #13 Florian" "UBOARD standalone RPI")
+INDEX_LIST=("ch03wxpevb12" "ch03wxpevb09" "ch03wx6xd2cf3" "ch03wx5027" "ch03wxeb01" "ch03wxgntxpp3" "ch03wxfpga11" "ch03wxfpga10" "ch03wxfpga13" "ch03wx5034" "ch03wxeevbcasa203" "ch03wxfpga15")
+COMMENT_LIST=("PEVB #12 Leo" "PEVB #9 Christophe" "EBOARD Alessandro" "UBOARD Standalone" "EBOARD SoC" "EBOARD Pascal" "PEB #11 Christophe" "PEB #10 Dimitri" "PEB #13 Florian" "UBOARD standalone RPI" "EBOARD Casablanca", "PEB #15 Samuel")
 
 function print_help {
 	echo "Usage: $0 [OPTION] INDEX [ARGS...]"
