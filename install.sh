@@ -130,7 +130,16 @@ function install_common() {
 }
 
 function install_ohmyzsh() {
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    if [ "$WORK_INSTALL" = 1 ]; then
+        OHZSH_ADDR="https://ch03git.phonak.com/13lbise/leo_dotfiles/raw/branch/master/ohmyzsh/tools/install.sh"
+        OHZSH_REMOTE="https://ch03git.phonak.com/13lbise/leo_dotfiles/src/branch/master/ohmyzsh"
+    else
+        OHZSH_ADDR="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+        OHZSH_REMOTE=""
+    fi
+
+    echo "Oh My Zsh remote: $OHZSH_REMOTE"
+    REMOTE="$OHZSH_REMOTE" sh -c "$(curl -fsSL $OHZSH_ADDR)"
 }
 
 function install_zsh() {
@@ -399,7 +408,6 @@ while [[ $# -gt 0 ]]; do
         WORK_INSTALL=1
         shift # get next arg
         ;;
-
         -k|--keys)
         KEYS_SSH_DIR="$2"
         KEYS_GPG_DIR="$2"
