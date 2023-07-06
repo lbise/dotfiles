@@ -1,0 +1,8 @@
+ch03wxpevb12;PEVB #12 Leo
+ch03wxpevb09;PEVB #9 Christophe
+ch03wxeb01;EBOARD SoC
+ch03wxfpga11;PEB #11 Christophe
+ch03wxfpga10;PEB #10 Dimitri
+ch03wxfpga13;PEB #13 Florian
+ch03wxeevbcasa203;EBOARD Casablanca
+ch03wxfpga15;PEB #15 Samuel
