@@ -90,6 +90,9 @@ function ln_symlinks() {
 }
 
 function install_nodejs() {
+    echo "-------------------------------------------------------------------------"
+    echo "Installing nodejs.."
+
     if ! command -v node &> /dev/null; then
         UPDATE=1
     else
@@ -131,15 +134,11 @@ function install_common() {
 
 function install_ohmyzsh() {
     if [ "$WORK_INSTALL" = 1 ]; then
-        OHZSH_ADDR="https://ch03git.phonak.com/13lbise/leo_dotfiles/raw/branch/master/ohmyzsh/tools/install.sh"
-        OHZSH_REMOTE="https://ch03git.phonak.com/13lbise/leo_dotfiles/src/branch/master/ohmyzsh"
+        OHZSH_REPO="https://ch03git.phonak.com/13lbise/leo_ohmyzsh"
+        REMOTE=$OHZSH_REPO $DIR/ohmyzsh/tools/install.sh --unattended
     else
-        OHZSH_ADDR="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
-        OHZSH_REMOTE=""
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
     fi
-
-    echo "Oh My Zsh remote: $OHZSH_REMOTE"
-    REMOTE="$OHZSH_REMOTE" sh -c "$(curl -fsSL $OHZSH_ADDR)"
 }
 
 function install_zsh() {
