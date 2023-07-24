@@ -65,5 +65,6 @@ githooks/post-merge
 githooks/pre-push
 
 vim/plugged
+vim/pack
 
 tmux/plugins/tmux-*
