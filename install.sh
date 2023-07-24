@@ -111,8 +111,22 @@ function install_nodejs() {
     fi
 
     if [ "$UPDATE" = "1" ]; then
-        # --force prevents prompt to ask to install nodejs
-        curl -sL install-node.vercel.app/lts | sudo bash -s -- --force
+        if [ "$WORK_INSTALL" = 1 ]; then
+            # Taken from https://github.com/vercel/install-node/blob/master/install.sh
+            VERSION="v18.17.0"
+            INSTALL_DIR="/usr/local/"
+            APP_DIR="$DIR/apps"
+            sudo tar -xJvf $APP_DIR/node-$VERSION-linux-x64.tar.xz  \
+                --exclude CHANGELOG.md                              \
+                --exclude LICENSE                                   \
+                --exclude README.md                                 \
+                --strip-components 1                                \
+                -C $INSTALL_DIR
+            echo "Installed node in $INSTALL_DIR"
+        else
+            # --force prevents prompt to ask to install nodejs
+            curl -sL install-node.vercel.app/lts | sudo bash -s -- --force
+        fi
     else
         echo "nodejs $VERSION already installed"
     fi
