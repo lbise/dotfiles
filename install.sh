@@ -33,7 +33,8 @@ function print_usage() {
             -w|--work: Perform installation for work.
             -k|--keys: Folder to find keys to install
             -s|--wslonly: Perform WSL installation only.
-            -t|--test: Do not perfrom any operation just print"
+            -t|--test: Do not perfrom any operation just print
+            -c|--copyvim: Copy VIM plugins (Used when no internet access available)"
     echo "$USAGE"
 }
 
@@ -141,6 +142,13 @@ function install_common() {
     # Setup symlinks
     rm_symlinks
     ln_symlinks
+
+    if [ "$COPY_VIM" = 1 ]; then
+        echo "Copying vim plugins..."
+        PLUGIN_DST="$DIR/vim/pack/my-plugins/start"
+        $MKDIR -p $PLUGIN_DST
+        $CP -R $DIR/vim_plugins/* $PLUGIN_DST
+    fi
 
     # Required for vim-coc (>= 14.14)
     install_nodejs
@@ -409,6 +417,7 @@ fi
 TEST_MODE=0
 LINK_ONLY=0
 WORK_INSTALL=0
+COPY_VIM=0
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -432,6 +441,10 @@ while [[ $# -gt 0 ]]; do
         ;;
         -s|--wslonly)
         WSL_ONLY=1
+        shift # get next arg
+        ;;
+        -c|--copyvim)
+        COPY_VIM=1
         shift # get next arg
         ;;
         -h|--help)
