@@ -135,7 +135,9 @@ function install_common() {
 function install_ohmyzsh() {
     if [ "$WORK_INSTALL" = 1 ]; then
         OHZSH_REPO="https://ch03git.phonak.com/13lbise/leo_ohmyzsh"
-        REMOTE=$OHZSH_REPO $DIR/ohmyzsh/tools/install.sh --unattended
+        curl -kSL "$OHZSH_REPO/raw/branch/master/install.sh" -o "$HOME/install_ohmyzsh.sh"
+        REMOTE=$OHZSH_REPO $HOME/install_ohmyzsh.sh --unattended
+        RM_RF "$HOME/install_ohmyzsh.sh"
     else
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
     fi
