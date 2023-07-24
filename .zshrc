@@ -88,10 +88,18 @@ plugins=(
 
 # !! MUST BE BEFORE SOURCE !!
 if [ "$USER" = "13lbise" ]; then
-	zstyle :omz:plugins:ssh-agent identities id_ed25519_git_sonova
+    key="id_ed25519_git_sonova"
 elif [ "$USER" = "leo" ]; then
-	zstyle :omz:plugins:ssh-agent identities id_rsa
+    key="id_rsa"
 	export SSH_KEY_PATH="~/.ssh/rsa_id"
+fi
+
+if [ -e "$HOME/.ssh/$key" ]; then
+    zstyle :omz:plugins:ssh-agent identities $key
+else
+    echo "!!! SSH key does not exist: $key !!!"
+    DEL="ssh-agent"
+    plugins=( "${plugins[@]/$DEL}" )
 fi
 
 source $ZSH/oh-my-zsh.sh
