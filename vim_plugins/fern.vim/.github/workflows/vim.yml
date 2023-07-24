@@ -1,0 +1,47 @@
+name: vim
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+          - ubuntu-latest
+        version:
+          - head
+          - v8.2.0716 # Ubuntu 20.10 (2021/02/28)
+          - v8.1.2269 # Ubuntu 20.04 (2021/02/28)
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+        with:
+          repository: thinca/vim-themis
+          path: vim-themis
+      - uses: thinca/action-setup-vim@v1
+        id: vim
+        with:
+          vim_type: "Vim"
+          vim_version: "${{ matrix.version }}"
+          # NOTE:
+          # On Linux, Vim must be built from source to fix `input` issue
+          # https://github.com/thinca/action-setup-vim/issues/11
+          download: "${{ (runner.OS == 'Linux' && 'never') || 'available' }}"
+      - name: Run tests
+        env:
+          THEMIS_VIM: ${{ steps.vim.outputs.executable }}
+          # XXX:
+          # Overwrite %TMP% to point a correct temp directory.
+          # Note that %TMP% only affects value of 'tempname()' in Windows.
+          # https://github.community/t5/GitHub-Actions/TEMP-is-broken-on-Windows/m-p/30432#M427
+          TMP: 'C:\Users\runneradmin\AppData\Local\Temp'
+        run: |
+          ./vim-themis/bin/themis
