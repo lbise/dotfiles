@@ -75,7 +75,8 @@
 	# Hides git status dirty symbol which might be very slow on some repo
 	hide-dirty = 1
 [credential]
-	helper = /home/13lbise/.scripts/git-credential-netrc -f ~/.netrc.gpg -v
+	helper = /usr/local/bin/git-credential-manager
+	credentialStore = gpg
 [commit]
 	gpgsign = true
 [safe]
@@ -89,3 +90,7 @@
 [fetch]
 	prune = true
 	pruneTags = true
+[credential "https://dev.azure.com"]
+	useHttpPath = true
+[credential "https://ch03git.phonak.com"]
+	provider = generic
