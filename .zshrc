@@ -131,31 +131,6 @@ export EDITOR='vim'
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 #
-# Bindings
-# FIXME: Not used any more
-#function setkeybind {
-#	if [ "${key[$1]}" != "" ]; then
-#		bindkey "${key[$1]}" $2
-#	else
-#		echo "No key code for $1"
-#	fi
-#}
-#
-#if [ -f "$HOME/.zkbd/$TERM-:0" ]; then
-#	source $HOME/.zkbd/$TERM-:0
-#	setkeybind Home beginning-of-line
-#	setkeybind End end-of-line
-#	setkeybind Insert overwrite-mode
-#	setkeybind Delete delete-char
-#	setkeybind Up up-line-or-history
-#	setkeybind Down down-line-or-history
-#	setkeybind Left backward-char
-#	setkeybind Right forward-char
-#	setkeybind PageUp history-beginning-search-backward
-#	setkeybind PageDown history-beginning-search-forward
-#else
-#	echo "zkbd file missing for $TERM"
-#fi
 
 setopt notify    # immediate job notifications
 
@@ -204,6 +179,8 @@ DOT="$HOME/gitrepo/dotfiles"
 
 #### ALIASES ####
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
+
+alias dotupdate="dotupdate.sh"
 
 if [ "$USER" = "13lbise" ]; then
     MYT="/mnt/t/${USER}"

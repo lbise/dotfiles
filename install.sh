@@ -318,27 +318,6 @@ function install_for_wsl() {
 UBUNTU_UPDATE="sudo apt update"
 UBUNTU_INSTALL="sudo apt install -y "
 
-function install_ubuntu_22_04() {
-    PKGS="universal-ctags"
-    $UBUNTU_INSTALL $PKGS
-}
-
-function install_ubuntu_20_04() {
-    PKGS="ctags"
-    $UBUNTU_INSTALL $PKGS
-}
-
-function install_ubuntu_common() {
-    # gzip needed for nodejs installation
-    PKGS=$COMMON_PACKAGES
-    if [ "$WORK_INSTALL" = 1 ]; then
-        PKGS="$PKGS git-lfs"
-    fi
-
-    $UBUNTU_UPDATE
-    $UBUNTU_INSTALL $PKGS
-}
-
 function install_ubuntu() {
     if [ "$WSL_ONLY" = 1 ]; then
         return
@@ -347,12 +326,19 @@ function install_ubuntu() {
     OS_VER=$VERSION_ID
     echo "Installing for Ubuntu-${OS_VER}..."
 
-    install_ubuntu_common
-    if [ "$OS_VER" = "20.04" ]; then
-        install_ubuntu_20_04
-    elif [ "$OS_VER" = "22.04" ]; then
-        install_ubuntu_22_04
+    PKGS=$COMMON_PACKAGES
+    if [ "$WORK_INSTALL" = 1 ]; then
+        PKGS="$PKGS git-lfs"
     fi
+
+    if [ "$OS_VER" = "20.04" ]; then
+        PKGS="$PKGS ctags"
+    elif [ "$OS_VER" = "22.04" ]; then
+        PKGS="$PKGS universal-ctags"
+    fi
+
+    $UBUNTU_UPDATE
+    $UBUNTU_INSTALL $PKGS
 
     install_common
 }
