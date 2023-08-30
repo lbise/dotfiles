@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-0.42.1
+0.43.0
 ------
 - `--listen` server can be secured by setting `$FZF_API_KEY` environment
   variable.
@@ -14,6 +14,7 @@ CHANGELOG
   # Client
   curl localhost:6266 -H "x-api-key: $FZF_API_KEY" -d 'change-query(yo)'
   ```
+- Added `toggle-header` action
 
 0.42.0
 ------
@@ -367,7 +368,7 @@ CHANGELOG
           (sleep 2; seq 1000) | fzf --height ~50%
           ```
 - Fixed tcell renderer used to render full-screen fzf on Windows
-- `--no-clear` is deprecated. Use `reload` action instead.
+- ~~`--no-clear` is deprecated. Use `reload` action instead.~~
 
 0.33.0
 ------
