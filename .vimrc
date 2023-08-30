@@ -35,19 +35,13 @@ set noswapfile
 " Switch buffers without writing
 set hidden
 
-" Write buffer on :next, :last etc
-set autowrite
-
 " Lower delay on exit insert mode
 set ttimeout
-set ttimeoutlen=100
+set ttimeoutlen=50
 
 " When in insert mode, highlight the current line.
 :autocmd InsertEnter * set cul
 :autocmd InsertLeave * set nocul
-
-" Fast scrolling
-set ttyfast
 
 " Allow backspacing over everything
 set backspace=indent,eol,start
@@ -81,9 +75,6 @@ set display=lastline
 
 " Show a little more status about running command
 set showcmd
-
-" Show more context when completing ctags
-set showfulltag
 
 " Hide the default mode text
 set noshowmode
@@ -182,6 +173,7 @@ map <f6> :source ~/.vimsession/lbise.vim<CR>
 "map <C-f9> :!compile_zephyr %:p:h clean<CR>
 "map <S-f9> :!compile_zephyr %:p:h distclean<CR>
 "map <f12> :!run_checkpatch %:p:h<CR>
+map <f11> :redraw!<CR>
 map <f12> :!ctags -R .<CR>
 
 " Next buffer remapping
@@ -196,13 +188,6 @@ nnoremap <silent> <Leader><Esc> <Esc>:nohlsearch<CR><Esc>
 
 " Remove all trailing and leading whitespaces
 map <F4> :%s/\s\+$//e<CR>
-
-" Copy/paste to system clipboard
-noremap <Leader>y "*y <bar> :let @+=@*<CR>
-noremap <Leader>p "*p
-
-" Remap jump to tag because windows is shitty...
-noremap <C-m> <C-]>
 
 " Resize splits
 nnoremap <silent> <Leader>+ :exe "resize " . (winheight(0) * 3/2)<CR>
@@ -292,9 +277,14 @@ nnoremap <leader>O O<Esc>0"_D
     let g:dirvish_mode = ':sort ,^.*[\/],'
 
     "***************************************************************************
-    " dirvish
+    " fern
     "***************************************************************************
     map <F9> :Fern . -drawer -toggle<CR>
+
+    "***************************************************************************
+    " oscyank
+    "***************************************************************************
+    let g:oscyank_trim = 1 " trim surrounding whitespaces before copy
 
     "***************************************************************************
     " coc config
@@ -502,26 +492,37 @@ augroup end
 " Create ~/.vimsession if needed
 silent !mkdir ~/.vimsession > /dev/null 2>&1
 
+function! IsWsl()
+    let uname = substitute(system('uname'),'\n','','')
+    if uname == 'Linux'
+        let lines = readfile("/proc/version")
+        if lines[0] =~ "Microsoft"
+            return 1
+        endif
+    endif
+
+    return 0
+endfunction
+
 "###############################################################################
 " Clipboard
 "###############################################################################
 " WSL yank support
-let uname = substitute(system('uname'),'\n','','')
-if uname == 'Linux'
-    let lines = readfile("/proc/version")
-    if lines[0] =~ "Microsoft"
-		let s:clip = '/mnt/c/Windows/System32/clip.exe'  " default location
-		if executable(s:clip)
-		    augroup WSLYank
-		        autocmd!
-			autocmd TextYankPost * call system(s:clip, join(v:event.regcontents, "\<CR>"))
-		    augroup END
-		end
-    endif
+if IsWsl()
+    let s:clip = '/mnt/c/Windows/System32/clip.exe'  " default location
+    if executable(s:clip)
+        augroup WSLYank
+            autocmd!
+            autocmd TextYankPost * call system(s:clip, join(v:event.regcontents, "\<CR>"))
+        augroup END
+    end
+else
+    " Use osc yank plugin
+    autocmd TextYankPost *
+        \ if v:event.operator is 'y' && v:event.regname is '+' |
+        \ execute 'OSCYankRegister +' |
+        \ endif
 endif
-
-" Use osc yank plugin
-autocmd TextYankPost * if v:event.operator is 'y' && v:event.regname is '' | execute 'OSCYankRegister "' | endif
 
 "###############################################################################
 " Plugins managed by vim-Plug
