@@ -159,7 +159,7 @@ autocmd FileType gitcommit setlocal spell
 
 " Use c syntax for andromeda files
 au BufRead,BufNewFile *.unity set filetype=c
-au BufRead,BufNewFile *.sid set filetype=c
+" au BufRead,BufNewFile *.sid set filetype=c
 
 "###############################################################################
 " Mappings
@@ -197,7 +197,8 @@ nnoremap <silent> <Leader>- :exe "resize " . (winheight(0) * 2/3)<CR>
 xnoremap p pgvy
 
 " Search files
-nnoremap <silent> <Leader><space> :Files<CR>
+nnoremap <silent> <Leader>ff :Files<CR>
+nnoremap <silent> <Leader>fg :GFiles<CR>
 
 " Search files content
 nnoremap <silent> <Leader>f :Rg<CR>
@@ -223,7 +224,6 @@ nnoremap N Nzz
 " Insert line without leaving normal mode
 nnoremap <leader>o o<Esc>0"_D
 nnoremap <leader>O O<Esc>0"_D
-
 "###############################################################################
 " Plugins
 "###############################################################################

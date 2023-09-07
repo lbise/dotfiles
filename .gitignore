@@ -68,3 +68,5 @@ vim/plugged
 vim/pack
 
 tmux/plugins/tmux-*
+
+lazy-lock.json

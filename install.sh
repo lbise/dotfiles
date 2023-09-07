@@ -19,6 +19,7 @@ CHMOD="chmod"
 CP="cp"
 MV="mv"
 MKDIR="mkdir"
+UNTAR="tar xvf"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
@@ -54,7 +55,7 @@ function rm_symlinks() {
     $RM_RF ~/.gdbinit.d
     $RM_RF ~/.tmux.conf
     $RM_RF ~/.tmux
-    # For pinentry configuration (passphrase enter in command line)
+    $RM_RF ~/.config/nvim
     if [ ! -d ~/.gnupg ]; then
         $MKDIR ~/.gnupg
         $CHMOD 700 ~/.gnupg
@@ -84,7 +85,10 @@ function ln_symlinks() {
     $LN_SF $DIR/.gdbinit.d ~/.gdbinit.d
     $LN_SF $DIR/.tmux.conf ~/.tmux.conf
     $LN_SF $DIR/tmux ~/.tmux
-    # For pinentry configuration (passphrase enter in command line)
+    if [ ! -d ~/.config ]; then
+        $MKDIR ~/.config
+    fi
+    $LN_SF $DIR/nvim ~/.config/nvim
     $LN_SF $DIR/gpg/gpg.conf ~/.gnupg/gpg.conf
     $LN_SF $DIR/gpg/gpg-agent.conf ~/.gnupg/gpg-agent.conf
     $X_OFF
@@ -133,11 +137,27 @@ function install_nodejs() {
     fi
 }
 
+function install_neovim() {
+    echo "-------------------------------------------------------------------------"
+    if [ -f "/usr/bin/nvim" ]; then
+        echo "Neovim already installed..."
+        return
+    fi
+
+    echo "Installing neovim..."
+    NVIM_VERSION="0.9.2"
+    NVIM_OUT="$DIR/apps"
+    NVIM_SRC="$NVIM_OUT/nvim-linux64"
+    NVIM_DST="/usr"
+
+    $UNTAR $DIR/apps/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
+    sudo $CP -r $NVIM_SRC/* $NVIM_DST
+    $RM_RF $NVIM_SRC
+}
+
 function install_common() {
     echo "-------------------------------------------------------------------------"
     echo "Installing common items..."
-
-    install_zsh
 
     # Setup symlinks
     rm_symlinks
@@ -150,6 +170,7 @@ function install_common() {
         $CP -R $DIR/vim_plugins/* $PLUGIN_DST
     fi
 
+    install_zsh
     # Required for vim-coc (>= 14.14)
     #install_nodejs
 }
@@ -326,7 +347,7 @@ function install_ubuntu() {
     OS_VER=$VERSION_ID
     echo "Installing for Ubuntu-${OS_VER}..."
 
-    PKGS=$COMMON_PACKAGES
+    PKGS="$COMMON_PACKAGES build-essential gdb"
     if [ "$WORK_INSTALL" = 1 ]; then
         PKGS="$PKGS git-lfs"
     fi
@@ -341,25 +362,32 @@ function install_ubuntu() {
     $UBUNTU_INSTALL $PKGS
 
     install_common
+    install_neovim
 }
 ################################################################################
 # MacOs
 ################################################################################
-MACOS_UPDATE="brew update"
-MACOS_UPGRADE="brew upgrade"
+MACOS_UPDATE="brew update -v"
+MACOS_UPGRADE="brew upgrade -v"
 MACOS_INSTALL="brew install"
 
 function install_macos() {
-    PKGS="$COMMON_PACKAGES gpg universal-ctags"
+    PKGS="$COMMON_PACKAGES gpg universal-ctags nvim"
 
     if [ "$WSL_ONLY" = 1 ]; then
         return
     fi
+brew tap homebrew/cask-fonts
 
     echo "Installing for MacOs..."
     $MACOS_UPDATE
     $MACOS_UPGRADE
     $MACOS_INSTALL $PKGS
+
+
+    # Install fonts
+    brew tap homebrew/cask-fonts
+    $MACOS_INSTALL font-jetbrains-mono-nerd-font
 
     install_common
 }
@@ -456,6 +484,7 @@ if [ $TEST_MODE = 1 ] || [ $LINK_ONLY = 1 ]; then
     CP="echo test: ${CP}"
     MV="echo test: ${MV}"
     MKDIR="echo test: ${MKDIR}"
+    UNTAR="echo test: ${UNTAR}"
 fi
 
 if [ $LINK_ONLY = 1 ]; then
