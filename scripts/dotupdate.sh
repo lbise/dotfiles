@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
+WLS=0
+if grep -q "WSL" /proc/version; then
+    WSL=1
+    echo "WSL detected"
+fi
+
 if [ "$USER" = "13lbise" ]; then
     DOT_PATH="$HOME/gitrepo/leo_dotfiles"
     DOT_FLAGS="-w -c"
+    if [ "$WSL" = 0 ]; then
+        DOT_FLAGS="$DOT_FLAGS -c"
+        echo "WSL detected"
+    fi
 else
     DOT_PATH="$HOME/gitrepo/dotfiles"
-    DOT_FLAGS="-c"
+    DOT_FLAGS=""
 fi
 
 if [ ! -d "$DOT_PATH" ]; then
