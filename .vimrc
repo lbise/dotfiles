@@ -519,9 +519,9 @@ if IsWsl()
 else
     " Use osc yank plugin
     autocmd TextYankPost *
-        \ if v:event.operator is 'y' && v:event.regname is '+' |
-        \ execute 'OSCYankRegister +' |
-        \ endif
+                \ if v:event.operator is 'y' && v:event.regname is '' |
+                \ execute 'OSCYankRegister "' |
+                \ endif
 endif
 
 "###############################################################################
