@@ -151,7 +151,7 @@ function install_common() {
     fi
 
     # Required for vim-coc (>= 14.14)
-    install_nodejs
+    #install_nodejs
 }
 
 function install_ohmyzsh() {

@@ -541,7 +541,6 @@ Plug 'moll/vim-bbye'
 Plug 'tpope/vim-obsession'
 Plug 'ludovicchabant/vim-gutentags'
 Plug 'pixelneo/vim-python-docstring'
-Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'airblade/vim-gitgutter'
 Plug 'lambdalisue/fern.vim'
 call plug#end()
