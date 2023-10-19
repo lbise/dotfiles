@@ -2,7 +2,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 MACHINE_FILE="$SCRIPT_DIR/ssh_machines.txt"
 USER="13lbise"
-OPTS="-X"
+OPTS="-X -C"
 
 INDEX_LIST=()
 COMMENT_LIST=()
