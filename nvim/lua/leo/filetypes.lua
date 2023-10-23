@@ -56,7 +56,7 @@ vim.api.nvim_create_autocmd('FileType', {
     pattern = 'make',
 })
 
-vim.api.nvim_create_autocmd('BufRead, BufNewFile', {
+vim.api.nvim_create_autocmd({ 'BufRead', 'BufNewFile' }, {
     callback = function()
         vim.opt.filetype = 'c'
     end,
