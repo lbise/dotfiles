@@ -179,6 +179,7 @@ DOT="$HOME/gitrepo/dotfiles"
 
 #### ALIASES ####
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
+alias vim=nvim
 
 alias dotupdate="dotupdate.sh"
 

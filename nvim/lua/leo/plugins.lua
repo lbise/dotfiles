@@ -77,6 +77,8 @@ local default_plugins = {
                 --theme = 'tokyonight',
                 theme = 'onedark',
                 --theme = 'nord',
+                --section_separators = { left = '', right = '' },
+                --component_separators = { left = '', right = '' }
                 -- component_separators = '|',
                 -- section_separators = '',
             },
