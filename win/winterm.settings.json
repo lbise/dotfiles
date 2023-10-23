@@ -6,6 +6,30 @@
         {
             "command": 
             {
+                "action": "newTab",
+                "index": 0
+            },
+            "keys": "ctrl+alt+1"
+        },
+        {
+            "command": 
+            {
+                "action": "moveFocus",
+                "direction": "left"
+            },
+            "keys": "ctrl+shift+h"
+        },
+        {
+            "command": 
+            {
+                "action": "switchToTab",
+                "index": 8
+            },
+            "keys": "ctrl+shift+9"
+        },
+        {
+            "command": 
+            {
                 "action": "moveFocus",
                 "direction": "right"
             },
@@ -20,12 +44,24 @@
             "keys": "ctrl+shift+7"
         },
         {
+            "command": "find",
+            "keys": "ctrl+shift+f"
+        },
+        {
+            "command": 
+            {
+                "action": "resizePane",
+                "direction": "left"
+            },
+            "keys": "alt+shift+h"
+        },
+        {
             "command": 
             {
                 "action": "newTab",
-                "index": 0
+                "index": 4
             },
-            "keys": "ctrl+alt+1"
+            "keys": "ctrl+alt+5"
         },
         {
             "command": 
@@ -36,8 +72,12 @@
             "keys": "ctrl+alt+9"
         },
         {
-            "command": "find",
-            "keys": "ctrl+shift+f"
+            "command": 
+            {
+                "action": "newTab",
+                "index": 2
+            },
+            "keys": "ctrl+alt+3"
         },
         {
             "command": 
@@ -54,22 +94,6 @@
                 "index": 7
             },
             "keys": "ctrl+shift+8"
-        },
-        {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 2
-            },
-            "keys": "ctrl+alt+3"
-        },
-        {
-            "command": 
-            {
-                "action": "moveFocus",
-                "direction": "left"
-            },
-            "keys": "ctrl+shift+h"
         },
         {
             "command": "togglePaneZoom",
@@ -96,6 +120,13 @@
         {
             "command": 
             {
+                "action": "scrollUp"
+            },
+            "keys": "ctrl+up"
+        },
+        {
+            "command": 
+            {
                 "action": "switchToTab",
                 "index": 0
             },
@@ -104,6 +135,14 @@
         {
             "command": "scrollDownPage",
             "keys": "ctrl+pgdn"
+        },
+        {
+            "command": 
+            {
+                "action": "newTab",
+                "index": 6
+            },
+            "keys": "ctrl+alt+7"
         },
         {
             "command": "scrollUpPage",
@@ -116,14 +155,6 @@
                 "index": 1
             },
             "keys": "ctrl+alt+2"
-        },
-        {
-            "command": 
-            {
-                "action": "switchToTab",
-                "index": 8
-            },
-            "keys": "ctrl+shift+9"
         },
         {
             "command": 
@@ -144,14 +175,6 @@
         {
             "command": "closePane",
             "keys": "ctrl+shift+q"
-        },
-        {
-            "command": 
-            {
-                "action": "resizePane",
-                "direction": "left"
-            },
-            "keys": "alt+shift+h"
         },
         {
             "command": 
@@ -249,12 +272,8 @@
             "keys": "ctrl+shift+5"
         },
         {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 4
-            },
-            "keys": "ctrl+alt+5"
+            "command": "scrollToBottom",
+            "keys": "ctrl+end"
         },
         {
             "command": 
@@ -268,28 +287,9 @@
             "command": 
             {
                 "action": "newTab",
-                "index": 6
-            },
-            "keys": "ctrl+alt+7"
-        },
-        {
-            "command": 
-            {
-                "action": "newTab",
                 "index": 7
             },
             "keys": "ctrl+alt+8"
-        },
-        {
-            "command": 
-            {
-                "action": "scrollUp"
-            },
-            "keys": "ctrl+up"
-        },
-        {
-            "command": "scrollToBottom",
-            "keys": "ctrl+end"
         },
         {
             "command": "scrollToTop",
@@ -303,27 +303,36 @@
     "language": "en-US",
     "largePasteWarning": false,
     "multiLinePasteWarning": false,
+    "newTabMenu": 
+    [
+        {
+            "type": "remainingProfiles"
+        }
+    ],
     "profiles": 
     {
-        "defaults": {},
+        "defaults": 
+        {
+            "colorScheme": "Tokyo Night Storm"
+        },
         "list": 
         [
             {
-                "backgroundImage": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
+                "backgroundImage": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "backgroundImageAlignment": "bottomRight",
-                "backgroundImageOpacity": 0.40000000000000002,
+                "backgroundImageOpacity": 0.4,
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
-                "colorScheme": "Nord",
+                "colorScheme": "Tokyo Night Storm",
                 "commandline": "wsl",
                 "font": 
                 {
-                    "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "face": "JetBrainsMono Nerd Font",
+                    "size": 13.0
                 },
                 "guid": "{e381fe40-9d15-58b7-99ea-5908cd6561e5}",
                 "hidden": false,
-                "icon": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
+                "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "name": "Ubuntu",
                 "opacity": 100,
                 "padding": "4",
@@ -333,21 +342,21 @@
                 "useAcrylic": true
             },
             {
-                "backgroundImage": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
+                "backgroundImage": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "backgroundImageAlignment": "bottomRight",
-                "backgroundImageOpacity": 0.40000000000000002,
+                "backgroundImageOpacity": 0.4,
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
-                "colorScheme": "Nord",
+                "colorScheme": "Tokyo Night Storm",
                 "commandline": "wsl -u root",
                 "font": 
                 {
-                    "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "face": "JetBrainsMono Nerd Font",
+                    "size": 13.0
                 },
                 "guid": "{20fa7bc1-04d8-547c-8ef6-6dadb2f5ccc1}",
                 "hidden": false,
-                "icon": "C:\\Users\\13lbise\\OneDrive - Sonova\\Pictures\\WindowsTerminal\\ubuntu-logo32.png",
+                "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "name": "Ubuntu (root)",
                 "opacity": 100,
                 "padding": "4",
@@ -355,16 +364,19 @@
                 "useAcrylic": true
             },
             {
+                "backgroundImage": null,
+                "backgroundImageAlignment": "bottomRight",
+                "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
-                "colorScheme": "Nord",
+                "colorScheme": "Tokyo Night Storm",
                 "commandline": "C:\\Shannon\\_tools\\PortableGit-2.38.1-64-bit\\bin\\bash.exe --init-file sourceme -i",
                 "font": 
                 {
-                    "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "face": "JetBrainsMono Nerd Font",
+                    "size": 13.0
                 },
                 "guid": "{48304432-9bb7-59d7-8dcd-c6121744ab02}",
-                "icon": "C:\\Shannon\\_tools\\PortableGit-2.25.0-64-bit\\mingw64\\share\\git\\git-for-windows.ico",
+                "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\andromeda_icon.png",
                 "name": "Andromeda",
                 "opacity": 100,
                 "startingDirectory": "C:\\SVN\\wp_%USERNAME%\\andromeda",
@@ -372,21 +384,21 @@
                 "useAcrylic": true
             },
             {
-                "colorScheme": "Nord",
+                "colorScheme": "Tokyo Night Storm",
                 "font": 
                 {
-                    "face": "CaskaydiaCove NF Mono",
-                    "size": 13
+                    "face": "JetBrainsMono Nerd Font",
+                    "size": 13.0
                 },
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
                 "name": "Windows PowerShell"
             },
             {
-                "colorScheme": "Nord",
+                "colorScheme": "Tokyo Night Storm",
                 "font": 
                 {
-                    "face": "Cascadia Code"
+                    "face": "JetBrainsMono Nerd Font"
                 },
                 "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
                 "hidden": true,
@@ -604,6 +616,98 @@
             "yellow": "#C4A000"
         },
         {
+            "background": "#1A1B2C",
+            "black": "#414868",
+            "blue": "#7AA2F7",
+            "brightBlack": "#414868",
+            "brightBlue": "#7AA2F7",
+            "brightCyan": "#7DCFFF",
+            "brightGreen": "#73DACA",
+            "brightPurple": "#BB9AF7",
+            "brightRed": "#F7768E",
+            "brightWhite": "#C0CAF5",
+            "brightYellow": "#E0AF68",
+            "cursorColor": "#C0CAF5",
+            "cyan": "#7DCFFF",
+            "foreground": "#A9B1DC",
+            "green": "#73DACA",
+            "name": "Tokyo Night",
+            "purple": "#BB9AF7",
+            "red": "#F7768E",
+            "selectionBackground": "#28344A",
+            "white": "#C0CAF5",
+            "yellow": "#E0AF68"
+        },
+        {
+            "background": "#24283B",
+            "black": "#414868",
+            "blue": "#7AA2F7",
+            "brightBlack": "#414868",
+            "brightBlue": "#7AA2F7",
+            "brightCyan": "#7DCFFF",
+            "brightGreen": "#73DACA",
+            "brightPurple": "#BB9AF7",
+            "brightRed": "#F7768E",
+            "brightWhite": "#C0CAF5",
+            "brightYellow": "#E0AF68",
+            "cursorColor": "#C0CAF5",
+            "cyan": "#7DCFFF",
+            "foreground": "#A9B1DC",
+            "green": "#73DACA",
+            "name": "Tokyo Night Storm",
+            "purple": "#BB9AF7",
+            "red": "#F7768E",
+            "selectionBackground": "#28344A",
+            "white": "#C0CAF5",
+            "yellow": "#E0AF68"
+        },
+        {
+            "background": "#300A24",
+            "black": "#171421",
+            "blue": "#0037DA",
+            "brightBlack": "#767676",
+            "brightBlue": "#08458F",
+            "brightCyan": "#2C9FB3",
+            "brightGreen": "#26A269",
+            "brightPurple": "#A347BA",
+            "brightRed": "#C01C28",
+            "brightWhite": "#F2F2F2",
+            "brightYellow": "#A2734C",
+            "cursorColor": "#FFFFFF",
+            "cyan": "#3A96DD",
+            "foreground": "#FFFFFF",
+            "green": "#26A269",
+            "name": "Ubuntu-22.04-ColorScheme",
+            "purple": "#881798",
+            "red": "#C21A23",
+            "selectionBackground": "#FFFFFF",
+            "white": "#CCCCCC",
+            "yellow": "#A2734C"
+        },
+        {
+            "background": "#300A24",
+            "black": "#171421",
+            "blue": "#0037DA",
+            "brightBlack": "#767676",
+            "brightBlue": "#08458F",
+            "brightCyan": "#2C9FB3",
+            "brightGreen": "#26A269",
+            "brightPurple": "#A347BA",
+            "brightRed": "#C01C28",
+            "brightWhite": "#F2F2F2",
+            "brightYellow": "#A2734C",
+            "cursorColor": "#FFFFFF",
+            "cyan": "#3A96DD",
+            "foreground": "#FFFFFF",
+            "green": "#26A269",
+            "name": "Ubuntu-ColorScheme",
+            "purple": "#881798",
+            "red": "#C21A23",
+            "selectionBackground": "#FFFFFF",
+            "white": "#CCCCCC",
+            "yellow": "#A2734C"
+        },
+        {
             "background": "#000000",
             "black": "#000000",
             "blue": "#000080",
@@ -628,6 +732,7 @@
         }
     ],
     "theme": "dark",
+    "themes": [],
     "trimBlockSelection": true,
     "wordDelimiters": " ()\"':,;<>~!@#$%^&*|+=[]{}~?\u2502"
 }
