@@ -120,7 +120,7 @@ function install_nodejs() {
             # Taken from https://github.com/vercel/install-node/blob/master/install.sh
             VERSION="v18.17.0"
             INSTALL_DIR="/usr/local/"
-            APP_DIR="$DIR/apps"
+            APP_DIR="$DIR/archives"
             sudo tar -xJvf $APP_DIR/node-$VERSION-linux-x64.tar.xz  \
                 --exclude CHANGELOG.md                              \
                 --exclude LICENSE                                   \
@@ -146,11 +146,11 @@ function install_neovim() {
 
     echo "Installing neovim..."
     NVIM_VERSION="0.9.2"
-    NVIM_OUT="$DIR/apps"
+    NVIM_OUT="$DIR/archives"
     NVIM_SRC="$NVIM_OUT/nvim-linux64"
     NVIM_DST="/usr"
 
-    $UNTAR $DIR/apps/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
+    $UNTAR $NVIM_OUT/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
     sudo $CP -r $NVIM_SRC/* $NVIM_DST
     $RM_RF $NVIM_SRC
 }
