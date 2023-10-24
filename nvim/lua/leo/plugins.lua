@@ -411,7 +411,7 @@ require('mason').setup()
 require('mason-lspconfig').setup()
 
 local servers = {
-    clangd = {},
+    --clangd = {},
     pyright = {},
     bashls = {},
     -- gopls = {},
