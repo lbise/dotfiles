@@ -302,6 +302,7 @@
     "focusFollowMouse": true,
     "language": "en-US",
     "largePasteWarning": false,
+    "launchMode": "maximized",
     "multiLinePasteWarning": false,
     "newTabMenu": 
     [
@@ -317,8 +318,9 @@
             "font": 
             {
                 "face": "JetBrainsMono Nerd Font",
-                "size": 13.0
-            }
+                "size": 12.0
+            },
+            "padding": "0"
         },
         "list": 
         [
@@ -338,7 +340,6 @@
                 "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "name": "Ubuntu",
                 "opacity": 100,
-                "padding": "4",
                 "scrollbarState": "hidden",
                 "suppressApplicationTitle": false,
                 "tabTitle": null,
@@ -360,7 +361,6 @@
                 "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
                 "name": "Ubuntu (root)",
                 "opacity": 100,
-                "padding": "4",
                 "scrollbarState": "hidden",
                 "useAcrylic": true
             },
@@ -487,7 +487,7 @@
             "brightYellow": "#D19A66",
             "cursorColor": "#FFFFFF",
             "cyan": "#56B6C2",
-            "foreground": "#5C6370",
+            "foreground": "#DCDFE4",
             "green": "#98C379",
             "name": "One Dark",
             "purple": "#C678DD",
@@ -753,5 +753,6 @@
     "theme": "dark",
     "themes": [],
     "trimBlockSelection": true,
+    "useAcrylicInTabRow": false,
     "wordDelimiters": " ()\"':,;<>~!@#$%^&*|+=[]{}~?\u2502"
 }
