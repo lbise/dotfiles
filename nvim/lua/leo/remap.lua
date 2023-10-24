@@ -62,6 +62,8 @@ vim.keymap.set('n', '<leader>fh', require('telescope.builtin').help_tags, { desc
 vim.keymap.set('n', '<leader>gs', vim.cmd.Git)
 
 -- *** LSP
+-- Format
+vim.keymap.set("n", "<leader>f", vim.lsp.buf.format)
 -- Diagnostic keymaps
 vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous diagnostic message' })
 vim.keymap.set('n', ']d', vim.diagnostic.goto_next, { desc = 'Go to next diagnostic message' })
