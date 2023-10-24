@@ -9,7 +9,7 @@
 	new = green bold
 
 [core]
-	editor = vim
+	editor = nvim
 	hooksPath = ~/.githooks
 	filemode = false
 	autocrlf = false
