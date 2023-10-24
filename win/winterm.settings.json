@@ -6,18 +6,10 @@
         {
             "command": 
             {
-                "action": "newTab",
-                "index": 0
-            },
-            "keys": "ctrl+alt+1"
-        },
-        {
-            "command": 
-            {
                 "action": "moveFocus",
-                "direction": "left"
+                "direction": "right"
             },
-            "keys": "ctrl+shift+h"
+            "keys": "ctrl+shift+l"
         },
         {
             "command": 
@@ -31,9 +23,17 @@
             "command": 
             {
                 "action": "moveFocus",
-                "direction": "right"
+                "direction": "left"
             },
-            "keys": "ctrl+shift+l"
+            "keys": "ctrl+shift+h"
+        },
+        {
+            "command": 
+            {
+                "action": "newTab",
+                "index": 0
+            },
+            "keys": "ctrl+alt+1"
         },
         {
             "command": 
@@ -44,8 +44,12 @@
             "keys": "ctrl+shift+7"
         },
         {
-            "command": "find",
-            "keys": "ctrl+shift+f"
+            "command": 
+            {
+                "action": "newTab",
+                "index": 4
+            },
+            "keys": "ctrl+alt+5"
         },
         {
             "command": 
@@ -56,12 +60,8 @@
             "keys": "alt+shift+h"
         },
         {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 4
-            },
-            "keys": "ctrl+alt+5"
+            "command": "find",
+            "keys": "ctrl+shift+f"
         },
         {
             "command": 
@@ -313,7 +313,12 @@
     {
         "defaults": 
         {
-            "colorScheme": "Tokyo Night Storm"
+            "colorScheme": "One Dark",
+            "font": 
+            {
+                "face": "JetBrainsMono Nerd Font",
+                "size": 13.0
+            }
         },
         "list": 
         [
@@ -323,13 +328,11 @@
                 "backgroundImageOpacity": 0.4,
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
-                "colorScheme": "Tokyo Night Storm",
-                "commandline": "wsl",
-                "font": 
+                "colorScheme": 
                 {
-                    "face": "JetBrainsMono Nerd Font",
-                    "size": 13.0
+                    "light": "One Dark"
                 },
+                "commandline": "wsl",
                 "guid": "{e381fe40-9d15-58b7-99ea-5908cd6561e5}",
                 "hidden": false,
                 "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
@@ -347,13 +350,11 @@
                 "backgroundImageOpacity": 0.4,
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
-                "colorScheme": "Tokyo Night Storm",
-                "commandline": "wsl -u root",
-                "font": 
+                "colorScheme": 
                 {
-                    "face": "JetBrainsMono Nerd Font",
-                    "size": 13.0
+                    "light": "One Dark"
                 },
+                "commandline": "wsl -u root",
                 "guid": "{20fa7bc1-04d8-547c-8ef6-6dadb2f5ccc1}",
                 "hidden": false,
                 "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
@@ -368,13 +369,11 @@
                 "backgroundImageAlignment": "bottomRight",
                 "backgroundImageStretchMode": "none",
                 "bellStyle": "none",
-                "colorScheme": "Tokyo Night Storm",
-                "commandline": "C:\\Shannon\\_tools\\PortableGit-2.38.1-64-bit\\bin\\bash.exe --init-file sourceme -i",
-                "font": 
+                "colorScheme": 
                 {
-                    "face": "JetBrainsMono Nerd Font",
-                    "size": 13.0
+                    "light": "One Dark"
                 },
+                "commandline": "C:\\Shannon\\_tools\\PortableGit-2.38.1-64-bit\\bin\\bash.exe --init-file sourceme -i",
                 "guid": "{48304432-9bb7-59d7-8dcd-c6121744ab02}",
                 "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\andromeda_icon.png",
                 "name": "Andromeda",
@@ -384,21 +383,18 @@
                 "useAcrylic": true
             },
             {
-                "colorScheme": "Tokyo Night Storm",
-                "font": 
+                "colorScheme": 
                 {
-                    "face": "JetBrainsMono Nerd Font",
-                    "size": 13.0
+                    "light": "One Dark"
                 },
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
                 "name": "Windows PowerShell"
             },
             {
-                "colorScheme": "Tokyo Night Storm",
-                "font": 
+                "colorScheme": 
                 {
-                    "face": "JetBrainsMono Nerd Font"
+                    "light": "One Dark"
                 },
                 "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
                 "hidden": true,
@@ -476,6 +472,29 @@
             "selectionBackground": "#FFFFFF",
             "white": "#E5E9F0",
             "yellow": "#EBCB8B"
+        },
+        {
+            "background": "#1E2127",
+            "black": "#000000",
+            "blue": "#61AFEF",
+            "brightBlack": "#5C6370",
+            "brightBlue": "#61AFEF",
+            "brightCyan": "#56B6C2",
+            "brightGreen": "#98C379",
+            "brightPurple": "#C678DD",
+            "brightRed": "#E06C75",
+            "brightWhite": "#FFFFFF",
+            "brightYellow": "#D19A66",
+            "cursorColor": "#FFFFFF",
+            "cyan": "#56B6C2",
+            "foreground": "#5C6370",
+            "green": "#98C379",
+            "name": "One Dark",
+            "purple": "#C678DD",
+            "red": "#E06C75",
+            "selectionBackground": "#FFFFFF",
+            "white": "#ABB2BF",
+            "yellow": "#D19A66"
         },
         {
             "background": "#282C34",
