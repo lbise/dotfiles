@@ -1,6 +1,5 @@
 -- List of all default plugins & their definitions
 local default_plugins = {
-    -- Theme
     {
         --'shaunsingh/nord.nvim',
         'navarasu/onedark.nvim',
@@ -71,7 +70,6 @@ local default_plugins = {
             --vim.cmd.colorscheme 'nordfox'
         end,
     },
-    -- Lua Line
     {
         'nvim-lualine/lualine.nvim',
         -- See `:help lualine.txt`
@@ -89,7 +87,6 @@ local default_plugins = {
             },
         },
     },
-    -- buffline
     {
 		'akinsho/bufferline.nvim',
 		dependencies = 'nvim-tree/nvim-web-devicons',
@@ -140,7 +137,6 @@ local default_plugins = {
             scope = { enabled = false },
         },
     },
-    -- Tree Sitter
     {
         'nvim-treesitter/nvim-treesitter',
         cmd = { 'TSInstall', 'TSBufEnable', 'TSBufDisable', 'TSModuleInfo' },
@@ -151,7 +147,6 @@ local default_plugins = {
         config = function()
         end,
     },
-    -- Fuzzy Finder
     {
         'nvim-telescope/telescope.nvim',
         branch = '0.1.x',
@@ -176,7 +171,55 @@ local default_plugins = {
             pcall(require('telescope').load_extension, 'fzf')
         end
     },
-    -- Git
+    {
+        'tamago324/lir.nvim',
+        lazy = false,
+        dependencies = {
+            'nvim-tree/nvim-web-devicons'
+        },
+        config = function()
+            local actions = require'lir.actions'
+            local mark_actions = require 'lir.mark.actions'
+            local clipboard_actions = require'lir.clipboard.actions'
+
+            require'lir'.setup({
+                show_hidden_files = false,
+                ignore = {}, -- { ".DS_Store", "node_modules" } etc.
+                devicons = {
+                    enable = true,
+                    highlight_dirname = false
+                },
+                mappings = {
+                    ['l']     = actions.edit,
+                    ['<CR>']  = actions.edit,
+                    ['<C-s>'] = actions.split,
+                    ['<C-v>'] = actions.vsplit,
+                    ['<C-t>'] = actions.tabedit,
+
+                    ['h']     = actions.up,
+                    ['q']     = actions.quit,
+
+                    ['K']     = actions.mkdir,
+                    ['N']     = actions.newfile,
+                    ['R']     = actions.rename,
+                    ['@']     = actions.cd,
+                    ['Y']     = actions.yank_path,
+                    ['.']     = actions.toggle_show_hidden,
+                    ['D']     = actions.delete,
+
+                    ['J'] = function()
+                        mark_actions.toggle_mark()
+                        vim.cmd('normal! j')
+                    end,
+                    ['C'] = clipboard_actions.copy,
+                    ['X'] = clipboard_actions.cut,
+                    ['P'] = clipboard_actions.paste,
+                },
+            })
+        end,
+        opts = {
+        }
+    },
     'tpope/vim-fugitive',
     {
         'lewis6991/gitsigns.nvim',
@@ -224,7 +267,6 @@ local default_plugins = {
             },
         }
     },
-    -- Buffers
     {
         'ojroques/nvim-bufdel',
         event = { 'BufReadPost', 'BufNewFile' },
@@ -232,7 +274,6 @@ local default_plugins = {
             quit = false
         },
     },
-    -- nvim-tree
     {
         'nvim-tree/nvim-tree.lua',
         cmd = { 'NvimTreeToggle', 'NvimTreeFocus' },
@@ -242,7 +283,6 @@ local default_plugins = {
             })
         end,
     },
-    -- LSP
     {
         'neovim/nvim-lspconfig',
         enable = true,
@@ -274,7 +314,6 @@ local default_plugins = {
             },
         }
     },
-    -- Autocompletion
     {
         'hrsh7th/nvim-cmp',
         event = 'InsertEnter',
