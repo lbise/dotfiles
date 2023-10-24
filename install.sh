@@ -24,7 +24,7 @@ ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
 COMMON_PACKAGES="zsh fzf ripgrep gzip tmux"
-NVIM_PLUGINS_MD5="3ba377ff2221f9c7d34e13ffaeb3e7f0"
+NVIM_PLUGINS_MD5="1a93c1560aef236389419eb499102659"
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
@@ -186,6 +186,17 @@ function install_common() {
 
         if [ "$NVIM_PLUGINS_MD5" != "$MD5_INSTALLED" ]; then
             echo "Copying nvim plugins to $NVIM_PLUGINS_DST (md5=$NVIM_PLUGINS_MD5)"
+            if [ -d "$NVIM_PLUGINS_DST" ]; then
+                while true; do
+                    read -p "Do you wish to delete $NVIM_PLUGINS_DST" yn
+                    case $yn in
+                        [Yy]* ) $RM_RF $NVIM_PLUGINS_DST; break;;
+                        [Nn]* ) echo "Skipping nvim plugins copy"; return;;
+                        * ) echo "Please answer yes or no.";;
+                    esac
+                done
+            fi
+
             $MKDIR -p $NVIM_PLUGINS_DST
             $UNTAR "$NVIM_PLUGINS_SRC" -C "$NVIM_PLUGINS_DST"
             echo $NVIM_PLUGINS_MD5 >> "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt"
