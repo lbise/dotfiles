@@ -186,18 +186,21 @@ function install_common() {
 
         if [ "$NVIM_PLUGINS_MD5" != "$MD5_INSTALLED" ]; then
             echo "Copying nvim plugins to $NVIM_PLUGINS_DST (md5=$NVIM_PLUGINS_MD5)"
-            if [ -d "$NVIM_PLUGINS_DST" ]; then
+            if [ ! -d "$NVIM_PLUGINS_DST" ]; then
+                $MKDIR -p $NVIM_PLUGINS_DST
+            fi
+
+            if [ -d "$NVIM_PLUGINS_DST/nvim" ]; then
                 while true; do
-                    read -p "Do you wish to delete $NVIM_PLUGINS_DST" yn
+                    read -p "Do you wish to delete $NVIM_PLUGINS_DST/nvim" yn
                     case $yn in
-                        [Yy]* ) $RM_RF $NVIM_PLUGINS_DST; break;;
+                        [Yy]* ) $RM_RF $NVIM_PLUGINS_DST/nvim; $RM_RF "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt"; break;;
                         [Nn]* ) echo "Skipping nvim plugins copy"; return;;
                         * ) echo "Please answer yes or no.";;
                     esac
                 done
             fi
 
-            $MKDIR -p $NVIM_PLUGINS_DST
             $UNTAR "$NVIM_PLUGINS_SRC" -C "$NVIM_PLUGINS_DST"
             echo $NVIM_PLUGINS_MD5 >> "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt"
             echo "Finished copying nvim plugins to $NVIM_PLUGINS_DST (md5=$NVIM_PLUGINS_MD5)"
