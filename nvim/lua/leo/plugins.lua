@@ -7,6 +7,7 @@ local default_plugins = {
         --'EdenEast/nightfox.nvim',
         --'folke/tokyonight.nvim',
         priority = 1000,
+        lazy = false,
         config = function()
             --vim.g.nord_borders = true
             --vim.g.nord_contrast = true
@@ -17,20 +18,23 @@ local default_plugins = {
                 style = 'darker', -- Default theme style. Choose between 'dark', 'darker', 'cool', 'deep', 'warm', 'warmer' and 'light'
                 transparent = false,
                 term_colors = true,
+                -- Change code style ---
+                -- Options are italic, bold, underline, none
+                -- You can configure multiple style with comma separated, For e.g., keywords = 'italic,bold'
                 code_style = {
                     comments = 'none',
                     keywords = 'none',
-                    functions = 'none',
+                    functions = 'bold',
                     strings = 'none',
-                    variables = 'none'
+                    variables = 'bold'
                 },
             }
             vim.cmd.colorscheme 'onedark'
 
             --require("tokyonight").setup({
-            --    -- your configuration comes here
-            --    -- or leave it empty to use the default settings
-            --    style = "storm", -- The theme comes in three styles, `storm`, `moon`, a darker variant `night` and `day`
+                --    -- your configuration comes here
+                --    -- or leave it empty to use the default settings
+                --    style = "storm", -- The theme comes in three styles, `storm`, `moon`, a darker variant `night` and `day`
             --    light_style = "day", -- The theme is used when the background is set to light
             --    transparent = false, -- Enable this to disable setting the background color
             --    terminal_colors = true, -- Configure the colors used when opening a `:terminal` in [Neovim](https://github.com/neovim/neovim)
@@ -71,6 +75,7 @@ local default_plugins = {
     {
         'nvim-lualine/lualine.nvim',
         -- See `:help lualine.txt`
+        event = "VeryLazy",
         opts = {
             options = {
                 icons_enabled = true,
@@ -83,6 +88,47 @@ local default_plugins = {
                 -- section_separators = '',
             },
         },
+    },
+    -- buffline
+    {
+		"akinsho/bufferline.nvim",
+		dependencies = "nvim-tree/nvim-web-devicons",
+		event = { "BufRead", "BufNewFile" },
+		config = function()
+            --require("bufferline").setup()
+            require("bufferline").setup({
+                options = {
+                    buffer_close_icon = "",
+                    modified_icon = " ",
+                    close_icon = "",
+                    left_trunc_marker = "",
+                    right_trunc_marker = "",
+                    max_name_length = 25,
+                    max_prefix_length = 15,
+                    tab_size = 25,
+                    diagnostics = "nvim_lsp",
+                    custom_filter = function(bufnr)
+                        local exclude_ft = { "qf", "fugitive", "git" }
+                        local cur_ft = vim.bo[bufnr].filetype
+                        local should_filter = vim.tbl_contains(exclude_ft, cur_ft)
+
+                        if should_filter then
+                            return false
+                        end
+
+                        return true
+                    end,
+                    show_buffer_icons = true,
+                    show_buffer_close_icons = false,
+                    show_tab_indicators = true,
+                    persist_buffer_sort = true,
+                    separator_style = 'slope',
+                    enforce_regular_tabs = false,
+                    always_show_bufferline = true,
+                    sort_by = 'id',
+                },
+            })
+        end
     },
     -- Tree Sitter
     {
@@ -221,7 +267,11 @@ local default_plugins = {
     },
 }
 
-require('lazy').setup(default_plugins)
+require('lazy').setup(default_plugins, {
+    defaults = {
+        lazy = true,
+    }
+})
 
 -- Defer nvim-treesitter configuration
 vim.defer_fn(function()
