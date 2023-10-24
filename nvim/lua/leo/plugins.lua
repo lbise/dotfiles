@@ -31,11 +31,11 @@ local default_plugins = {
             }
             vim.cmd.colorscheme 'onedark'
 
-            --require("tokyonight").setup({
-                --    -- your configuration comes here
-                --    -- or leave it empty to use the default settings
-                --    style = "storm", -- The theme comes in three styles, `storm`, `moon`, a darker variant `night` and `day`
-            --    light_style = "day", -- The theme is used when the background is set to light
+            --require('tokyonight').setup({
+            --    -- your configuration comes here
+            --    -- or leave it empty to use the default settings
+            --    style = 'storm', -- The theme comes in three styles, `storm`, `moon`, a darker variant `night` and `day`
+            --    light_style = 'day', -- The theme is used when the background is set to light
             --    transparent = false, -- Enable this to disable setting the background color
             --    terminal_colors = true, -- Configure the colors used when opening a `:terminal` in [Neovim](https://github.com/neovim/neovim)
             --    styles = {
@@ -45,11 +45,11 @@ local default_plugins = {
             --        keywords = { italic = false },
             --        functions = {},
             --        variables = {},
-            --        -- Background styles. Can be "dark", "transparent" or "normal"
-            --        sidebars = "dark", -- style for sidebars, see below
-            --        floats = "dark", -- style for floating windows
+            --        -- Background styles. Can be 'dark', 'transparent' or 'normal'
+            --        sidebars = 'dark', -- style for sidebars, see below
+            --        floats = 'dark', -- style for floating windows
             --    },
-            --    sidebars = { "qf", "help" }, -- Set a darker background on sidebar-like windows. For example: `["qf", "vista_kind", "terminal", "packer"]`
+            --    sidebars = { 'qf', 'help' }, -- Set a darker background on sidebar-like windows. For example: `['qf', 'vista_kind', 'terminal', 'packer']`
             --    day_brightness = 0.3, -- Adjusts the brightness of the colors of the **Day** style. Number between 0 and 1, from dull to vibrant colors
             --    hide_inactive_statusline = false, -- Enabling this option, will hide inactive statuslines and replace them with a thin border instead. Should work with the standard **StatusLine** and **LuaLine**.
             --    dim_inactive = false, -- dims inactive windows
@@ -75,7 +75,7 @@ local default_plugins = {
     {
         'nvim-lualine/lualine.nvim',
         -- See `:help lualine.txt`
-        event = "VeryLazy",
+        event = 'VeryLazy',
         opts = {
             options = {
                 icons_enabled = true,
@@ -91,24 +91,25 @@ local default_plugins = {
     },
     -- buffline
     {
-		"akinsho/bufferline.nvim",
-		dependencies = "nvim-tree/nvim-web-devicons",
-		event = { "BufRead", "BufNewFile" },
+		'akinsho/bufferline.nvim',
+		dependencies = 'nvim-tree/nvim-web-devicons',
+		event = { 'BufRead', 'BufNewFile' },
 		config = function()
-            --require("bufferline").setup()
-            require("bufferline").setup({
+            --require('bufferline').setup()
+            require('bufferline').setup({
                 options = {
-                    buffer_close_icon = "",
-                    modified_icon = " ",
-                    close_icon = "",
-                    left_trunc_marker = "",
-                    right_trunc_marker = "",
+                    style_preset = require('bufferline').style_preset.no_italic,
+                    buffer_close_icon = '',
+                    modified_icon = ' ',
+                    close_icon = '',
+                    left_trunc_marker = '',
+                    right_trunc_marker = '',
                     max_name_length = 25,
                     max_prefix_length = 15,
                     tab_size = 25,
-                    diagnostics = "nvim_lsp",
+                    diagnostics = 'nvim_lsp',
                     custom_filter = function(bufnr)
-                        local exclude_ft = { "qf", "fugitive", "git" }
+                        local exclude_ft = { 'qf', 'fugitive', 'git' }
                         local cur_ft = vim.bo[bufnr].filetype
                         local should_filter = vim.tbl_contains(exclude_ft, cur_ft)
 
@@ -130,9 +131,17 @@ local default_plugins = {
             })
         end
     },
+    {
+        -- Add indentation guides even on blank lines
+        'lukas-reineke/indent-blankline.nvim',
+        event = { 'BufReadPost', 'BufNewFile' },
+        main = 'ibl',
+        opts = {},
+    },
     -- Tree Sitter
     {
         'nvim-treesitter/nvim-treesitter',
+        cmd = { 'TSInstall', 'TSBufEnable', 'TSBufDisable', 'TSModuleInfo' },
         dependencies = {
             'nvim-treesitter/nvim-treesitter-textobjects',
         },
@@ -144,6 +153,7 @@ local default_plugins = {
     {
         'nvim-telescope/telescope.nvim',
         branch = '0.1.x',
+        event = 'UIEnter',
         dependencies = {
             'nvim-lua/plenary.nvim',
             -- Fuzzy Finder Algorithm which requires local dependencies to be built.
@@ -168,6 +178,8 @@ local default_plugins = {
     'tpope/vim-fugitive',
     {
         'lewis6991/gitsigns.nvim',
+        event = { 'BufReadPost', 'BufNewFile' },
+        enabled = true,
         opts = {
             signs = {
                 add          = { text = '│' },
@@ -213,6 +225,7 @@ local default_plugins = {
     -- Buffers
     {
         'ojroques/nvim-bufdel',
+        event = { 'BufReadPost', 'BufNewFile' },
         opts = {
             quit = false
         },
@@ -220,6 +233,7 @@ local default_plugins = {
     -- nvim-tree
     {
         'nvim-tree/nvim-tree.lua',
+        cmd = { 'NvimTreeToggle', 'NvimTreeFocus' },
         config = function()
             require('nvim-tree').setup({
                 hijack_netrw = false
@@ -229,9 +243,17 @@ local default_plugins = {
     -- LSP
     {
         'neovim/nvim-lspconfig',
+        enable = true,
+		event = {
+			'BufReadPost',
+			'BufNewFile',
+		},
         dependencies = {
             -- Automatically install LSPs to stdpath for neovim
-            'williamboman/mason.nvim',
+            {
+                'williamboman/mason.nvim',
+                cmd = { 'Mason', 'MasonInstall', 'MasonUpdate' },
+            },
             'williamboman/mason-lspconfig.nvim',
 
             -- Useful status updates for LSP
@@ -253,6 +275,7 @@ local default_plugins = {
     -- Autocompletion
     {
         'hrsh7th/nvim-cmp',
+        event = 'InsertEnter',
         dependencies = {
             -- Snippet Engine & its associated nvim-cmp source
             'L3MON4D3/LuaSnip',
@@ -287,7 +310,7 @@ vim.defer_fn(function()
         -- Recommendation: set to false if you don't have `tree-sitter` CLI installed locally
         auto_install = true,
 
-        -- List of parsers to ignore installing (or "all")
+        -- List of parsers to ignore installing (or 'all')
         ignore_install = {},
 
         ---- If you need to change the installation directory of the parsers (see -> Advanced Setup)

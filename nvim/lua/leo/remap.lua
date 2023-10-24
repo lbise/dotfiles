@@ -11,8 +11,8 @@ vim.keymap.set({ 'n' }, '<C-k>', '<C-w>k', { desc = 'Window up' })
 -- Close current buffer
 vim.keymap.set({ 'n' }, '<leader>x', '<cmd> BufDel <CR>', { desc = 'Close current buffer' })
 -- Switch buffer
-vim.keymap.set({ 'n' }, '<tab>', '<cmd> bn <CR>', { desc = 'Next buffer' })
-vim.keymap.set({ 'n' }, '<S-tab>', '<cmd> bp <CR>', { desc = 'Previous buffer' })
+vim.keymap.set({ 'n' }, '<tab>', '<cmd> BufferLineCycleNext <CR>', { desc = 'Next buffer' })
+vim.keymap.set({ 'n' }, '<S-tab>', '<cmd> BufferLineCyclePrev <CR>', { desc = 'Previous buffer' })
 -- nvim-tree
 vim.keymap.set({ 'n' }, '<C-p>', '<cmd> NvimTreeToggle <CR>', { desc = 'Toggle nvim-tree' })
 -- Center view after jump or search next
