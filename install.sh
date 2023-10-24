@@ -24,7 +24,7 @@ ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
 COMMON_PACKAGES="zsh fzf ripgrep gzip tmux"
-NVIM_PLUGINS_MD5="1a93c1560aef236389419eb499102659"
+NVIM_PLUGINS_MD5="3a3c452a28463a2552169577cd83de03"
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
