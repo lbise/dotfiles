@@ -6,10 +6,11 @@ endif
 
 syn keyword sidTodo contained TODO FIXME XXX NOTE
 syn match sidComment "#.*$" contains=sidTodo
+
 syn keyword sidBlockCmd time alias table instructions period lookup group labels
 syn keyword sidBlockCmd layout2 mapping include times
 syn keyword sidFuncCmd LATCH_RemoteSched EV_Irq GOTO NOP JUMP FLG_Clear FLG_Set
-syn keyword sidFuncCmd VLP_Allowed EV_G722 RADIO_TxRx EV_IncrLoopCnt
+syn keyword sidFuncCmd VLP_Allowed EV_G722 RADIO_TxRx EV_IncrLoopCnt RADIO_Assess
 
 let b:current_syntax = "sid"
 
