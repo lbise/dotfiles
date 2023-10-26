@@ -1,8 +1,3 @@
-# If you come from bash you might have to change your $PATH.
-# export PATH=$HOME/bin:/usr/local/bin:$PATH
-
-export COLORTERM=truecolor
-
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
@@ -11,22 +6,6 @@ export ZSH="$HOME/.oh-my-zsh"
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 ZSH_THEME="candy"
-
-# powerlevel9k config
-#POWERLEVEL9K_PROMPT_ON_NEWLINE=true
-#POWERLEVEL9K_SHORTEN_DIR_LENGTH=2
-#POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(dir nvm vcs)
-##POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status history time)
-#POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=()
-##POWERLEVEL9K_MODE='awesome-fontconfig'
-## Use fonts from https://github.com/ryanoasis/nerd-fonts
-#POWERLEVEL9K_MODE='nerdfont-complete'
-
-# Set list of themes to pick from when loading at random
-# Setting this variable when ZSH_THEME=random will cause zsh to load
-# a theme from this variable instead of looking in ~/.oh-my-zsh/themes/
-# If set to an empty array, this variable will have no effect.
-# ZSH_THEME_RANDOM_CANDIDATES=( "robbyrussell" "agnoster" )
 
 # Uncomment the following line to use case-sensitive completion.
 # CASE_SENSITIVE="true"
@@ -84,6 +63,7 @@ plugins=(
   colored-man-pages
   fzf
   ssh-agent
+  vi-mode
 )
 
 # !! MUST BE BEFORE SOURCE !!
@@ -103,6 +83,10 @@ else
 fi
 
 source $ZSH/oh-my-zsh.sh
+
+# Add vi-mode indication to prompt
+#PROMPT="$PROMPT\$(vi_mode_prompt_info)"
+#RPROMPT="\$(vi_mode_prompt_info)$RPROMPT"
 
 # User configuration
 
@@ -135,7 +119,7 @@ export EDITOR='nvim'
 setopt notify    # immediate job notifications
 
 # 10ms for key sequences
-KEYTIMEOUT=1
+KEYTIMEOUT=15
 
 # History
 HISTSIZE=10000
