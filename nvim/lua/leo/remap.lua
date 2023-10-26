@@ -48,15 +48,15 @@ vim.keymap.set('n', '<leader>pv', vim.cmd.Ex)
 -- *** Telescope
 local builtin = require('telescope.builtin')
 -- Find in all files
-vim.keymap.set('n', '<leader>ff', builtin.find_files, { desc = '[F]ind [F]iles' })
+vim.keymap.set('n', '<leader>ff', function()
+    builtin.find_files({ no_ignore = true })
+end, { desc = '[F]ind [F]iles' })
 -- Find in all git files
 vim.keymap.set('n', '<leader>fg', builtin.git_files, { desc = '[F]ind [G]it Files' })
 -- Find current word in files
 vim.keymap.set('n', '<leader>fw', require('telescope.builtin').grep_string, { desc = '[F]ind current [W]ord' })
 -- Find string in files
-vim.keymap.set('n', '<leader>fs', function()
-    builtin.grep_string({ search = vim.fn.input('Grep > ') })
-end, { desc = '[F]ind [S]tring' })
+vim.keymap.set('n', '<leader>fs', builtin.live_grep, { desc = '[F]ind [S]tring' })
 -- Find recently opened files
 vim.keymap.set('n', '<leader>fr', require('telescope.builtin').oldfiles, { desc = '[F]ind [r]ecently opened files' })
 vim.keymap.set('n', '<leader>fc', function()
