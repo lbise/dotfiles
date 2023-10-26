@@ -73,7 +73,7 @@ vim.keymap.set('n', '<leader>fh', require('telescope.builtin').help_tags, { desc
 vim.keymap.set('n', '<leader>gs', vim.cmd.Git)
 
 -- *** nvim-tree
-vim.keymap.set({ 'n' }, '<C-p>', '<cmd> NvimTreeToggle <CR>', { desc = 'Toggle nvim-tree' })
+vim.keymap.set({ 'n' }, '<C-p>', '<cmd> Neotree toggle <CR>', { desc = 'Toggle tree' })
 
 -- *** LSP
 -- Format
@@ -89,3 +89,37 @@ vim.keymap.set('n', '<leader>t', function() require('trouble').toggle() end)
 --vim.keymap.set("n", "<leader>xq", function() require("trouble").toggle("quickfix") end)
 --vim.keymap.set("n", "<leader>xl", function() require("trouble").toggle("loclist") end)
 --vim.keymap.set("n", "gR", function() require("trouble").toggle("lsp_references") end)
+
+-- Use LspAttach autocommand to only map the following keys
+-- after the language server attaches to the current buffer
+vim.api.nvim_create_autocmd('LspAttach', {
+    group = vim.api.nvim_create_augroup('UserLspConfig', {}),
+    callback = function(ev)
+        -- Only map for buffer
+        local opts = { buffer = ev.buf }
+
+        vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, opts)
+        vim.keymap.set({ 'n', 'v' }, '<space>ca', vim.lsp.buf.code_action, opts)
+
+        vim.keymap.set('n', 'gd', require('telescope.builtin').lsp_definitions, opts)
+        vim.keymap.set('n', 'gr', require('telescope.builtin').lsp_references, opts)
+        vim.keymap.set('n', 'gI', require('telescope.builtin').lsp_implementations, opts)
+        vim.keymap.set('n', '<leader>D', require('telescope.builtin').lsp_type_definitions, opts)
+        vim.keymap.set('n', '<leader>ds', require('telescope.builtin').lsp_document_symbols, opts)
+        vim.keymap.set('n', '<leader>ws', require('telescope.builtin').lsp_dynamic_workspace_symbols, opts)
+
+        vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
+        vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, opts)
+
+        vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
+        vim.keymap.set('n', '<leader>wa', vim.lsp.buf.add_workspace_folder, opts)
+        vim.keymap.set('n', '<leader>wr', vim.lsp.buf.remove_workspace_folder, opts)
+        vim.keymap.set('n', '<leader>wl', function()
+            print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+        end, opts)
+
+        vim.api.nvim_buf_create_user_command(ev.buf, 'Format', function(_)
+            vim.lsp.buf.format()
+        end, { desc = 'Format current buffer with LSP' })
+    end,
+})
