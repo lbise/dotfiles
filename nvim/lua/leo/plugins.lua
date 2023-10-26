@@ -285,7 +285,6 @@ local default_plugins = {
     },
     {
         'neovim/nvim-lspconfig',
-        enable = true,
 		event = {
 			'BufReadPost',
 			'BufNewFile',
