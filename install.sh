@@ -23,7 +23,7 @@ UNTAR="tar xvf"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
-COMMON_PACKAGES="zsh fzf ripgrep gzip tmux"
+COMMON_PACKAGES="zsh fzf ripgrep gzip tmux fd-find"
 NVIM_PLUGINS_MD5="3a3c452a28463a2552169577cd83de03"
 
 function print_usage() {
