@@ -6,10 +6,18 @@
         {
             "command": 
             {
-                "action": "moveFocus",
-                "direction": "right"
+                "action": "newTab",
+                "index": 0
             },
-            "keys": "ctrl+shift+l"
+            "keys": "ctrl+alt+1"
+        },
+        {
+            "command": 
+            {
+                "action": "moveFocus",
+                "direction": "left"
+            },
+            "keys": "ctrl+shift+h"
         },
         {
             "command": 
@@ -23,17 +31,9 @@
             "command": 
             {
                 "action": "moveFocus",
-                "direction": "left"
+                "direction": "right"
             },
-            "keys": "ctrl+shift+h"
-        },
-        {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 0
-            },
-            "keys": "ctrl+alt+1"
+            "keys": "ctrl+shift+l"
         },
         {
             "command": 
@@ -44,12 +44,8 @@
             "keys": "ctrl+shift+7"
         },
         {
-            "command": 
-            {
-                "action": "newTab",
-                "index": 4
-            },
-            "keys": "ctrl+alt+5"
+            "command": "find",
+            "keys": "ctrl+shift+f"
         },
         {
             "command": 
@@ -60,8 +56,12 @@
             "keys": "alt+shift+h"
         },
         {
-            "command": "find",
-            "keys": "ctrl+shift+f"
+            "command": 
+            {
+                "action": "newTab",
+                "index": 4
+            },
+            "keys": "ctrl+alt+5"
         },
         {
             "command": 
@@ -121,8 +121,7 @@
             "command": 
             {
                 "action": "scrollUp"
-            },
-            "keys": "ctrl+up"
+            }
         },
         {
             "command": 
@@ -225,6 +224,14 @@
             "keys": "ctrl+shift+home"
         },
         {
+            "command": "unbound",
+            "keys": "ctrl+down"
+        },
+        {
+            "command": "unbound",
+            "keys": "ctrl+up"
+        },
+        {
             "command": 
             {
                 "action": "switchToTab",
@@ -244,8 +251,7 @@
             "command": 
             {
                 "action": "scrollDown"
-            },
-            "keys": "ctrl+down"
+            }
         },
         {
             "command": 
