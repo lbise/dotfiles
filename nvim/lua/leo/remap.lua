@@ -1,28 +1,39 @@
 -- General
 -- ??
 vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true })
+
 -- Clear search highlight
 vim.keymap.set({ 'n' }, '<leader><Esc>', '<cmd> nohlsearch <CR>')
+
 -- Switch between windows
 vim.keymap.set({ 'n' }, '<C-h>', '<C-w>h', { desc = 'Window left' })
 vim.keymap.set({ 'n' }, '<C-l>', '<C-w>l', { desc = 'Window right' })
 vim.keymap.set({ 'n' }, '<C-j>', '<C-w>j', { desc = 'Window down' })
 vim.keymap.set({ 'n' }, '<C-k>', '<C-w>k', { desc = 'Window up' })
+
 -- Close current buffer
 vim.keymap.set({ 'n' }, '<leader>x', '<cmd> BufDel <CR>', { desc = 'Close current buffer' })
+
 -- Switch buffer
 vim.keymap.set({ 'n' }, '<tab>', '<cmd> BufferLineCycleNext <CR>', { desc = 'Next buffer' })
 vim.keymap.set({ 'n' }, '<S-tab>', '<cmd> BufferLineCyclePrev <CR>', { desc = 'Previous buffer' })
--- nvim-tree
-vim.keymap.set({ 'n' }, '<C-p>', '<cmd> NvimTreeToggle <CR>', { desc = 'Toggle nvim-tree' })
+
+-- Window resize
+vim.keymap.set('n', '<C-Right>', [[<cmd>vertical resize +5<cr>]])
+vim.keymap.set('n', '<C-Left>', [[<cmd>vertical resize -5<cr>]])
+vim.keymap.set('n', '<C-Up>', [[<cmd>horizontal resize +2<cr>]])
+vim.keymap.set('n', '<C-Down>', [[<cmd>horizontal resize -2<cr>]])
+
 -- Center view after jump or search next
 vim.keymap.set('n', '<C-d>', '<C-d>zz')
 vim.keymap.set('n', '<C-u>', '<C-u>zz')
 vim.keymap.set('n', 'n', 'nzzzv')
 vim.keymap.set('n', 'N', 'Nzzzv')
+
 -- Insert line stay in normal mode
 vim.keymap.set('n', '<leader>o', [[o<Esc>0'_D]])
 vim.keymap.set('n', '<leader>O', [[O<Esc>0'_D]])
+
 -- Remove all trailing and leading whitespaces
 vim.keymap.set('n', '<F4>', [[:%s/\s\+$//e<CR>]])
 vim.keymap.set('n', 'Q', '<nop>')
@@ -60,6 +71,9 @@ vim.keymap.set('n', '<leader>fh', require('telescope.builtin').help_tags, { desc
 
 -- *** Fugitive
 vim.keymap.set('n', '<leader>gs', vim.cmd.Git)
+
+-- *** nvim-tree
+vim.keymap.set({ 'n' }, '<C-p>', '<cmd> NvimTreeToggle <CR>', { desc = 'Toggle nvim-tree' })
 
 -- *** LSP
 -- Format
