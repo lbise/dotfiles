@@ -4,7 +4,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- global statusline
-vim.opt.laststatus = 3 
+vim.opt.laststatus = 3
 
 -- Show matching braces
 vim.opt.showmatch = true
@@ -91,6 +91,10 @@ end
 -- go to previous/next line with h,l,left arrow and right arrow
 -- when cursor reaches end/beginning of line
 vim.opt.whichwrap:append "<>[]hl"
+
+-- Highlight whitespaces
+vim.api.nvim_set_hl(0, 'fullHighlight', { standout = true })
+vim.fn.matchadd('fullHighlight', [[\s\+$]])
 
 -- Prevent adding comment leader on new line
 -- Use augroup to ensure no other plugin overwrite the setting
