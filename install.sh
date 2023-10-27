@@ -156,60 +156,63 @@ function install_neovim() {
     $RM_RF $NVIM_SRC
 }
 
+function copy_neovim_plugins() {
+    echo "Copying vim plugins..."
+
+    PLUGIN_DST="$DIR/vim/pack/my-plugins/start"
+    $MKDIR -p $PLUGIN_DST
+    $CP -R $DIR/vim_plugins/* $PLUGIN_DST
+    # nvim
+    NVIM_PLUGINS_DST="$HOME/.local/share"
+    #NVIM_PLUGINS_SRC="$DIR/archives/nvim_plugins_$NVIM_PLGINS_MD5.tar.gz"
+    NVIM_PLUGINS_SRC="/mnt/ch03pool/murten_mirror/shannon/packages/bootstrap/nvim_plugins_$NVIM_PLUGINS_MD5.tar.gz"
+    MD5_INSTALLED=""
+    if [ ! -f "$NVIM_PLUGINS_SRC" ]; then
+        echo "$NVIM_PLUGINS_SRC not found!"
+        exit 1
+    fi
+
+    if [ -f "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt" ]; then
+        MD5_INSTALLED=$(cat $NVIM_PLUGINS_DST/nvim_plugins_installed.txt)
+        echo "nvim plugins already installed md5=$MD5_INSTALLED"
+    fi
+
+    if [ "$NVIM_PLUGINS_MD5" != "$MD5_INSTALLED" ]; then
+        echo "Copying nvim plugins to $NVIM_PLUGINS_DST (md5=$NVIM_PLUGINS_MD5)"
+        if [ ! -d "$NVIM_PLUGINS_DST" ]; then
+            $MKDIR -p $NVIM_PLUGINS_DST
+        fi
+
+        if [ -d "$NVIM_PLUGINS_DST/nvim" ]; then
+            while true; do
+                read -p "Do you wish to delete $NVIM_PLUGINS_DST/nvim? (y/n): " yn
+                case $yn in
+                    [Yy]* ) $RM_RF $NVIM_PLUGINS_DST/nvim; $RM_RF "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt"; break;;
+                    [Nn]* ) echo "Skipping nvim plugins copy"; return;;
+                    * ) echo "Please answer yes or no.";;
+                esac
+            done
+        fi
+
+        $UNTAR "$NVIM_PLUGINS_SRC" -C "$NVIM_PLUGINS_DST"
+        echo $NVIM_PLUGINS_MD5 >> "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt"
+        echo "Finished copying nvim plugins to $NVIM_PLUGINS_DST (md5=$NVIM_PLUGINS_MD5)"
+    fi
+}
+
 function install_common() {
     echo "-------------------------------------------------------------------------"
     echo "Installing common items..."
 
-    # Setup symlinks
-    rm_symlinks
-    ln_symlinks
-
     if [ "$COPY_VIM" = 1 ]; then
-        echo "Copying vim plugins..."
-        PLUGIN_DST="$DIR/vim/pack/my-plugins/start"
-        $MKDIR -p $PLUGIN_DST
-        $CP -R $DIR/vim_plugins/* $PLUGIN_DST
-        # nvim
-        NVIM_PLUGINS_DST="$HOME/.local/share"
-        #NVIM_PLUGINS_SRC="$DIR/archives/nvim_plugins_$NVIM_PLGINS_MD5.tar.gz"
-        NVIM_PLUGINS_SRC="/mnt/ch03pool/murten_mirror/shannon/packages/bootstrap/nvim_plugins_$NVIM_PLUGINS_MD5.tar.gz"
-        MD5_INSTALLED=""
-        if [ ! -f "$NVIM_PLUGINS_SRC" ]; then
-            echo "$NVIM_PLUGINS_SRC not found!"
-            exit 1
-        fi
-
-        if [ -f "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt" ]; then
-            MD5_INSTALLED=$(cat $NVIM_PLUGINS_DST/nvim_plugins_installed.txt)
-            echo "nvim plugins already installed md5=$MD5_INSTALLED"
-        fi
-
-        if [ "$NVIM_PLUGINS_MD5" != "$MD5_INSTALLED" ]; then
-            echo "Copying nvim plugins to $NVIM_PLUGINS_DST (md5=$NVIM_PLUGINS_MD5)"
-            if [ ! -d "$NVIM_PLUGINS_DST" ]; then
-                $MKDIR -p $NVIM_PLUGINS_DST
-            fi
-
-            if [ -d "$NVIM_PLUGINS_DST/nvim" ]; then
-                while true; do
-                    read -p "Do you wish to delete $NVIM_PLUGINS_DST/nvim" yn
-                    case $yn in
-                        [Yy]* ) $RM_RF $NVIM_PLUGINS_DST/nvim; $RM_RF "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt"; break;;
-                        [Nn]* ) echo "Skipping nvim plugins copy"; return;;
-                        * ) echo "Please answer yes or no.";;
-                    esac
-                done
-            fi
-
-            $UNTAR "$NVIM_PLUGINS_SRC" -C "$NVIM_PLUGINS_DST"
-            echo $NVIM_PLUGINS_MD5 >> "$NVIM_PLUGINS_DST/nvim_plugins_installed.txt"
-            echo "Finished copying nvim plugins to $NVIM_PLUGINS_DST (md5=$NVIM_PLUGINS_MD5)"
-        fi
+        copy_neovim_plugins
     fi
 
     install_zsh
-    # Required for vim-coc (>= 14.14)
-    #install_nodejs
+
+    # Setup symlinks
+    rm_symlinks
+    ln_symlinks
 }
 
 function install_ohmyzsh() {
@@ -398,8 +401,8 @@ function install_ubuntu() {
     $UBUNTU_UPDATE
     $UBUNTU_INSTALL $PKGS
 
-    install_common
     install_neovim
+    install_common
 }
 ################################################################################
 # MacOs
