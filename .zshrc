@@ -63,7 +63,7 @@ plugins=(
   colored-man-pages
   fzf
   ssh-agent
-  vi-mode
+  zsh-vi-mode
 )
 
 # !! MUST BE BEFORE SOURCE !!
