@@ -25,7 +25,7 @@ KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
 COMMON_PACKAGES="zsh fzf ripgrep gzip tmux fd-find pinentry-tty"
 NVIM_PLUGINS_MD5="e0959a24634ec6d7bceb340c75e7d78b"
-.
+
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
 
