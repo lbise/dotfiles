@@ -17,7 +17,11 @@ local settings = {
             clangd = false,
             pyright = true,
             bashls = true,
-            lua_ls = true,
+            lua_ls = {
+                workspace = {
+                    checkThirdParty = false
+                },
+            }
         }
     }
 }

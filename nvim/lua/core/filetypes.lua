@@ -1,4 +1,4 @@
-local set_ft_config = function(size) 
+local set_ft_config = function(size)
     vim.opt.shiftwidth = size
     vim.opt.softtabstop = size
     vim.opt.expandtab = true
