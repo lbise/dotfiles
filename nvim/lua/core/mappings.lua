@@ -75,6 +75,9 @@ vim.keymap.set('n', '<leader>gs', vim.cmd.Git)
 -- *** nvim-tree
 vim.keymap.set({ 'n' }, '<C-p>', '<cmd> Neotree toggle <CR>', { desc = 'Toggle tree' })
 
+-- *** Neogen
+vim.api.nvim_set_keymap("n", "<Leader>nf", ":lua require('neogen').generate()<CR>", { noremap = true, silent = true })
+
 -- *** LSP
 -- Format
 vim.keymap.set("n", "<leader>f", vim.lsp.buf.format)

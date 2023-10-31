@@ -15,6 +15,18 @@ local config = {
             'WhichKey'
         },
     },
+    {
+        'danymat/neogen',
+        dependencies = 'nvim-treesitter/nvim-treesitter',
+        cmd = {
+            'Neogen'
+        },
+        config = function()
+	        require('neogen').setup({
+                snippet_engine = 'luasnip'
+            })
+        end
+    },
 }
 
 return config
