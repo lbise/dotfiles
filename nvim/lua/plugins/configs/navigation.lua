@@ -24,6 +24,7 @@ local config = {
                     }
                 },
                 filesystem = {
+                    bind_to_cwd = false, -- true creates a 2-way binding between vim's cwd and neo-tree's root
                     hijack_netrw_behavior = 'open_current'
                 },
             })
