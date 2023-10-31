@@ -70,3 +70,5 @@ vim/pack
 tmux/plugins/tmux-*
 
 lazy-lock.json
+
+.luarc.json
