@@ -23,6 +23,13 @@ vim.api.nvim_create_autocmd('FileType', {
     callback = function()
         set_ft_config(2)
     end,
+    pattern = 'xml',
+})
+
+vim.api.nvim_create_autocmd('FileType', {
+    callback = function()
+        set_ft_config(2)
+    end,
     pattern = 'json',
 })
 
