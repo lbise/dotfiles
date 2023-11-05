@@ -23,7 +23,9 @@ UNTAR="tar xvf"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
-COMMON_PACKAGES="zsh fzf ripgrep gzip tmux fd-find pinentry-tty"
+COMMON_PACKAGES="zsh fzf ripgrep gzip tmux"
+UBUNTU_COMMON_PACKAGES="fd-find pinentry-tty build-essential gdb"
+MAC_PACKAGES="fd gpg universal-ctags nvim"
 NVIM_PLUGINS_MD5="bdf24dfc6ce8ad532eb95af2d1c04778"
 
 function print_usage() {
@@ -389,7 +391,7 @@ function install_ubuntu() {
     OS_VER=$VERSION_ID
     echo "Installing for Ubuntu-${OS_VER}..."
 
-    PKGS="$COMMON_PACKAGES build-essential gdb"
+    PKGS="$COMMON_PACKAGES $UBUNTU_COMMON_PACKAGES"
     if [ "$WORK_INSTALL" = 1 ]; then
         PKGS="$PKGS git-lfs"
     fi
@@ -414,12 +416,11 @@ MACOS_UPGRADE="brew upgrade -v"
 MACOS_INSTALL="brew install"
 
 function install_macos() {
-    PKGS="$COMMON_PACKAGES gpg universal-ctags nvim"
+    PKGS="$COMMON_PACKAGES $MAC_PACKAGES"
 
     if [ "$WSL_ONLY" = 1 ]; then
         return
     fi
-brew tap homebrew/cask-fonts
 
     echo "Installing for MacOs..."
     $MACOS_UPDATE
