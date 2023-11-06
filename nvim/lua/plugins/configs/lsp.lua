@@ -44,8 +44,13 @@ local config = {
                     -- override options if user defines them
                     if type(require('core.settings').lsp.servers[config_server]) == 'table' then
                         local user_opts = require('core.settings').lsp.servers[config_server]
-                        opts = require('core.tools').merge_table(opts, user_opts)
+                        if user_opts ~= nil then
+                            opts['settings'] = user_opts['settings']
+                        end
                     end
+
+                    --print('Config LSP: ', config_server)
+                    --print(require('core.tools').dump_table(opts))
 
                     require('lspconfig')[config_server].setup(opts)
                 end

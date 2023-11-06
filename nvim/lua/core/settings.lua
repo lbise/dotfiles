@@ -8,15 +8,33 @@ local settings = {
             'bashls',
             'lua_ls',
         },
-        -- Servers enable status, can also be a list of options passed to  require('lspconfig')[server].setup()
+        -- Servers enable status, can also be a list of settings passed to require('lspconfig')[server].setup(settings = { xxx })
         servers = {
             clangd = false,
-            pyright = true,
+            pyright = {
+                settings = {
+                    python = {
+                        analysis = {
+                            extraPaths = {
+                                vim.fn.expand('$HOME/andromeda/rom/scripts/python'),
+                                vim.fn.expand('$HOME/andromeda/rom/_export/python3'),
+                                vim.fn.expand('$HOME/andromeda/pctools/scripts/python'),
+                                vim.fn.expand('$HOME/andromeda/executer/scripts/python'),
+                                vim.fn.expand('$HOME/andromeda/infrastructure/scripts/python'),
+                            }
+                        },
+                    },
+                },
+            },
             ruff_lsp = true,
             bashls = true,
             lua_ls = {
-                workspace = {
-                    checkThirdParty = false
+                settings = {
+                    Lua = {
+                        workspace = {
+                            checkThirdParty = false
+                        },
+                    },
                 },
             }
         }

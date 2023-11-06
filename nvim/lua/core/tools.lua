@@ -18,16 +18,21 @@ function tools.is_work()
 end
 
 function tools.dump_table(o)
-    if type(o) == 'table' then
-        local s = '{ '
-        for k,v in pairs(o) do
-            if type(k) ~= 'number' then k = '"'..k..'"' end
-            s = s .. '['..k..'] = ' .. tools.dump_table(v) .. ','
-        end
-        return s .. '} '
-    else
-        return tostring(o)
-    end
+    return vim.inspect(o)
+    --if type(o) == 'table' then
+    --    local s = '{ '
+    --    for k,v in pairs(o) do
+    --        if type(k) ~= 'number' then k = '"'..k..'"' end
+    --        s = s .. '['..k..'] = ' .. tools.dump_table(v) .. ','
+    --    end
+    --    return s .. '} '
+    --else
+    --    return tostring(o)
+    --end
+end
+
+function tools.dump_lsp_config()
+    return vim.inspect(vim.lsp.get_active_clients())
 end
 
 function tools.merge_table(tbl1, tbl2)
