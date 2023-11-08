@@ -141,3 +141,6 @@ vim.api.nvim_create_user_command('SaveAsRoot', function()
     vim.cmd('e!')
 end, {})
 vim.cmd('cnoreabbrev sudow SaveAsRoot')
+
+-- Clear whitespace on write
+vim.api.nvim_create_autocmd('BufWritePre', {command = '%s/\\s\\+$//e'})
