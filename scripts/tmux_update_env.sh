@@ -41,36 +41,15 @@ VARS=("DISPLAY")
 ALL_PANES=$(tmux list-panes -s -F "#{session_name}:#{window_index}.#{pane_index};#{pane_current_command}")
 for PANE in ${ALL_PANES[@]}; do
     IFS=';' read -ra INFO <<< "$PANE"
-    if [[ "${INFO[1]}" == "zsh" || "${INFO[1]}" == "bash" ]]; then
-        for VAR in ${VARS[@]}; do
-            NEW_VAL=$(tmux show-env | sed -n "s/^${VAR}=//p")
-            if [ "$NEW_VAL" != "" ]; then
+    for VAR in ${VARS[@]}; do
+        NEW_VAL=$(tmux show-env | sed -n "s/^${VAR}=//p")
+        if [ "$NEW_VAL" != "" ]; then
+            if [[ "${INFO[1]}" == "zsh" || "${INFO[1]}" == "bash" ]]; then
                 tmux send-keys -t ${INFO[0]} Enter "export \"$VAR=$NEW_VAL\"" Enter
+            elif [[ "${INFO[1]}" == *"vim"* ]]; then
+                tmux send-keys -t ${INFO[0]} Escape
+                tmux send-keys -t ${INFO[0]} ":let \$DISPLAY = \"$NEW_VAL\"" Enter
             fi
-        done
-    fi
-done
-
-exit
-tmux list-panes -s -F "#{session_name}:#{window_index}.#{pane_index} #{pane_current_command}" | \
-while read pane_process
-do
-    IFS=' ' read -ra pane_process <<< "$pane_process"
-    if [[ "${pane_process[1]}" == "zsh" || "${pane_process[1]}" == "bash" ]]; then
-        for VAR in ${VARS[@]}; do
-            #CURR_VAL=${!VAR}
-            NEW_VAL=$(tmux show-env | sed -n "s/^${VAR}=//p")
-            if [ "$NEW_VAL" != "" ]; then
-                #echo "$VAR: $NEW_VAL -> $CURR_VAL"
-                #echo "$VAR: $NEW_VAL -> $CURR_VAL" >> ~/.tmux.env
-                echo $"pane_process: ${pane_process[0]}"
-                #tmux send-keys -t ${pane_process[0]} C-c "export \"$VAR=$NEW_VAL\"" Enter
-            fi
-        done
-        #elif [[ "${pane_process[1]}" == *"python"* ]]; then
-        #   tmux send-keys -t ${pane_process[0]} "import os; os.environ['\"$VAR\"']=\"$NEW_VAL\"" Enter
-        #elif [[ "${pane_process[1]}" == *"vim"* ]]; then
-        #   tmux send-keys -t ${pane_process[0]} Escape
-        #   tmux send-keys -t ${pane_process[0]} ":let \$VAR = \"$NEW_VAL\"" Enter
-    fi
+        fi
+    done
 done
