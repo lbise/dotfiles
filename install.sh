@@ -26,7 +26,7 @@ KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
 COMMON_PACKAGES="zsh fzf ripgrep gzip tmux"
 UBUNTU_COMMON_PACKAGES="fd-find pinentry-tty build-essential gdb"
 MAC_PACKAGES="fd gpg universal-ctags nvim"
-NVIM_PLUGINS_MD5="bdf24dfc6ce8ad532eb95af2d1c04778"
+NVIM_PLUGINS_MD5="57052318a2c506e65f7ad06310a3ee44"
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
