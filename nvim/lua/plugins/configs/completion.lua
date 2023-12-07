@@ -7,7 +7,7 @@ end
 local config = {
     {
         'hrsh7th/nvim-cmp',
-        event = 'InsertEnter',
+        event = { "InsertEnter", "CmdlineEnter" },
         config = function()
             require('cmp').setup({
                 snippet = {
@@ -20,22 +20,21 @@ local config = {
                     ['<C-p>'] = require('cmp').mapping.select_prev_item(),
                     ['<C-d>'] = require('cmp').mapping.scroll_docs(-4),
                     ['<C-f>'] = require('cmp').mapping.scroll_docs(4),
-                    ['<C-Space>'] = require('cmp').mapping.complete {},
+                    ['<C-Space>'] = require('cmp').mapping.complete(),
                     ['<CR>'] = require('cmp').mapping.confirm {
                         behavior = require('cmp').ConfirmBehavior.Replace,
                         select = true,
                     },
-                    --['<Tab>'] = nil,
-                    --['<S-Tab>'] = nil,
                     ['<Tab>'] = require('cmp').mapping(function(fallback)
                         if require('cmp').visible() then
                             require('cmp').select_next_item()
-                            -- You could replace the expand_or_jumpable() calls with expand_or_locally_jumpable() 
+                            -- You could replace the expand_or_jumpable() calls with expand_or_locally_jumpable()
                             -- that way you will only jump inside the snippet region
                         elseif require('luasnip').expand_or_jumpable() then
                             require('luasnip').expand_or_jump()
-                        elseif has_words_before() then
-                            require('cmp').complete()
+                        -- LeB: Prevent entering tab characters if the cursor is just after text...
+                        --elseif has_words_before() then
+                        --    require('cmp').complete()
                         else
                             fallback()
                         end
