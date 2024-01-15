@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -e
+
 PLUGINS_DIR="$HOME/.local/share"
 PLUGINS="$PLUGINS_DIR/nvim"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
@@ -18,4 +20,4 @@ cp $DST/nvim_plugins_$MD5.tar.gz $COPY
 echo "Created archive: $DST/nvim_plugins_$MD5.tar.gz"
 echo "Copied to : $DST/nvim_plugins_$MD5.tar.gz"
 echo ">> Remember to delete the previous version in $DST!"
-echo ">> Modify the MD5 in install.sh"
+echo ">> Modify the MD5 in install.sh to $MD5"
