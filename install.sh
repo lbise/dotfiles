@@ -143,18 +143,29 @@ function install_nodejs() {
 }
 
 function install_neovim() {
-    echo "-------------------------------------------------------------------------"
-    if [ -f "/usr/bin/nvim" ]; then
-        echo "Neovim already installed..."
-        return
-    fi
-
-    echo "Installing neovim..."
-    NVIM_VERSION="0.9.2"
+    NVIM_VERSION="0.9.5"
+    NVIM_VER_REGEX="^NVIM v([0-9]+.[0-9]+.[0-9]+)"
     NVIM_OUT="$DIR/archives"
     NVIM_SRC="$NVIM_OUT/nvim-linux64"
     NVIM_DST="/usr"
 
+    echo "-------------------------------------------------------------------------"
+    if [ -f "/usr/bin/nvim" ]; then
+        NVIM_CUR_VER=$(nvim -v)
+        if [[ $NVIM_CUR_VER =~ $NVIM_VER_REGEX ]]; then
+            # Match
+            NVIM_CUR_VER=${BASH_REMATCH[1]}
+            if [[ $NVIM_CUR_VER == $NVIM_VERSION ]]; then
+                echo "nvim $NVIM_CUR_VER already installed!"
+                return
+            fi
+        else
+            # No match
+            echo "Cannot determine nvim version, re-installing"
+        fi
+    fi
+
+    echo "Installing neovim v$NVIM_VERSION..."
     $UNTAR $NVIM_OUT/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
     sudo $CP -r $NVIM_SRC/* $NVIM_DST
     $RM_RF $NVIM_SRC
