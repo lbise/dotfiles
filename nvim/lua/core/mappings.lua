@@ -38,8 +38,12 @@ vim.keymap.set('n', '<leader>O', [[O<Esc>0'_D]])
 vim.keymap.set('n', '<F4>', [[:%s/\s\+$//e<CR>]])
 vim.keymap.set('n', 'Q', '<nop>')
 
+-- Generate tags manually
+vim.keymap.set('n', '<F12>', ':!ctags -R --exclude="*Sim*" .<CR>')
+
 -- Exit terminal mode
-vim.keymap.set({ 't' }, '<C-x>', vim.api.nvim_replace_termcodes('<C-\\><C-N>', true, true, true), { desc = 'Escape terminal mode' })
+vim.keymap.set({ 't' }, '<C-x>', vim.api.nvim_replace_termcodes('<C-\\><C-N>', true, true, true),
+    { desc = 'Escape terminal mode' })
 
 -- Open file browser
 vim.keymap.set('n', '<leader>pv', vim.cmd.Ex)
@@ -60,14 +64,65 @@ vim.keymap.set('n', '<leader>fs', builtin.live_grep, { desc = '[F]ind [S]tring' 
 -- Find recently opened files
 vim.keymap.set('n', '<leader>fr', require('telescope.builtin').oldfiles, { desc = '[F]ind [r]ecently opened files' })
 vim.keymap.set('n', '<leader>fc', function()
-  -- You can pass additional configuration to telescope to change theme, layout, etc.
-  require('telescope.builtin').current_buffer_fuzzy_find(require('telescope.themes').get_dropdown {
-    winblend = 10,
-    previewer = false,
-  })
+    -- You can pass additional configuration to telescope to change theme, layout, etc.
+    require('telescope.builtin').current_buffer_fuzzy_find(require('telescope.themes').get_dropdown {
+        winblend = 10,
+        previewer = false,
+    })
 end, { desc = '[F]ind in [C]urrent buffer' })
 -- Find in help
 vim.keymap.set('n', '<leader>fh', require('telescope.builtin').help_tags, { desc = '[F]ind [H]elp' })
+
+-- TODO
+--vim.keymap.set('n', '<leader>fd', function()
+--    --require('telescope.builtin').find_files({
+--    --    find_command = { 'find', '/home/13lbise', '-type d' }
+--    --})
+--    --require('telescope.builtin').find_files({
+--    --    cwd = vim.fn.input("Cwd > ")
+--    --})
+--
+--    -- First fuzzy find the directory we want to search in
+--    -- TODO
+--    -- Then search from directory provided
+--end, { desc = '[F]ind in [D]irectory' })
+
+-- First show a telescope window to select among a list of items
+-- Then open a new one concatening opts['dirname'] and selection
+function _G.select_and_find(opts)
+    local pickers = require "telescope.pickers"
+    local finders = require "telescope.finders"
+    local conf = require("telescope.config").values
+    local actions = require "telescope.actions"
+    local action_state = require "telescope.actions.state"
+
+    pickers.new(opts, {
+        prompt_title = opts['prompt'],
+        finder = finders.new_table(opts['items']),
+        --finder = finders.new_oneshot_job({ "find", opts['dirname'], "-type", "d" }, opts),
+        sorter = conf.generic_sorter(opts),
+        attach_mappings = function(prompt_bufnr, map)
+            actions.select_default:replace(function()
+                local selection = action_state.get_selected_entry()
+                if selection ~= nil then
+                    actions.close(prompt_bufnr)
+                    -- Open regular telescope with selected cwd
+                    require('telescope.builtin').find_files({
+                        cwd = opts['dirname'] .. '/' .. selection[1]
+                    })
+                end
+            end)
+            return true
+        end,
+    }):find()
+end
+
+-- Select then find in Andromeda
+vim.keymap.set('n', '<leader>fa', function()
+    select_and_find({ prompt = 'Select andromeda directory',
+                      dirname = os.getenv('HOME') .. '/andromeda',
+                      items = { 'apps', 'rom', 'executer', 'stmf4', 'raspi4', 'dsp', 'pctools', 'tstenv', 'bt', 'cf6', 'tx', 'dsp' }})
+end, { desc = '[F]ind in [A]ndromeda' })
 
 -- *** Fugitive
 vim.keymap.set('n', '<leader>gs', vim.cmd.Git)
