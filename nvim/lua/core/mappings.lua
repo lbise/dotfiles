@@ -48,6 +48,18 @@ vim.keymap.set({ 't' }, '<C-x>', vim.api.nvim_replace_termcodes('<C-\\><C-N>', t
 -- Open file browser
 vim.keymap.set('n', '<leader>pv', vim.cmd.Ex)
 
+-- diff mode specific mappings
+if vim.api.nvim_win_get_option(0, "diff") then
+    -- Select changes from LOCAL/BASE/REMOTE
+    vim.keymap.set('n', '<leader>1', ':diffget LOCAL<CR>')
+    vim.keymap.set('n', '<leader>2', ':diffget BASE<CR>')
+    vim.keymap.set('n', '<leader>3', ':diffget REMOTE<CR>')
+    -- Save all buffers and quit when done merging
+    vim.keymap.set('n', '<leader>4', ':wqa<CR>')
+    -- Cancel merge
+    vim.keymap.set('n', '<leader>5', ':cq<CR>')
+end
+
 -- Plugins
 -- *** Telescope
 local builtin = require('telescope.builtin')
