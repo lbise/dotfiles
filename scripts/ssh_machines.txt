@@ -1,4 +1,5 @@
 ch03wxpevb12;PEVB #12 Leo
+ch03wxuboard311;UBOARD3 #11 Leo
 ch03wxpevb09;PEVB #9 Christophe
 ch03wxeb01;EBOARD SoC
 ch03wxfpga11;PEB #11 Christophe
