@@ -314,7 +314,7 @@ function install_ssh_keys() {
 
 function install_gpg_keys() {
     echo "-------------------------------------------------------------------------"
-    echo "Installing SSH keys..."
+    echo "Installing GPG keys..."
 
     if [ -z "$1" ] || [ -z "$2" ]; then
         echo "You must provide the key names: $0 <private_key> <public_key>"
@@ -351,6 +351,12 @@ function install_gpg_keys() {
         $CP "$GPG_SRC_PUB" "$GPG_DST_PUB"
         $CHMOD 644 "$GPG_DST_PUB"
         gpg --import "$GPG_DST_PRIV"
+    fi
+
+    if gpg --list-secret-keys --keyid-format=long $GPG_KEYID | grep -q 'unknown'; then
+        echo "Invalid gpg key trust level..."
+        # Increase trust level
+        cat "$DIR/gpg/gpg_ownertrust.txt" | gpg --import-ownertrust
     fi
 }
 
