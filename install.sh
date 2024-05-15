@@ -23,10 +23,11 @@ UNTAR="tar xvf"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
-COMMON_PACKAGES="zsh fzf ripgrep gzip tmux curl wget unzip tar npm python3 python3.12-venv"
+COMMON_PACKAGES="zsh fzf ripgrep gzip tmux curl wget unzip tar npm python3 python3.12-venv pass"
 UBUNTU_COMMON_PACKAGES="fd-find pinentry-tty build-essential gdb"
 MAC_PACKAGES="fd gpg universal-ctags nvim"
 NVIM_PLUGINS_MD5="6346ed3833ee02a75aba246bb9edb6af"
+GPG_KEYID="ED0DFB79FF83B277"
 
 function print_usage() {
     USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
@@ -139,6 +140,19 @@ function install_nodejs() {
         fi
     else
         echo "nodejs $VERSION already installed"
+    fi
+}
+
+function install_gcm_home() {
+    echo "-------------------------------------------------------------------------"
+    echo "Installing git credential manager"
+    GCM_ARCHIVE="$DIR/archives/gcm-linux_amd64.2.5.0.deb"
+
+    if [ ! -f "/usr/local/bin/git-credential-manager" ]; then
+        sudo dpkg -i $GCM_ARCHIVE
+        if [ ! -d "$HOME/.password-store" ]; then
+            pass init $GPG_KEYID
+        fi
     fi
 }
 
@@ -415,6 +429,10 @@ function install_ubuntu() {
 
     $UBUNTU_UPDATE
     $UBUNTU_INSTALL $PKGS
+
+    if [ "$WORK_INSTALL" = 0 ]; then
+        install_gcm_home
+    fi
 
     install_neovim
     install_common
