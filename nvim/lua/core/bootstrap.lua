@@ -5,7 +5,7 @@ function bootstrap.setup_plugin_manager()
 	local mgr_address = "https://github.com/folke/lazy.nvim.git"
 
 	if not vim.loop.fs_stat(lazypath) then
-		if require('leo.tools').is_work() and not require('leo.tools').is_wsl() then
+		if require('core.tools').is_work() and not require('core.tools').is_wsl() then
 			-- No internet access
 			mgr_address = ""
 		end
