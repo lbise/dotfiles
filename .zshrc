@@ -134,8 +134,8 @@ setopt inc_append_history
 autoload -Uz compinit
 compinit
 
-# Add .scripts to PATH
-export PATH=$PATH:~/.scripts
+# Update PATH, ensure local user nvim is favoured
+export PATH=~/.bin/nvim-linux64/bin:$PATH:~/.scripts:~/.bin
 # Prompt for passphrase
 export GPG_TTY=$(tty)
 # Prevent zsh opening a new window on git diff for example
