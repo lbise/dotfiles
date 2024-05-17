@@ -5,12 +5,6 @@ vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true })
 -- Clear search highlight
 vim.keymap.set({ 'n' }, '<leader><Esc>', '<cmd> nohlsearch <CR>')
 
--- Switch between windows
-vim.keymap.set({ 'n' }, '<C-h>', '<C-w>h', { desc = 'Window left' })
-vim.keymap.set({ 'n' }, '<C-l>', '<C-w>l', { desc = 'Window right' })
-vim.keymap.set({ 'n' }, '<C-j>', '<C-w>j', { desc = 'Window down' })
-vim.keymap.set({ 'n' }, '<C-k>', '<C-w>k', { desc = 'Window up' })
-
 -- Close current buffer
 vim.keymap.set({ 'n' }, '<leader>x', '<cmd> BufDel <CR>', { desc = 'Close current buffer' })
 
