@@ -19,7 +19,7 @@ CHMOD="chmod"
 CP="cp"
 MV="mv"
 MKDIR="mkdir"
-UNTAR="tar xvf"
+UNTAR="tar xf"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
@@ -157,15 +157,16 @@ function install_gcm_home() {
 }
 
 function install_neovim() {
-    NVIM_VERSION="0.9.5"
+    NVIM_VERSION="0.10.0"
     NVIM_VER_REGEX="^NVIM v([0-9]+.[0-9]+.[0-9]+)"
     NVIM_OUT="$DIR/archives"
     NVIM_SRC="$NVIM_OUT/nvim-linux64"
-    NVIM_DST="/usr"
+    NVIM_DST="$HOME/.bin"
+    NVIM_BIN="$NVIM_DST/nvim-linux64/bin/nvim"
 
     echo "-------------------------------------------------------------------------"
-    if [ -f "/usr/bin/nvim" ]; then
-        NVIM_CUR_VER=$(nvim -v)
+    if [ -f $NVIM_BIN ]; then
+        NVIM_CUR_VER=$($NVIM_BIN -v)
         if [[ $NVIM_CUR_VER =~ $NVIM_VER_REGEX ]]; then
             # Match
             NVIM_CUR_VER=${BASH_REMATCH[1]}
@@ -179,9 +180,18 @@ function install_neovim() {
         fi
     fi
 
+    if [ -d "$NVIM_SRC" ]; then
+        echo "$NVIM_SRC already exists! Delete it"
+        exit
+    fi
+
     echo "Installing neovim v$NVIM_VERSION..."
     $UNTAR $NVIM_OUT/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
-    sudo $CP -r $NVIM_SRC/* $NVIM_DST
+    if [ ! -d "$NVIM_DST" ]; then
+        mkdir "$NVIM_DST"
+    fi
+
+    $CP -r $NVIM_SRC $NVIM_DST
     $RM_RF $NVIM_SRC
 }
 
@@ -436,6 +446,8 @@ function install_ubuntu() {
     fi
 
     $UBUNTU_UPDATE
+
+    echo "> Installing following packages: $PKGS"
     $UBUNTU_INSTALL $PKGS
 
     if [ "$WORK_INSTALL" = 0 ]; then
