@@ -23,7 +23,7 @@ UNTAR="tar xvf"
 ONEDRIVE_PATH="/mnt/c/Users/13lbise/OneDrive - Sonova"
 KEYS_SSH_DIR="$ONEDRIVE_PATH/.ssh"
 KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
-COMMON_PACKAGES="zsh fzf ripgrep gzip tmux curl wget unzip tar npm python3 python3.12-venv pass"
+COMMON_PACKAGES="zsh fzf ripgrep gzip tmux curl wget unzip tar npm python3 pass"
 UBUNTU_COMMON_PACKAGES="fd-find pinentry-tty build-essential gdb"
 MAC_PACKAGES="fd gpg universal-ctags nvim"
 NVIM_PLUGINS_MD5="6346ed3833ee02a75aba246bb9edb6af"
@@ -431,6 +431,8 @@ function install_ubuntu() {
         PKGS="$PKGS ctags"
     elif [ "$OS_VER" = "22.04" ]; then
         PKGS="$PKGS universal-ctags"
+    elif [ "$OS_VER" = "24.04" ]; then
+        PKGS="$PKGS python3.12-venv"
     fi
 
     $UBUNTU_UPDATE
