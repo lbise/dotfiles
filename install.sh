@@ -102,45 +102,42 @@ function ln_symlinks() {
 
 function install_nodejs() {
     echo "-------------------------------------------------------------------------"
-    echo "Installing nodejs.."
+    NODE_VERSION="20.13.1"
+    NODE_VER_REGEX="^v([0-9]+.[0-9]+.[0-9]+)"
+    NODE_NAME="node-v$NODE_VERSION-linux-x64"
+    NODE_OUT="$DIR/archives"
+    NODE_SRC="$NODE_OUT/$NODE_NAME"
+    NODE_DST="$HOME/.bin"
+    NODE_BIN="$NODE_DST/$NODE_NAME/bin/node"
 
-    if ! command -v node &> /dev/null; then
-        UPDATE=1
-    else
-        # Check version, need >= 14.14
-        VERSION=$(node -v)
-        # Format v18.14.0
-        if [[ $VERSION =~ v([0-9]+).([0-9]+) ]]; then
-            MAJOR=${BASH_REMATCH[1]}
-            MINOR=${BASH_REMATCH[2]}
-            if [ "$MAJOR" -lt "14" ]; then
-                UPDATE=1
-            elif [ "$MAJOR" -eq "14" ] && [ "$MINOR" -lt "14" ]; then
-                UPDATE=1
+    if [ -f "$NODE_BIN" ]; then
+        NODE_CUR_VER=$($NODE_BIN -v)
+        if [[ $NODE_CUR_VER =~ $NODE_VER_REGEX ]]; then
+            # Match
+            NODE_CUR_VER=${BASH_REMATCH[1]}
+            if [[ $NODE_CUR_VER == $NODE_VERSION ]]; then
+                echo "node $NODE_CUR_VER already installed!"
+                return
             fi
+        else
+            # No match
+            echo "Cannot determine node version, re-installing"
         fi
     fi
 
-    if [ "$UPDATE" = "1" ]; then
-        if [ "$WORK_INSTALL" = 1 ]; then
-            # Taken from https://github.com/vercel/install-node/blob/master/install.sh
-            VERSION="v18.17.0"
-            INSTALL_DIR="/usr/local/"
-            APP_DIR="$DIR/archives"
-            sudo tar -xJvf $APP_DIR/node-$VERSION-linux-x64.tar.xz  \
-                --exclude CHANGELOG.md                              \
-                --exclude LICENSE                                   \
-                --exclude README.md                                 \
-                --strip-components 1                                \
-                -C $INSTALL_DIR
-            echo "Installed node in $INSTALL_DIR"
-        else
-            # --force prevents prompt to ask to install nodejs
-            curl -sL install-node.vercel.app/lts | sudo bash -s -- --force
-        fi
-    else
-        echo "nodejs $VERSION already installed"
+    if [ -d "$NODE_SRC" ]; then
+        echo "$NODE_SRC already exists! Delete it"
+        exit
     fi
+
+    echo "Installing nodejs v$NODE_VERSION..."
+    $UNTAR $NODE_OUT/$NODE_NAME.tar.xz -C $NODE_OUT
+    if [ ! -d "$NODE_DST" ]; then
+        mkdir "$NODE_DST"
+    fi
+
+    $CP -r $NODE_SRC $NODE_DST
+    $RM_RF $NODE_SRC
 }
 
 function install_gcm_home() {
@@ -455,6 +452,8 @@ function install_ubuntu() {
     fi
 
     install_neovim
+    # Required by pyright
+    install_nodejs
     install_common
 }
 ################################################################################
