@@ -1,6 +1,8 @@
 local config = {
     {
         'nvim-treesitter/nvim-treesitter',
+        -- Always load treesitter
+        lazy = false,
         cmd = { 'TSInstall', 'TSBufEnable', 'TSBufDisable', 'TSModuleInfo' },
         dependencies = {
             'nvim-treesitter/nvim-treesitter-textobjects',
