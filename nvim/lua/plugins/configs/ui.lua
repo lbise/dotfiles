@@ -58,6 +58,16 @@ local config = {
                 hide_inactive_statusline = false, -- Enabling this option, will hide inactive statuslines and replace them with a thin border instead. Should work with the standard **StatusLine** and **LuaLine**.
                 dim_inactive = false, -- dims inactive windows
                 lualine_bold = false, -- When `true`, section headers in the lualine theme will be bold
+                on_colors = function(colors)
+                    -- Make comments brighter
+                    colors.comment = "#67719f"
+                end,
+                on_highlights = function(hl, colors)
+                    -- Make linenumbers brighter
+                    hl.LineNr = {
+                        fg = "#67719f"
+                    }
+                end,
             })
         end
     },
