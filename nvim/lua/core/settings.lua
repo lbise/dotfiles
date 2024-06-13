@@ -4,7 +4,7 @@ local settings = {
         ensure_installed = {
             'clangd',
             'pyright',
-            'ruff_lsp',
+            --'ruff_lsp',
             'bashls',
             'lua_ls',
         },
@@ -26,7 +26,7 @@ local settings = {
                     },
                 },
             },
-            ruff_lsp = true,
+            --ruff_lsp = true,
             bashls = true,
             lua_ls = {
                 settings = {
