@@ -4,11 +4,11 @@ local function get_yapf_style()
 		local style_path = vim.fn.expand("$HOME/andromeda/pctools/prj/python_style_lint/style.yapf")
 		if vim.fn.filereadable(style_path) then
 			return style_path
-		else
-			-- Simply use pep3 formatting
-			return "pep8"
 		end
 	end
+
+	-- Simply use pep3 formatting
+	return "pep8"
 end
 
 local config = {
@@ -99,7 +99,8 @@ local config = {
 						if vim.fn.expand("$USER") == "13lbise" then
 							return { "isort", "yapf" }
 						else
-							return { "isort", "ruff_lsp" }
+							--return { "isort", "ruff_lsp" }
+							return { "isort", "black" }
 						end
 					end,
 				},
