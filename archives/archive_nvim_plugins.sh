@@ -16,6 +16,7 @@ cd $PLUGINS_DIR
 echo "Creating archive $DST/nvim_plugins_$MD5.tar.gz..."
 tar -czf $DST/nvim_plugins_tmp.tar.gz nvim
 MD5=$(md5sum $DST/nvim_plugins_tmp.tar.gz | cut -d " " -f1)
+echo $MD5 > $DST/plugins.md5
 echo "Copying archive $DST/nvim_plugins_$MD5.tar.gz to $COPY"
 mv $DST/nvim_plugins_tmp.tar.gz $DST/nvim_plugins_$MD5.tar.gz
 cp $DST/nvim_plugins_$MD5.tar.gz $COPY

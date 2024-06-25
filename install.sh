@@ -26,7 +26,7 @@ KEYS_GPG_DIR="$ONEDRIVE_PATH/.gnupg"
 COMMON_PACKAGES="zsh fzf ripgrep gzip tmux curl wget unzip tar npm python3 pass"
 UBUNTU_COMMON_PACKAGES="fd-find pinentry-tty build-essential gdb"
 MAC_PACKAGES="fd gpg universal-ctags nvim"
-NVIM_PLUGINS_MD5="fe0596de07fd08ac83e7543d24174ec7"
+NVIM_PLUGINS_MD5=`cat $DIR/archives/plugins.md5`
 GPG_KEYID="ED0DFB79FF83B277"
 
 function print_usage() {
