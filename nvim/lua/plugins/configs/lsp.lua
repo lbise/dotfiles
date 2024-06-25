@@ -103,10 +103,19 @@ local config = {
 							return { "isort", "black" }
 						end
 					end,
+					cpp = { "clang_format" },
+					c = { "clang_format" },
 				},
 				formatters = {
 					yapf = {
 						prepend_args = { "--style=" .. get_yapf_style() },
+					},
+					clang_format = {
+						-- Any additional configuration for Clang Format can go here
+						--command = "clang-format", -- Path to clang-format executable
+						args = {
+							"--style={BasedOnStyle: Google, IndentWidth: 4, TabWidth: 4, UseTab: Never, AlignConsecutiveMacros: AcrossComments}",
+						},
 					},
 				},
 			})
