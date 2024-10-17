@@ -67,6 +67,7 @@ function rm_symlinks() {
     fi
     $RM_RF ~/.gnupg/gpg.conf
     $RM_RF ~/.gnupg/gpg-agent.conf
+    $RM_RF ~/.clang-format
     $X_OFF
 }
 
@@ -97,6 +98,7 @@ function ln_symlinks() {
     $LN_SF $DIR/ruff ~/.config/ruff
     $LN_SF $DIR/gpg/gpg.conf ~/.gnupg/gpg.conf
     $LN_SF $DIR/gpg/gpg-agent.conf ~/.gnupg/gpg-agent.conf
+    $LN_SF $DIR/.clang-format ~/.clang-format
     $X_OFF
 }
 

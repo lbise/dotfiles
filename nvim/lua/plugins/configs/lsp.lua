@@ -112,10 +112,10 @@ local config = {
 					},
 					clang_format = {
 						-- Any additional configuration for Clang Format can go here
-						--command = "clang-format", -- Path to clang-format executable
+                        -- Use format from a file
 						args = {
-							"--style={BasedOnStyle: Google, IndentWidth: 4, TabWidth: 4, UseTab: Never, AlignConsecutiveMacros: AcrossComments}",
-						},
+                            "--style=file:" .. vim.fn.expand("$HOME") .. "/.clang-format",
+                        }
 					},
 				},
 			})
