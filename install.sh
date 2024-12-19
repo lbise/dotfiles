@@ -421,9 +421,6 @@ function install_ubuntu() {
     echo "Installing for Ubuntu-${OS_VER}..."
 
     PKGS="$COMMON_PACKAGES $UBUNTU_COMMON_PACKAGES"
-    if [ "$WORK_INSTALL" = 1 ]; then
-        PKGS="$PKGS git-lfs"
-    fi
 
     if [ "$OS_VER" = "20.04" ]; then
         PKGS="$PKGS ctags"
