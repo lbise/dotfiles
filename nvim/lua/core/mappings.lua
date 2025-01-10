@@ -149,6 +149,14 @@ vim.keymap.set({ "n" }, "<C-p>", "<cmd> Neotree toggle <CR>", { desc = "Toggle t
 -- *** Neogen
 vim.api.nvim_set_keymap("n", "<Leader>nf", ":lua require('neogen').generate()<CR>", { noremap = true, silent = true })
 
+-- *** Luasnip
+-- These mappings are used to jump between snippets fields.
+-- Also used when generating comments for functions with neogen
+-- They are the same mappings than blink.cmp
+local ls = require("luasnip")
+vim.keymap.set({"i", "s"}, "<C-n>", function() ls.jump( 1) end, {silent = true})
+vim.keymap.set({"i", "s"}, "<C-p>", function() ls.jump(-1) end, {silent = true})
+
 -- *** LSP
 -- Format
 --vim.keymap.set("n", "<leader>f", vim.lsp.buf.format)
