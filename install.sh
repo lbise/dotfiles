@@ -156,7 +156,7 @@ function install_gcm_home() {
 }
 
 function install_neovim() {
-    NVIM_VERSION="0.10.0"
+    NVIM_VERSION="0.10.3"
     NVIM_VER_REGEX="^NVIM v([0-9]+.[0-9]+.[0-9]+)"
     NVIM_OUT="$DIR/archives"
     NVIM_SRC="$NVIM_OUT/nvim-linux64"
@@ -172,6 +172,8 @@ function install_neovim() {
             if [[ $NVIM_CUR_VER == $NVIM_VERSION ]]; then
                 echo "nvim $NVIM_CUR_VER already installed!"
                 return
+            else
+                echo "nvim $NVIM_VERSION must be installed"
             fi
         else
             # No match
@@ -185,6 +187,7 @@ function install_neovim() {
     fi
 
     echo "Installing neovim v$NVIM_VERSION..."
+    killall nvim
     $UNTAR $NVIM_OUT/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
     if [ ! -d "$NVIM_DST" ]; then
         mkdir "$NVIM_DST"
