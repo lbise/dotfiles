@@ -17,7 +17,7 @@ local config = {
     },
     {
         'danymat/neogen',
-        dependencies = 'nvim-treesitter/nvim-treesitter',
+        dependencies = { 'nvim-treesitter/nvim-treesitter', 'L3MON4D3/LuaSnip' },
         cmd = {
             'Neogen'
         },
