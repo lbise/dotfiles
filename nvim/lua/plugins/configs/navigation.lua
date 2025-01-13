@@ -1,3 +1,10 @@
+local function filenameFirst(_, path)
+	local tail = vim.fs.basename(path)
+	local parent = vim.fs.dirname(path)
+	if parent == "." then return tail end
+	return string.format("%s\t\t%s", tail, parent)
+end
+
 local config = {
     {
         'ThePrimeagen/harpoon',
@@ -50,6 +57,13 @@ local config = {
             },
         },
         config = function()
+            require('telescope').setup({
+                defaults = {
+                    --path_display = filenameFirst
+                    path_display = { 'truncate' }
+                }
+            })
+
             -- Enable telescope fzf native, if installed
             pcall(require('telescope').load_extension, 'fzf')
         end
