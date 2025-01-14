@@ -61,6 +61,7 @@ function rm_symlinks() {
     $RM_RF ~/.tmux
     $RM_RF ~/.config/nvim
     $RM_RF ~/.config/ruff
+    $RM_RF ~/.config/ghostty
     if [ ! -d ~/.gnupg ]; then
         $MKDIR ~/.gnupg
         $CHMOD 700 ~/.gnupg
@@ -96,6 +97,7 @@ function ln_symlinks() {
     fi
     $LN_SF $DIR/nvim ~/.config/nvim
     $LN_SF $DIR/ruff ~/.config/ruff
+    $LN_SF $DIR/ghostty ~/.config/ghostty
     $LN_SF $DIR/gpg/gpg.conf ~/.gnupg/gpg.conf
     $LN_SF $DIR/gpg/gpg-agent.conf ~/.gnupg/gpg-agent.conf
     $LN_SF $DIR/.clang-format ~/.clang-format
