@@ -189,7 +189,8 @@ function install_neovim() {
     fi
 
     echo "Installing neovim v$NVIM_VERSION..."
-    killall nvim
+    # Prevent script stopping if there is no nvim process running
+    killall nvim || true
     $UNTAR $NVIM_OUT/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
     if [ ! -d "$NVIM_DST" ]; then
         mkdir "$NVIM_DST"
