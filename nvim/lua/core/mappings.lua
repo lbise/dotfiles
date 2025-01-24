@@ -154,8 +154,12 @@ vim.api.nvim_set_keymap("n", "<Leader>nf", ":lua require('neogen').generate()<CR
 -- Also used when generating comments for functions with neogen
 -- They are the same mappings than blink.cmp
 local ls = require("luasnip")
-vim.keymap.set({"i", "s"}, "<C-n>", function() ls.jump( 1) end, {silent = true})
-vim.keymap.set({"i", "s"}, "<C-p>", function() ls.jump(-1) end, {silent = true})
+vim.keymap.set({ "i", "s" }, "<C-n>", function()
+	ls.jump(1)
+end, { silent = true })
+vim.keymap.set({ "i", "s" }, "<C-p>", function()
+	ls.jump(-1)
+end, { silent = true })
 
 -- *** LSP
 -- Format
@@ -163,6 +167,57 @@ vim.keymap.set({"i", "s"}, "<C-p>", function() ls.jump(-1) end, {silent = true})
 vim.keymap.set("n", "<leader>f", function()
 	require("conform").format({ lsp_fallback = true })
 end)
+
+-- *** Harpoon
+local harpoon = require("harpoon")
+-- Function to toggle harpoon files with telescope
+local conf = require("telescope.config").values
+local function toggle_telescope(harpoon_files)
+	local file_paths = {}
+	for _, item in ipairs(harpoon_files.items) do
+		table.insert(file_paths, item.value)
+	end
+
+	require("telescope.pickers")
+		.new({}, {
+			prompt_title = "Harpoon",
+			finder = require("telescope.finders").new_table({
+				results = file_paths,
+			}),
+			previewer = conf.file_previewer({}),
+			sorter = conf.generic_sorter({}),
+            -- does not work?
+			attach_mappings = function(prompt_buffer_number, map)
+				map("i", "<D-d>", function()
+					local state = require("telescope.actions.state")
+					local selected_entry = state.get_selected_entry()
+					local current_picker = state.get_current_picker(prompt_buffer_number)
+
+					harpoon:list():removeAt(selected_entry.index)
+					current_picker:refresh(make_finder())
+					-- current_picker:set_selection(selected_entry.index)
+				end)
+
+				return true
+			end,
+		})
+		:find()
+end
+
+vim.keymap.set("n", "<leader>a", function()
+	harpoon:list():add()
+end)
+--vim.keymap.set("n", "<leader>s", function() toggle_telescope(harpoon:list()) end)
+vim.keymap.set("n", "<leader>s", function()
+	harpoon.ui:toggle_quick_menu(harpoon:list())
+end)
+vim.keymap.set("n", "<leader>1", function() harpoon:list():select(1) end)
+vim.keymap.set("n", "<leader>2", function() harpoon:list():select(2) end)
+vim.keymap.set("n", "<leader>3", function() harpoon:list():select(3) end)
+vim.keymap.set("n", "<leader>4", function() harpoon:list():select(4) end)
+---- Toggle previous & next buffers stored within Harpoon list
+--vim.keymap.set("n", "<C-S-P>", function() harpoon:list():prev() end)
+--vim.keymap.set("n", "<C-S-N>", function() harpoon:list():next() end)
 
 -- Diagnostic keymaps
 vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { desc = "Go to previous diagnostic message" })
