@@ -2,7 +2,7 @@
 Version=1.0
 Name=Ghostty
 Exec=/home/leo/.local/bin/ghostty
-Icon=utilities-terminal
+Icon=/home/leo/gitrepo/dotfiles/ghostty/icon_1024.png
 Terminal=false
 Type=Application
 Categories=Utility;
