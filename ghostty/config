@@ -41,4 +41,11 @@
 # # which is explained in the docs for that config option.
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
-font-family = "JetBrains Mono"
+theme = tokyonight-storm
+
+#font-family = "Iosevka Nerd Font Mono"
+font-family = FiraCode Nerd Font Mono Reg
+font-thicken = true
+font-size = 14
+
+# window-decoration = flse
