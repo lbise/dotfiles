@@ -18,5 +18,5 @@ if [[ $EXT != "" ]]; then
     EXT="*.$EXT"
     echo "Extension: $EXT"
 fi
-#git grep -l "TODO" . | xargs -i@ sed -i 's/TODO/TODO(anon)/g' @
-git grep -l "${OLD_WORD}" "$ROOT"/"$EXT" | xargs -i@ sed -i "s/${OLD_WORD}/${NEW_WORD}/g" @
+
+git grep -l "${OLD_WORD}" "$ROOT"/"$EXT" | xargs -i@ sed -i "s/\<${OLD_WORD}\>/${NEW_WORD}/g" @
