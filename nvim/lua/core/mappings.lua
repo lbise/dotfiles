@@ -5,9 +5,6 @@ vim.keymap.set({ "n", "v" }, "<Space>", "<Nop>", { silent = true })
 -- Clear search highlight
 vim.keymap.set({ "n" }, "<leader><Esc>", "<cmd> nohlsearch <CR>")
 
--- Close current buffer
-vim.keymap.set({ "n" }, "<leader>x", "<cmd> BufDel <CR>", { desc = "Close current buffer" })
-
 -- Switch buffer
 vim.keymap.set({ "n" }, "<tab>", "<cmd> BufferLineCycleNext <CR>", { desc = "Next buffer" })
 vim.keymap.set({ "n" }, "<S-tab>", "<cmd> BufferLineCyclePrev <CR>", { desc = "Previous buffer" })
@@ -144,7 +141,7 @@ end, { desc = "[F]ind in [A]ndromeda" })
 vim.keymap.set("n", "<leader>gs", vim.cmd.Git)
 
 -- *** nvim-tree
-vim.keymap.set({ "n" }, "<C-p>", "<cmd> Neotree toggle <CR>", { desc = "Toggle tree" })
+-- vim.keymap.set({ "n" }, "<C-p>", "<cmd> Neotree toggle <CR>", { desc = "Toggle tree" })
 
 -- *** Neogen
 vim.api.nvim_set_keymap("n", "<Leader>nf", ":lua require('neogen').generate()<CR>", { noremap = true, silent = true })

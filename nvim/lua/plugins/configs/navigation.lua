@@ -17,31 +17,6 @@ local config = {
         end
     },
     {
-        'nvim-neo-tree/neo-tree.nvim',
-        cmd = 'Neotree',
-        event = { 'BufEnter' },
-        branch = 'v3.x',
-        dependencies = {
-            'nvim-lua/plenary.nvim',
-            -- not strictly required, but recommended
-            'nvim-tree/nvim-web-devicons',
-            'MunifTanjim/nui.nvim',
-        },
-        config = function()
-            require('neo-tree').setup({
-                window = {
-                    mappings = {
-                        ['l'] =  'open'
-                    }
-                },
-                filesystem = {
-                    bind_to_cwd = false, -- true creates a 2-way binding between vim's cwd and neo-tree's root
-                    hijack_netrw_behavior = 'open_current'
-                },
-            })
-        end
-    },
-    {
         'nvim-telescope/telescope.nvim',
         branch = '0.1.x',
         event = 'UIEnter',
@@ -71,13 +46,6 @@ local config = {
             -- Enable telescope fzf native, if installed
             pcall(require('telescope').load_extension, 'fzf')
         end
-    },
-    {
-        'ojroques/nvim-bufdel',
-        event = { 'BufReadPost', 'BufNewFile' },
-        opts = {
-            quit = false
-        },
     },
     {
         'christoomey/vim-tmux-navigator',
