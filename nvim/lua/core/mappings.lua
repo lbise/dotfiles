@@ -56,92 +56,8 @@ if vim.api.nvim_win_get_option(0, "diff") then
 end
 
 -- Plugins
--- *** Telescope
-local builtin = require("telescope.builtin")
--- Find in all files
-vim.keymap.set("n", "<leader>ff", function()
-	builtin.find_files({ no_ignore = true })
-end, { desc = "[F]ind [F]iles" })
--- Find in all git files
-vim.keymap.set("n", "<leader>fg", builtin.git_files, { desc = "[F]ind [G]it Files" })
--- Find current word in files
-vim.keymap.set("n", "<leader>fw", require("telescope.builtin").grep_string, { desc = "[F]ind current [W]ord" })
--- Find string in files
-vim.keymap.set("n", "<leader>fs", builtin.live_grep, { desc = "[F]ind [S]tring" })
--- Find recently opened files
-vim.keymap.set("n", "<leader>fr", require("telescope.builtin").oldfiles, { desc = "[F]ind [r]ecently opened files" })
-vim.keymap.set("n", "<leader>fc", function()
-	-- You can pass additional configuration to telescope to change theme, layout, etc.
-	require("telescope.builtin").current_buffer_fuzzy_find(require("telescope.themes").get_dropdown({
-		winblend = 10,
-		previewer = false,
-	}))
-end, { desc = "[F]ind in [C]urrent buffer" })
--- Find in help
-vim.keymap.set("n", "<leader>fh", require("telescope.builtin").help_tags, { desc = "[F]ind [H]elp" })
--- Find in buffers
-vim.keymap.set("n", "<leader>fb", require("telescope.builtin").buffers, { desc = "[F]ind [B]uffers" })
-
--- TODO
---vim.keymap.set('n', '<leader>fd', function()
---    --require('telescope.builtin').find_files({
---    --    find_command = { 'find', '/home/13lbise', '-type d' }
---    --})
---    --require('telescope.builtin').find_files({
---    --    cwd = vim.fn.input("Cwd > ")
---    --})
---
---    -- First fuzzy find the directory we want to search in
---    -- TODO
---    -- Then search from directory provided
---end, { desc = '[F]ind in [D]irectory' })
-
--- First show a telescope window to select among a list of items
--- Then open a new one concatening opts['dirname'] and selection
-function _G.select_and_find(opts)
-	local pickers = require("telescope.pickers")
-	local finders = require("telescope.finders")
-	local conf = require("telescope.config").values
-	local actions = require("telescope.actions")
-	local action_state = require("telescope.actions.state")
-
-	pickers
-		.new(opts, {
-			prompt_title = opts["prompt"],
-			finder = finders.new_table(opts["items"]),
-			--finder = finders.new_oneshot_job({ "find", opts['dirname'], "-type", "d" }, opts),
-			sorter = conf.generic_sorter(opts),
-			attach_mappings = function(prompt_bufnr, map)
-				actions.select_default:replace(function()
-					local selection = action_state.get_selected_entry()
-					if selection ~= nil then
-						actions.close(prompt_bufnr)
-						-- Open regular telescope with selected cwd
-						require("telescope.builtin").find_files({
-							cwd = opts["dirname"] .. "/" .. selection[1],
-						})
-					end
-				end)
-				return true
-			end,
-		})
-		:find()
-end
-
--- Select then find in Andromeda
-vim.keymap.set("n", "<leader>fa", function()
-	select_and_find({
-		prompt = "Select andromeda directory",
-		dirname = os.getenv("HOME") .. "/andromeda",
-		items = { "apps", "rom", "executer", "stmf4", "raspi4", "dsp", "pctools", "tstenv", "bt", "cf6", "tx", "dsp" },
-	})
-end, { desc = "[F]ind in [A]ndromeda" })
-
 -- *** Fugitive
 vim.keymap.set("n", "<leader>gs", vim.cmd.Git)
-
--- *** nvim-tree
--- vim.keymap.set({ "n" }, "<C-p>", "<cmd> Neotree toggle <CR>", { desc = "Toggle tree" })
 
 -- *** Neogen
 vim.api.nvim_set_keymap("n", "<Leader>nf", ":lua require('neogen').generate()<CR>", { noremap = true, silent = true })
@@ -167,44 +83,9 @@ end)
 
 -- *** Harpoon
 local harpoon = require("harpoon")
--- Function to toggle harpoon files with telescope
-local conf = require("telescope.config").values
-local function toggle_telescope(harpoon_files)
-	local file_paths = {}
-	for _, item in ipairs(harpoon_files.items) do
-		table.insert(file_paths, item.value)
-	end
-
-	require("telescope.pickers")
-		.new({}, {
-			prompt_title = "Harpoon",
-			finder = require("telescope.finders").new_table({
-				results = file_paths,
-			}),
-			previewer = conf.file_previewer({}),
-			sorter = conf.generic_sorter({}),
-            -- does not work?
-			attach_mappings = function(prompt_buffer_number, map)
-				map("i", "<D-d>", function()
-					local state = require("telescope.actions.state")
-					local selected_entry = state.get_selected_entry()
-					local current_picker = state.get_current_picker(prompt_buffer_number)
-
-					harpoon:list():removeAt(selected_entry.index)
-					current_picker:refresh(make_finder())
-					-- current_picker:set_selection(selected_entry.index)
-				end)
-
-				return true
-			end,
-		})
-		:find()
-end
-
 vim.keymap.set("n", "<leader>a", function()
 	harpoon:list():add()
 end)
---vim.keymap.set("n", "<leader>s", function() toggle_telescope(harpoon:list()) end)
 vim.keymap.set("n", "<leader>s", function()
 	harpoon.ui:toggle_quick_menu(harpoon:list())
 end)
@@ -233,13 +114,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 		vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, opts)
 		vim.keymap.set({ "n", "v" }, "<space>ca", vim.lsp.buf.code_action, opts)
-
-		vim.keymap.set("n", "gd", require("telescope.builtin").lsp_definitions, opts)
-		vim.keymap.set("n", "gr", require("telescope.builtin").lsp_references, opts)
-		vim.keymap.set("n", "gI", require("telescope.builtin").lsp_implementations, opts)
-		vim.keymap.set("n", "<leader>D", require("telescope.builtin").lsp_type_definitions, opts)
-		vim.keymap.set("n", "<leader>ds", require("telescope.builtin").lsp_document_symbols, opts)
-		vim.keymap.set("n", "<leader>ws", require("telescope.builtin").lsp_dynamic_workspace_symbols, opts)
 
 		vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
 		vim.keymap.set("n", "<leader>k", vim.lsp.buf.signature_help, opts)

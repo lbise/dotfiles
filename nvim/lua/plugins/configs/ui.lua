@@ -190,10 +190,23 @@ local config = {
             words = { enabled = true },
             explorer = {
                 replace_netrw = true, -- Replace netrw with the snacks explorer
-            }
+            },
+            picker = {}
         },
         keys = {
           -- { "<leader>z",  function() Snacks.zen() end, desc = "Toggle Zen Mode" },
+          -- pickers
+          { "<leader>ff", function() Snacks.picker.files() end, desc = "Find Files" },
+          { "<leader>fg", function() Snacks.picker.git_files() end, desc = "Find Git Files" },
+          { "<leader>fw", function() Snacks.picker.grep_word() end, desc = "Find Word or visual selection", mode = { "n", "x" } },
+          { "<leader>fs", function() Snacks.picker.grep() end, desc = "Find String" },
+          { "<leader>fr", function() Snacks.picker.recent() end, desc = "Recent" },
+          { "<leader>fc", function() Snacks.picker.lines() end, desc = "Find Current Buffer Lines" },
+          { "<leader>fh", function() Snacks.picker.help() end, desc = "Help Pages" },
+          { "<leader>fb", function() Snacks.picker.buffers() end, desc = "Find Buffers" },
+          { "<leader>fl", function() Snacks.picker.git_log() end, desc = "Find Git Log" },
+          -- Find andromeda TODO!!
+          { "<leader>fa", function() Snacks.picker.files() end, desc = "Find Andromeda" },
           { "<leader>x",  function() Snacks.bufdelete() end, desc = "Delete current buffer" },
           { "<c-p>",  function() Snacks.explorer.open() end, desc = "Open explorer" },
           -- { "<leader>Z",  function() Snacks.zen.zoom() end, desc = "Toggle Zoom" },
