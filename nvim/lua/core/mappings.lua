@@ -30,7 +30,7 @@ vim.keymap.set("n", "<F4>", [[:%s/\s\+$//e<CR>]])
 vim.keymap.set("n", "Q", "<nop>")
 
 -- Generate tags manually
-vim.keymap.set("n", "<F12>", ':!ctags -R --exclude="*Sim*" .<CR>')
+vim.keymap.set("n", "<F12>", ':!ctags -R --exclude="*Sim*" --exclude="*scripts" .<CR>')
 
 -- Exit terminal mode
 vim.keymap.set(
