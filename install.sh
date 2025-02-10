@@ -102,7 +102,9 @@ function ln_symlinks() {
     $LN_SF $DIR/gpg/gpg.conf ~/.gnupg/gpg.conf
     $LN_SF $DIR/gpg/gpg-agent.conf ~/.gnupg/gpg-agent.conf
     $LN_SF $DIR/.clang-format ~/.clang-format
-    $LN_SF $DIR/ghostty/ghostty.desktop ~/.local/share/applications/ghostty.desktop
+    if [ -d "~/.local/share/applications/" ]; then
+        $LN_SF $DIR/ghostty/ghostty.desktop ~/.local/share/applications/ghostty.desktop
+    fi
     $X_OFF
 }
 
