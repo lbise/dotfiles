@@ -35,7 +35,7 @@ vim.keymap.set("n", "<F12>", ':!ctags -R --exclude="*Sim*" .<CR>')
 -- Exit terminal mode
 vim.keymap.set(
 	{ "t" },
-	"<C-x>",
+	"<Esc>",
 	vim.api.nvim_replace_termcodes("<C-\\><C-N>", true, true, true),
 	{ desc = "Escape terminal mode" }
 )
