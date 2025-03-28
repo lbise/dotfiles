@@ -182,7 +182,7 @@ local config = {
             input = { enabled = true },
             notifier = { enabled = true },
             quickfile = { enabled = true },
-            scroll = { enabled = true },
+            scroll = { enabled = false },
             statuscolumn = { enabled = true },
             words = { enabled = true },
             terminal = {
