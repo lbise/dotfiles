@@ -171,6 +171,10 @@ alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git r
 alias vim=nvim
 alias dotupdate="dotupdate.sh"
 
+if [ -f "$HOME/.keys" ]; then
+    source "$HOME/.keys"
+fi
+
 if [ "$USER" = "13lbise" ]; then
     MYT="/mnt/t/${USER}"
     WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
