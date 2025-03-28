@@ -9,13 +9,6 @@ local config = {
 		},
 	},
 	{
-		"folke/which-key.nvim",
-		event = "VeryLazy",
-		cmd = {
-			"WhichKey",
-		},
-	},
-	{
 		"danymat/neogen",
 		dependencies = {
             "nvim-treesitter/nvim-treesitter",
