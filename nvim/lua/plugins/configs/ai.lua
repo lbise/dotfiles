@@ -1,12 +1,12 @@
 local config = {
-    {
-        "zbirenbaum/copilot.lua",
-        cmd = "Copilot",
-        event = "InsertEnter",
-        config = function()
-          require("copilot").setup({})
-        end,
-    },
+    --{
+    --    "zbirenbaum/copilot.lua",
+    --    cmd = "Copilot",
+    --    event = "InsertEnter",
+    --    config = function()
+    --      require("copilot").setup({})
+    --    end,
+    --},
 	{
 		"yetone/avante.nvim",
 		event = "VeryLazy",
@@ -32,6 +32,7 @@ local config = {
 			-- for example
 			--provider = "copilot",
 			provider = "azure",
+			--provider = "openai",
 			copilot = {
                 endpoint = "https://api.githubcopilot.com",
                 model = "gpt-4o-2024-08-06",
@@ -52,15 +53,14 @@ local config = {
 				max_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
 				--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
 			},
-			--provider = "openai",
-			--openai = {
-			--	endpoint = "https://api.openai.com/v1",
-			--	model = "gpt-4o", -- your desired model (or use gpt-4o, etc.)
-			--	timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
-			--	temperature = 0,
-			--	max_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
-			--	--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
-			--},
+			openai = {
+				endpoint = "https://api.openai.com/v1",
+				model = "gpt-4o", -- your desired model (or use gpt-4o, etc.)
+				timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
+				temperature = 0,
+				max_tokens = 8192, -- Increase this to include reasoning tokens (for reasoning models)
+				--reasoning_effort = "medium", -- low|medium|high, only used for reasoning models
+			},
 		},
 		-- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
 		build = "make",
