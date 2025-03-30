@@ -109,11 +109,11 @@ local config = {
 			keymap = {
 				preset = "default",
 				['<C-x>'] = { 'show', 'show_documentation', 'hide_documentation' },
-				["<C-s>"] = {
-					function(cmp)
-						cmp.show({ providers = { "snippets" } })
-					end,
-				},
+				--["<M-s>"] = {
+				--	function(cmp)
+				--		cmp.show({ providers = { "snippets" } })
+				--	end,
+				--},
 				--["<C-x>"] = {
 				--	function(cmp)
 				--		cmp.show()

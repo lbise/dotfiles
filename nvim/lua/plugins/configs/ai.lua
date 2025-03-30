@@ -23,6 +23,100 @@ local config = {
 			})
 		end,
 	},
+	{
+		"CopilotC-Nvim/CopilotChat.nvim",
+		dependencies = {
+			{ "github/copilot.vim" }, -- or zbirenbaum/copilot.lua
+			{ "nvim-lua/plenary.nvim", branch = "master" }, -- for curl, log and async functions
+		},
+		build = "make tiktoken", -- Only on MacOS or Linux
+		opts = {
+			-- See Configuration section for options
+			proxy = os.getenv("http_proxy"),
+		},
+		-- See Commands section for default commands if you want to lazy load on them
+	},
+	{
+		"olimorris/codecompanion.nvim",
+		dependencies = {
+			"nvim-lua/plenary.nvim",
+			"nvim-treesitter/nvim-treesitter",
+		},
+		config = function()
+			local provider = "azure_openai"
+			--local provider = "copilot"
+			require("codecompanion").setup({
+				--opts = {
+				--	log_level = "TRACE",
+				--},
+				adapters = {
+					opts = {
+						allow_insecure = true,
+						proxy = os.getenv("http_proxy"),
+					},
+					azure_openai = function()
+						return require("codecompanion.adapters").extend("azure_openai", {
+							env = {
+								endpoint = "https://soc-ai0-sdc.openai.azure.com",
+								api_version = "2024-12-01-preview",
+							},
+							schema = {
+								model = {
+									-- Deployment name
+									--default = "gpt-4o",
+									default = "o3-mini",
+									choices = {
+										"gpt-4o",
+										-- opts can be stream and can_reason
+										["o3-mini"] = { opts = { can_reason = true, stream = false } },
+									},
+								},
+							},
+						})
+					end,
+				},
+				strategies = {
+					chat = {
+						adapter = provider,
+					},
+					inline = {
+						adapter = provider,
+					},
+					agent = {
+						adapter = provider,
+					},
+				},
+				display = {
+					chat = {
+						window = {
+							layout = "vertical", -- float|vertical|horizontal|buffer
+							width = 0.3,
+						},
+					},
+					diff = {
+						enabled = true,
+						close_chat_at = 240, -- Close an open chat buffer if the total columns of your display are less than...
+						layout = "vertical", -- vertical|horizontal split for default provider
+						--opts = { "internal", "filler", "closeoff", "algorithm:patience", "followwrap", "linematch:120" },
+						provider = "mini_diff", -- default|mini_diff
+					},
+				},
+			})
+		end,
+		init = function()
+			--vim.keymap.set({ "n", "v" }, "<C-a>", "<cmd>CodeCompanionActions<cr>", { noremap = true, silent = true })
+			vim.keymap.set(
+				{ "n", "v" },
+				"<leader>d",
+				"<cmd>CodeCompanionChat Toggle<cr>",
+				{ noremap = true, silent = true }
+			)
+			vim.keymap.set("v", "ga", "<cmd>CodeCompanionChat Add<cr>", { noremap = true, silent = true })
+
+			-- Expand 'cc' into 'CodeCompanion' in the command line
+			vim.cmd([[cab cc CodeCompanion]])
+		end,
+	},
 	--{
 	--	"yetone/avante.nvim",
 	--	event = "VeryLazy",
