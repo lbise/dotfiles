@@ -84,6 +84,7 @@ local config = {
 		dependencies = {
 			"rafamadriz/friendly-snippets",
 			"L3MON4D3/LuaSnip",
+			"fang2hou/blink-copilot",
 			version = "v2.*",
 		},
 		-- use a release tag to download pre-built binaries
@@ -102,17 +103,17 @@ local config = {
 			-- See the full "keymap" documentation for information on defining your own keymap.
 			keymap = {
 				preset = "default",
-				-- ['<C-x>'] = { 'show', 'show_documentation', 'hide_documentation' },
+				['<C-x>'] = { 'show', 'show_documentation', 'hide_documentation' },
 				["<C-s>"] = {
 					function(cmp)
 						cmp.show({ providers = { "snippets" } })
 					end,
 				},
-				["<C-x>"] = {
-					function(cmp)
-						cmp.show()
-					end,
-				},
+				--["<C-x>"] = {
+				--	function(cmp)
+				--		cmp.show()
+				--	end,
+				--},
 			},
 			appearance = {
 				-- Sets the fallback highlight groups to nvim-cmp's highlight groups
@@ -126,7 +127,15 @@ local config = {
 			-- Default list of enabled providers defined so that you can extend it
 			-- elsewhere in your config, without redefining it, due to `opts_extend`
 			sources = {
-				default = { "lsp", "path", "snippets", "buffer" },
+				default = { "lsp", "path", "snippets", "buffer", "copilot" },
+				providers = {
+					copilot = {
+						name = "copilot",
+						module = "blink-copilot",
+						score_offset = 100,
+						async = true,
+					},
+				},
 			},
 			-- Disable cmdline completions
 			cmdline = {
