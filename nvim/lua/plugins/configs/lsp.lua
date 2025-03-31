@@ -78,6 +78,11 @@ local config = {
 			"williamboman/mason.nvim",
 		},
 	},
+    {
+		"fang2hou/blink-copilot",
+        -- Use version just before neovim v0.11 support
+        version = "v1.3.8"
+    },
 	{
 		"saghen/blink.cmp",
 		-- optional: provides snippets for the snippet source
