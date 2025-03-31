@@ -4,6 +4,12 @@ local config = {
 		cmd = "Copilot",
 		event = "InsertEnter",
 		config = function()
+			if os.getenv("USER") == "13lbise" then
+				vim.g.copilot_proxy = os.getenv("http_proxy")
+				if vim.g.copilot_proxy == nil then
+					vim.notify("No proxy set for copilot. http_proxy not set in env", vim.log.levels.ERROR)
+				end
+			end
 			require("copilot").setup({
 				suggestion = { enabled = false, auto_trigger = true },
 				panel = { enabled = false },
