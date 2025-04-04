@@ -176,10 +176,10 @@ if [ -f "$HOME/.keys" ]; then
 fi
 
 if [ "$USER" = "13lbise" ]; then
-    MYT="/mnt/t/${USER}"
+    alias lint_rom="cd $ANDROMEDA_ROOT/pctools;b -p prj/python_style_lint -x -- --component=rom"
+    alias lint_executer="cd $ANDROMEDA_ROOT/pctools;b -p prj/python_style_lint -x -- --component=executer"
+    MYT="/mnt/ch03transfer/${USER}"
     WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
-    alias andro="cd $HOME/andromeda; source sourceme"
-    alias androwin="cd /mnt/c/SVN/wp_13lbise/andromeda; source sourceme"
     CURRENT_DIR=$PWD
     if [ -d "$HOME/andromeda" ]; then
         # Sourceme then go back to pwd
@@ -187,9 +187,6 @@ if [ "$USER" = "13lbise" ]; then
         source sourceme
         cd $CURRENT_DIR
     fi
-
-    # Helios stuff
-    export PYTHON310_64_EXE=/usr/bin/python3
 fi
 
 if [[ -n "$IS_WSL" || -n "$WSL_DISTRO_NAME" ]]; then
