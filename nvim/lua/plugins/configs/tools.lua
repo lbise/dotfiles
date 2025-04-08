@@ -38,7 +38,7 @@ local config = {
 		"rmagatti/auto-session",
 		config = function()
 			-- Recomended for the plugin
-			vim.o.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions"
+			vim.o.sessionoptions = "blank,buffers,curdir,folds,help,winsize,winpos,terminal,localoptions"
 			require("auto-session").setup({
 				session_lens = {
 					load_on_setup = true,

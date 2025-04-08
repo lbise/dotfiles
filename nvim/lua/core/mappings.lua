@@ -6,8 +6,8 @@ vim.keymap.set({ "n", "v" }, "<Space>", "<Nop>", { silent = true })
 vim.keymap.set({ "n" }, "<leader><Esc>", "<cmd> nohlsearch <CR>")
 
 -- Switch buffer
-vim.keymap.set({ "n" }, "<tab>", "<cmd> BufferLineCycleNext <CR>", { desc = "Next buffer" })
-vim.keymap.set({ "n" }, "<S-tab>", "<cmd> BufferLineCyclePrev <CR>", { desc = "Previous buffer" })
+vim.keymap.set({ "n" }, "<tab>", "<cmd> bnext <CR>", { desc = "Next buffer" })
+vim.keymap.set({ "n" }, "<S-tab>", "<cmd> bprev <CR>", { desc = "Previous buffer" })
 
 -- Window resize
 vim.keymap.set("n", "<C-Right>", [[<cmd>vertical resize +5<cr>]])
