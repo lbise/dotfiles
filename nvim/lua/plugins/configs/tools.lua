@@ -9,16 +9,22 @@ local config = {
 		},
 	},
 	{
+		"echasnovski/mini.diff",
+		enabled = true,
+		version = false,
+		config = true,
+	},
+	{
 		"danymat/neogen",
 		dependencies = {
-            "nvim-treesitter/nvim-treesitter",
-            {
-                'L3MON4D3/LuaSnip',
-                config = function()
-                    require("luasnip.loaders.from_vscode").lazy_load()
-                end
-            },
-        },
+			"nvim-treesitter/nvim-treesitter",
+			{
+				"L3MON4D3/LuaSnip",
+				config = function()
+					require("luasnip.loaders.from_vscode").lazy_load()
+				end,
+			},
+		},
 		cmd = {
 			"Neogen",
 		},
@@ -42,15 +48,15 @@ local config = {
 			})
 		end,
 	},
-    {
-        "samharju/yeet.nvim",
-        dependencies = {
-            "stevearc/dressing.nvim", -- optional, provides sane UX
-        },
-        version = "*", -- use the latest release, remove for master
-        cmd = "Yeet",
-        opts = {},
-    }
+	{
+		"samharju/yeet.nvim",
+		dependencies = {
+			"stevearc/dressing.nvim", -- optional, provides sane UX
+		},
+		version = "*", -- use the latest release, remove for master
+		cmd = "Yeet",
+		opts = {},
+	},
 }
 
 return config
