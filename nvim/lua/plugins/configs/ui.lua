@@ -409,6 +409,10 @@ local config = {
 			},
 		},
 	},
+    {
+        "folke/todo-comments.nvim",
+        config = true
+    }
 }
 
 return config
