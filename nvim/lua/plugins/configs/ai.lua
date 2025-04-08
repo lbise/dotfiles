@@ -43,8 +43,10 @@ local config = {
 			"nvim-treesitter/nvim-treesitter",
 		},
 		config = function()
-			local provider = "azure_openai"
-			--local provider = "copilot"
+			local provider = "copilot"
+			if os.getenv("USER") == "13lbise" then
+				provider = "azure_openai"
+			end
 			require("codecompanion").setup({
 				--opts = {
 				--	log_level = "TRACE",
