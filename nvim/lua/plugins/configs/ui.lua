@@ -80,19 +80,23 @@ local config = {
 				theme = require("core.settings").colorscheme,
 				--section_separators = { left = '', right = '' },
 				--component_separators = { left = '', right = '' }
-				-- component_separators = '|',
+				--component_separators = "|",
 				-- section_separators = '',
+				component_separators = { left = "", right = "" },
 				section_separators = { left = "", right = "" },
+				--component_separators = { left = '', right = ''},
+				--section_separators = { left = '', right = ''},
 			},
 			sections = {
 				lualine_a = { "mode" },
 				-- lualine_b = { "branch", "diff", "diagnostics" },
-				lualine_b = { "filename" },
-				lualine_c = { "branch" },
+				lualine_b = { "branch", { "filename", path = 1 } },
+				lualine_c = {},
 				-- lualine_x = { "encoding", "fileformat", "filetype" },
-				lualine_x = { "filetype" },
-				lualine_y = { "progress" },
-				lualine_z = { "location" },
+				lualine_x = {},
+				lualine_y = { "filetype", "progress" },
+				--lualine_z = { "location" },
+				lualine_z = {},
 			},
 		},
 	},
@@ -102,48 +106,48 @@ local config = {
 			-- options
 		},
 	},
-	--{
-	--	"akinsho/bufferline.nvim",
-	--	dependencies = "nvim-tree/nvim-web-devicons",
-	--	event = { "BufRead", "BufNewFile" },
-	--    --enabled = false,
-	--	config = function()
-	--		require("bufferline").setup({
-	--			options = {
-	--				mode = "buffers", -- set to "tabs" to only show tabpages instead
-	--				style_preset = require("bufferline").style_preset.no_italic,
-	--				buffer_close_icon = "",
-	--				modified_icon = " ",
-	--				close_icon = "",
-	--				left_trunc_marker = "",
-	--				right_trunc_marker = "",
-	--				max_name_length = 25,
-	--				max_prefix_length = 15,
-	--				tab_size = 25,
-	--				diagnostics = "nvim_lsp",
-	--				custom_filter = function(bufnr)
-	--					local exclude_ft = { "qf", "fugitive", "git" }
-	--					local cur_ft = vim.bo[bufnr].filetype
-	--					local should_filter = vim.tbl_contains(exclude_ft, cur_ft)
+	{
+		"akinsho/bufferline.nvim",
+		dependencies = "nvim-tree/nvim-web-devicons",
+		event = { "BufRead", "BufNewFile" },
+		--enabled = false,
+		config = function()
+			require("bufferline").setup({
+				options = {
+					mode = "buffers", -- set to "tabs" to only show tabpages instead
+					style_preset = require("bufferline").style_preset.no_italic,
+					buffer_close_icon = "",
+					modified_icon = " ",
+					close_icon = "",
+					left_trunc_marker = "",
+					right_trunc_marker = "",
+					max_name_length = 25,
+					max_prefix_length = 15,
+					tab_size = 25,
+					diagnostics = "nvim_lsp",
+					custom_filter = function(bufnr)
+						local exclude_ft = { "qf", "fugitive", "git" }
+						local cur_ft = vim.bo[bufnr].filetype
+						local should_filter = vim.tbl_contains(exclude_ft, cur_ft)
 
-	--					if should_filter then
-	--						return false
-	--					end
+						if should_filter then
+							return false
+						end
 
-	--					return true
-	--				end,
-	--				show_buffer_icons = true,
-	--				show_buffer_close_icons = false,
-	--				show_tab_indicators = true,
-	--				persist_buffer_sort = true,
-	--				separator_style = "slope",
-	--				enforce_regular_tabs = false,
-	--				always_show_bufferline = true,
-	--				sort_by = "id",
-	--			},
-	--		})
-	--	end,
-	--},
+						return true
+					end,
+					show_buffer_icons = true,
+					show_buffer_close_icons = false,
+					show_tab_indicators = true,
+					persist_buffer_sort = true,
+					separator_style = "slope",
+					enforce_regular_tabs = false,
+					always_show_bufferline = true,
+					sort_by = "id",
+				},
+			})
+		end,
+	},
 	{
 		"lewis6991/gitsigns.nvim",
 		event = { "BufReadPost", "BufNewFile" },
@@ -409,10 +413,10 @@ local config = {
 			},
 		},
 	},
-    {
-        "folke/todo-comments.nvim",
-        config = true
-    }
+	{
+		"folke/todo-comments.nvim",
+		config = true,
+	},
 }
 
 return config
