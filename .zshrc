@@ -176,8 +176,7 @@ if [ -f "$HOME/.keys" ]; then
 fi
 
 if [ "$USER" = "13lbise" ]; then
-    alias lint_rom="cd $ANDROMEDA_ROOT/pctools;b -p prj/python_style_lint -x -- --component=rom"
-    alias lint_executer="cd $ANDROMEDA_ROOT/pctools;b -p prj/python_style_lint -x -- --component=executer"
+    alias aruffall="ruff check --config $ANDROMEDA_ROOT/pyproject.toml $ANDROMEDA_ROOT/rom $ANDROMEDA_ROOT/pctools $ANDROMEDA_ROOT/executer"
     MYT="/mnt/ch03transfer/${USER}"
     WT="/mnt/c/Users/13lbise/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
     CURRENT_DIR=$PWD
