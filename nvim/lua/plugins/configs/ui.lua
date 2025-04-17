@@ -315,9 +315,11 @@ local config = {
 				desc = "Delete current buffer",
 			},
 			{
-				"<c-p>",
+				"<C-p>",
 				function()
-					Snacks.explorer.open()
+					Snacks.explorer.open({
+						layout = { preset = "sidebar", preview = false },
+					})
 				end,
 				desc = "Open explorer",
 			},
