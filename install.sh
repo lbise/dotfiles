@@ -70,6 +70,7 @@ function rm_symlinks() {
     $RM_RF ~/.gnupg/gpg.conf
     $RM_RF ~/.gnupg/gpg-agent.conf
     $RM_RF ~/.clang-format
+    $RM_RF ~/.aider.conf.yml
     $X_OFF
 }
 
@@ -102,6 +103,7 @@ function ln_symlinks() {
     $LN_SF $DIR/gpg/gpg.conf ~/.gnupg/gpg.conf
     $LN_SF $DIR/gpg/gpg-agent.conf ~/.gnupg/gpg-agent.conf
     $LN_SF $DIR/.clang-format ~/.clang-format
+    $LN_SF $DIR/.aider.conf.yml ~/.aider.conf.yml
     if [ -d "~/.local/share/applications/" ]; then
         $LN_SF $DIR/ghostty/ghostty.desktop ~/.local/share/applications/ghostty.desktop
     fi
