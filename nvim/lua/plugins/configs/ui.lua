@@ -299,11 +299,11 @@ local config = {
 				end,
 				desc = "Find Git Log",
 			},
-			-- Find andromeda TODO!!
 			{
 				"<leader>fa",
 				function()
-					Snacks.picker.files()
+					-- Not ideal because ignored files are shown but better than nothing
+					Snacks.picker.files({ cwd = os.getenv("ANDROMEDA_ROOT"), ignored = true })
 				end,
 				desc = "Find Andromeda",
 			},
