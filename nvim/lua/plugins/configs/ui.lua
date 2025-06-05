@@ -426,6 +426,12 @@ local config = {
 		"folke/todo-comments.nvim",
 		config = true,
 	},
+	{
+		"m4xshen/hardtime.nvim",
+		lazy = false,
+		dependencies = { "MunifTanjim/nui.nvim" },
+		opts = {},
+	},
 }
 
 return config
