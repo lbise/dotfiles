@@ -300,6 +300,13 @@ local config = {
 				desc = "Find Git Log",
 			},
 			{
+				"<leader>fd",
+				function()
+					Snacks.picker.lsp_symbols()
+				end,
+				desc = "Find LSP symbols",
+			},
+			{
 				"<leader>fa",
 				function()
 					-- Not ideal because ignored files are shown but better than nothing
