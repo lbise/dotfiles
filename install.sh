@@ -164,12 +164,14 @@ function install_gcm_home() {
 }
 
 function install_neovim() {
-    NVIM_VERSION="0.10.3"
+    NVIM_VERSION="0.11.2"
     NVIM_VER_REGEX="^NVIM v([0-9]+.[0-9]+.[0-9]+)"
     NVIM_OUT="$DIR/archives"
-    NVIM_SRC="$NVIM_OUT/nvim-linux64"
+    NVIM_DIR="nvim-linux-x86_64"
+    NVIM_SRC="$NVIM_OUT/$NVIM_DIR"
     NVIM_DST="$HOME/.bin"
-    NVIM_BIN="$NVIM_DST/nvim-linux64/bin/nvim"
+    NVIM_BIN="$NVIM_DST/$NVIM_DIR/bin/nvim"
+    NVIM_ARCHIVE="$NVIM_OUT/nvim-${NVIM_VERSION}-linux-x86_64.tar.gz"
 
     echo "-------------------------------------------------------------------------"
     if [ -f $NVIM_BIN ]; then
@@ -194,10 +196,10 @@ function install_neovim() {
         exit
     fi
 
-    echo "Installing neovim v$NVIM_VERSION..."
+    echo "Installing neovim v$NVIM_VERSION from $NVIM_ARCHIVE..."
     # Prevent script stopping if there is no nvim process running
     killall nvim || true
-    $UNTAR $NVIM_OUT/nvim-linux64-${NVIM_VERSION}.tar.gz -C $NVIM_OUT
+    $UNTAR $NVIM_ARCHIVE -C $NVIM_OUT
     if [ ! -d "$NVIM_DST" ]; then
         mkdir "$NVIM_DST"
     fi
