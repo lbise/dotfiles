@@ -11,7 +11,7 @@ local settings = {
         },
         -- Servers enable status, can also be a list of settings passed to require('lspconfig')[server].setup(settings = { xxx })
         servers = {
-            clangd = false,
+            clangd = true,
             pyright = {
                 settings = {
                     python = {

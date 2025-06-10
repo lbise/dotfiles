@@ -33,7 +33,7 @@ local config = {
             { "<c-\\>", "<cmd><C-U>TmuxNavigatePrevious<cr>" },
         },
     },
-    { 'ludovicchabant/vim-gutentags' },
+    -- { 'ludovicchabant/vim-gutentags' },
 }
 
 return config
