@@ -3,6 +3,7 @@ local settings = {
     lsp = {
         ensure_installed = {
             'clangd',
+            'pyright',
             'ruff@0.11.2',
             'bashls',
             'lua_ls',
