@@ -4,6 +4,7 @@ local settings = {
         ensure_installed = {
             'clangd',
             'pyright',
+            -- Required version for work..
             'ruff@0.11.2',
             'bashls',
             'lua_ls',

@@ -171,19 +171,22 @@ local config = {
 					lua = { "stylua" },
 					-- Conform will run multiple formatters sequentially
 					python = function(bufnr)
-						-- use yapf for work
-						if vim.fn.expand("$USER") == "13lbise" then
-							return { "isort", "ruff_format" }
-						else
-							--return { "isort", "ruff_lsp" }
-							return { "isort", "black" }
-						end
+						return { "ruff_organize_imports", "ruff_format" }
 					end,
 					cpp = { "clang_format" },
 					c = { "clang_format" },
 				},
 				formatters = {
 					ruff_format = {
+						prepend_args = function()
+							local config = get_ruff_config()
+							if config ~= "" then
+								return { "--config", config }
+							end
+							return {}
+						end,
+					},
+					ruff_organize_imports = {
 						prepend_args = function()
 							local config = get_ruff_config()
 							if config ~= "" then
