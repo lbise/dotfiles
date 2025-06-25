@@ -27,8 +27,6 @@ local settings = {
                     },
                 },
             },
-            --ruff_lsp = true,
-            bashls = true,
             lua_ls = {
                 settings = {
                     Lua = {
