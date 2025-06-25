@@ -187,7 +187,6 @@ local config = {
 						prepend_args = function()
 							local config = get_ruff_config()
 							if config ~= "" then
-								vim.notify(config)
 								return { "--config", config }
 							end
 							return {}
