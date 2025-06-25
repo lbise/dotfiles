@@ -1,7 +1,7 @@
-local function get_yapf_style()
+local function get_ruff_config()
 	if vim.fn.expand("$USER") == "13lbise" then
 		-- Check for andromeda style file
-		local style_path = vim.fn.expand("$HOME/andromeda/pctools/prj/python_style_lint/style.yapf")
+		local style_path = vim.fn.expand("$HOME/andromeda/pyproject.toml")
 		if vim.fn.filereadable(style_path) then
 			return style_path
 		end
@@ -78,11 +78,11 @@ local config = {
 			"williamboman/mason.nvim",
 		},
 	},
-    {
+	{
 		"fang2hou/blink-copilot",
-        -- Use version just before neovim v0.11 support
-        version = "v1.3.8"
-    },
+		-- Use version just before neovim v0.11 support
+		version = "v1.3.8",
+	},
 	{
 		"saghen/blink.cmp",
 		-- optional: provides snippets for the snippet source
@@ -108,7 +108,7 @@ local config = {
 			-- See the full "keymap" documentation for information on defining your own keymap.
 			keymap = {
 				preset = "default",
-				['<C-x>'] = { 'show', 'show_documentation', 'hide_documentation' },
+				["<C-x>"] = { "show", "show_documentation", "hide_documentation" },
 				--["<M-s>"] = {
 				--	function(cmp)
 				--		cmp.show({ providers = { "snippets" } })
@@ -165,13 +165,15 @@ local config = {
 		cmd = { "ConformInfo" },
 		config = function()
 			require("conform").setup({
+				-- Enable to see full command called from log
+				-- log_level = vim.log.levels.DEBUG,
 				formatters_by_ft = {
 					lua = { "stylua" },
 					-- Conform will run multiple formatters sequentially
 					python = function(bufnr)
 						-- use yapf for work
 						if vim.fn.expand("$USER") == "13lbise" then
-							return { "isort", "yapf" }
+							return { "isort", "ruff_format" }
 						else
 							--return { "isort", "ruff_lsp" }
 							return { "isort", "black" }
@@ -181,8 +183,15 @@ local config = {
 					c = { "clang_format" },
 				},
 				formatters = {
-					yapf = {
-						prepend_args = { "--style=" .. get_yapf_style() },
+					ruff_format = {
+						prepend_args = function()
+							local config = get_ruff_config()
+							if config ~= "" then
+								vim.notify(config)
+								return { "--config", config }
+							end
+							return {}
+						end,
 					},
 					clang_format = {
 						-- Any additional configuration for Clang Format can go here
