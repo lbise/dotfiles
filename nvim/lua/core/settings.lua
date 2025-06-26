@@ -11,7 +11,11 @@ local settings = {
         },
         -- Servers enable status, can also be a list of settings passed to require('lspconfig')[server].setup(settings = { xxx })
         servers = {
-            clangd = true,
+            clangd = {
+                cmd = { 'clangd' },
+                filetypes = { 'unity', 'c', 'cpp', 'objc', 'objcpp', 'cuda', 'proto' },
+                root_markers = { '.clangd', '.clang-tidy', '.clang-format', 'compile_commands.json', 'compile_flags.txt', 'configure.ac' }
+            },
             pyright = {
                 settings = {
                     python = {

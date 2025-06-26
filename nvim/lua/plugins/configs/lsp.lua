@@ -28,6 +28,25 @@ local config = {
             -- Setup mason so LSPs are added to the PATH
             require("mason").setup()
 
+            vim.diagnostic.config({
+                virtual_text = { current_line = true },
+                underline = true,
+                update_in_insert = true,
+                severity_sort = true,
+                --signs = {
+                --    text = {
+                --        [vim.diagnostic.severity.ERROR] = "",
+                --        [vim.diagnostic.severity.WARN] = "",
+                --        [vim.diagnostic.severity.INFO] = "",
+                --        [vim.diagnostic.severity.HINT] = "",
+                --    },
+                --},
+                float = {
+                    border = "rounded",
+                    source = "if_many",
+                },
+            })
+
             for config_server, config_opt in pairs(require("core.settings").lsp.servers) do
                 if not config_opt == false then
                     if type(config_opt) == "table" then
@@ -40,16 +59,16 @@ local config = {
             end
         end
     },
-	{
-		-- Show diagnostics messages in a window
-		"folke/trouble.nvim",
-		cmd = "Trouble",
-		event = "LspAttach",
-		opts = {},
-		dependencies = {
-			"nvim-tree/nvim-web-devicons",
-		},
-	},
+    {
+        -- Show diagnostics messages in a window
+        "folke/trouble.nvim",
+        cmd = "Trouble",
+        event = "LspAttach",
+        opts = {},
+        dependencies = {
+            "nvim-tree/nvim-web-devicons",
+        },
+    },
     {
         "stevearc/conform.nvim",
         event = { "BufWritePre" },
