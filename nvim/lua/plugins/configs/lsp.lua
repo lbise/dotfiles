@@ -7,30 +7,17 @@ local function get_ruff_config()
 		end
 	end
 
-	-- Simply use pep3 formatting
-	return "pep8"
+	return ""
 end
 
 local config = {
 	{
 		"neovim/nvim-lspconfig",
-		event = {
-			"BufReadPost",
-			"BufNewFile",
-		},
-		-- Plugins setup before nvim-lspconfig
 		dependencies = {
 			"williamboman/mason.nvim",
-			cmd = {
-				"Mason",
-				"MasonInstall",
-				"MasonUpdate",
-			},
-			"williamboman/mason-lspconfig.nvim",
 			{
-				-- Neovim setup for init.lua and plugin development with full signature help, docs and completion for the nvim lua API.
 				"folke/lazydev.nvim",
-				ft = "lua",
+				ft = "lua", -- only load on lua files
 				opts = {
 					library = {
 						-- See the configuration section for more details
@@ -42,41 +29,107 @@ local config = {
 		},
 	},
 	{
-		"williamboman/mason-lspconfig.nvim",
-		event = {
-			"BufEnter",
+		"mason-org/mason.nvim",
+		cmd = {
+			"Mason",
+			"MasonInstall",
+			"MasonUpdate",
 		},
 		config = function()
+			-- Setup mason so LSPs are added to the PATH
 			require("mason").setup()
-			require("mason-lspconfig").setup({
-				ensure_installed = require("core.settings").lsp.ensure_installed,
+
+			vim.diagnostic.config({
+				virtual_text = { current_line = true },
+				underline = true,
+				update_in_insert = true,
+				severity_sort = true,
+				signs = {
+					text = {
+						[vim.diagnostic.severity.ERROR] = "",
+						[vim.diagnostic.severity.WARN] = "",
+						[vim.diagnostic.severity.INFO] = "󰋽",
+						[vim.diagnostic.severity.HINT] = "",
+						--[vim.diagnostic.severity.ERROR] = " ",
+						--[vim.diagnostic.severity.WARN] = " ",
+						--[vim.diagnostic.severity.INFO] = " ",
+						--[vim.diagnostic.severity.HINT] = " ",
+					},
+				},
+				float = {
+					border = "rounded",
+					source = "if_many",
+				},
 			})
 
 			for config_server, config_opt in pairs(require("core.settings").lsp.servers) do
 				if not config_opt == false then
-					local capabilities = require("blink.cmp").get_lsp_capabilities()
-					local opts = {
-						capabilities = capabilities,
-					}
-
-					-- override options if user defines them
-					if type(require("core.settings").lsp.servers[config_server]) == "table" then
-						local user_opts = require("core.settings").lsp.servers[config_server]
-						if user_opts ~= nil then
-							opts["settings"] = user_opts["settings"]
-						end
+					if type(config_opt) == "table" then
+						-- Add extra configuration
+						vim.lsp.config(config_server, config_opt)
 					end
 
-					--print('Config LSP: ', config_server)
-					--print(require('core.tools').dump_table(opts))
-
-					require("lspconfig")[config_server].setup(opts)
+					vim.lsp.enable(config_server)
 				end
 			end
 		end,
+	},
+	{
+		-- Show diagnostics messages in a window
+		"folke/trouble.nvim",
+		cmd = "Trouble",
+		event = "LspAttach",
+		opts = {},
 		dependencies = {
-			"williamboman/mason.nvim",
+			"nvim-tree/nvim-web-devicons",
 		},
+	},
+	{
+		"stevearc/conform.nvim",
+		event = { "BufWritePre" },
+		cmd = { "ConformInfo" },
+		config = function()
+			require("conform").setup({
+				-- Enable to see full command called from log
+				-- log_level = vim.log.levels.DEBUG,
+				formatters_by_ft = {
+					lua = { "stylua" },
+					-- Conform will run multiple formatters sequentially
+					python = function(bufnr)
+						return { "ruff_organize_imports", "ruff_format" }
+					end,
+					cpp = { "clang_format" },
+					c = { "clang_format" },
+				},
+				formatters = {
+					ruff_format = {
+						prepend_args = function()
+							local config = get_ruff_config()
+							if config ~= "" then
+								return { "--config", config }
+							end
+							return {}
+						end,
+					},
+					ruff_organize_imports = {
+						prepend_args = function()
+							local config = get_ruff_config()
+							if config ~= "" then
+								return { "--config", config }
+							end
+							return {}
+						end,
+					},
+					clang_format = {
+						-- Any additional configuration for Clang Format can go here
+						-- Use format from a file
+						args = {
+							"--style=file:" .. vim.fn.expand("$HOME") .. "/.clang-format",
+						},
+					},
+				},
+			})
+		end,
 	},
 	{
 		"fang2hou/blink-copilot",
@@ -148,63 +201,6 @@ local config = {
 			},
 		},
 		opts_extend = { "sources.default" },
-	},
-	{
-		-- Show diagnostics messages in a window
-		"folke/trouble.nvim",
-		cmd = "Trouble",
-		event = "LspAttach",
-		opts = {},
-		dependencies = {
-			"nvim-tree/nvim-web-devicons",
-		},
-	},
-	{
-		"stevearc/conform.nvim",
-		event = { "BufWritePre" },
-		cmd = { "ConformInfo" },
-		config = function()
-			require("conform").setup({
-				-- Enable to see full command called from log
-				-- log_level = vim.log.levels.DEBUG,
-				formatters_by_ft = {
-					lua = { "stylua" },
-					-- Conform will run multiple formatters sequentially
-					python = function(bufnr)
-						return { "ruff_organize_imports", "ruff_format" }
-					end,
-					cpp = { "clang_format" },
-					c = { "clang_format" },
-				},
-				formatters = {
-					ruff_format = {
-						prepend_args = function()
-							local config = get_ruff_config()
-							if config ~= "" then
-								return { "--config", config }
-							end
-							return {}
-						end,
-					},
-					ruff_organize_imports = {
-						prepend_args = function()
-							local config = get_ruff_config()
-							if config ~= "" then
-								return { "--config", config }
-							end
-							return {}
-						end,
-					},
-					clang_format = {
-						-- Any additional configuration for Clang Format can go here
-						-- Use format from a file
-						args = {
-							"--style=file:" .. vim.fn.expand("$HOME") .. "/.clang-format",
-						},
-					},
-				},
-			})
-		end,
 	},
 }
 
