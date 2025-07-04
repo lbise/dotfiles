@@ -109,23 +109,24 @@ vim.keymap.set("n", "<leader>t", "<cmd>Trouble diagnostics toggle focus=false fi
 vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("UserLspConfig", {}),
 	callback = function(ev)
+        -- See default mappings: help lsp
+        -- CTRL-X -> Trigger completion
+        -- CTRL-] -> Jump to definition
+        -- "grn" is mapped in Normal mode to |vim.lsp.buf.rename()|
+        -- "gra" is mapped in Normal and Visual mode to |vim.lsp.buf.code_action()|
+        -- "grr" is mapped in Normal mode to |vim.lsp.buf.references()|
+        -- "gri" is mapped in Normal mode to |vim.lsp.buf.implementation()|
+
 		-- Only map for buffer
 		local opts = { buffer = ev.buf }
 
-		vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, opts)
-		vim.keymap.set({ "n", "v" }, "<space>ca", vim.lsp.buf.code_action, opts)
-
-		vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
-		vim.keymap.set("n", "<leader>k", vim.lsp.buf.signature_help, opts)
-
-		vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts)
 		vim.keymap.set("n", "<leader>wa", vim.lsp.buf.add_workspace_folder, opts)
 		vim.keymap.set("n", "<leader>wr", vim.lsp.buf.remove_workspace_folder, opts)
 		vim.keymap.set("n", "<leader>wl", function()
 			print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
 		end, opts)
 
-		vim.api.nvim_buf_create_user_command(ev.buf, "Format", function(_)
+		vim.api.nvim_buf_create_user_command(ev.buf, "LspFormat", function(_)
 			vim.lsp.buf.format()
 		end, { desc = "Format current buffer with LSP" })
 	end,
