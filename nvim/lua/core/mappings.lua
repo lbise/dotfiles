@@ -117,13 +117,18 @@ vim.keymap.set("n", "<leader>t", "<cmd>Trouble diagnostics toggle focus=false fi
 vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("UserLspConfig", {}),
 	callback = function(ev)
+        -- Default vim mappings:
+        -- CTRL+] -> Jump to tag
+        -- grr -> List references
+        -- grn -> Rename
+        -- gra -> code action
 		-- Only map for buffer
 		local opts = { buffer = ev.buf }
 
-		vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, opts)
-		vim.keymap.set({ "n", "v" }, "<space>ca", vim.lsp.buf.code_action, opts)
+        vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, opts)
+        vim.keymap.set({ "n", "v" }, "<space>ca", vim.lsp.buf.code_action, opts)
 
-		vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+		--vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
 		vim.keymap.set("n", "<leader>k", vim.lsp.buf.signature_help, opts)
 
 		vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts)
