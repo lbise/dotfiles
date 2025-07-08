@@ -41,6 +41,7 @@ local settings = {
 								vim.fn.expand("$HOME/andromeda/pctools/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
 							},
 						},
 					},
