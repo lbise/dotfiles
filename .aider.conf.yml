@@ -18,7 +18,8 @@
 # Main model:
 
 ## Specify the model to use for the main chat
-model: azure/o4-mini
+#model: azure/o4-mini
+model: azure/o3
 
 ########################
 # API Keys and settings:
@@ -81,7 +82,7 @@ model: azure/o4-mini
 #  - zzz
 
 ## Set the reasoning_effort API parameter (default: not set)
-#reasoning-effort: xxx
+reasoning-effort: high
 
 ## Set the thinking token budget for models that support it (default: not set)
 #thinking-tokens: xxx
@@ -102,10 +103,10 @@ model: azure/o4-mini
 #auto-accept-architect: true
 
 ## Specify the model to use for commit messages and chat history summarization (default depends on --model)
-weak-model: azure/gpt-4o
+weak-model: azure/o4-mini
 
 ## Specify the model to use for editor tasks (default depends on --model)
-editor-model: azure/gpt-4o
+editor-model: azure/o4-mini
 
 ## Specify the edit format for the editor model (default: depends on editor model)
 #editor-edit-format: xxx
@@ -373,7 +374,7 @@ show-diffs: true
 #  - zzz
 
 ## specify a read-only file (can be used multiple times)
-read: docs/conventions.md
+read: /home/13lbise/andromeda/ai/docs/conventions.md
 ## Specify multiple values like this:
 #read:
 #  - xxx
