@@ -66,6 +66,10 @@ local config = {
 					-- Make linenumbers brighter
 					hl.LineNr = {
 						fg = "#67719f",
+						bg = "#292e42",
+					}
+					hl.ColorColumn = {
+						bg = "#1d202f",
 					}
 				end,
 			})

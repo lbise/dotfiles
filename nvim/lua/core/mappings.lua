@@ -38,6 +38,9 @@ end
 --vim.keymap.set("n", "<leader>yp", yank_path, { noremap = true, silent = true, desc = "[y]ank full file [p]ath" })
 vim.keymap.set("n", "<C-y>", yank_path, { noremap = true, silent = true, desc = "[y]ank full file [p]ath" })
 
+-- Paste last yanked
+vim.keymap.set({ 'n', 'v' }, '<leader>p', '"0p', { desc = 'Paste last yanked' })
+
 -- Generate tags manually
 vim.keymap.set("n", "<F12>", ':!ctags -R --exclude="*Sim*" --exclude="*scripts" .<CR>')
 

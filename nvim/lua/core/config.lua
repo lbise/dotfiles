@@ -29,6 +29,12 @@ vim.wo.number = true
 vim.wo.relativenumber = true
 vim.wo.numberwidth = 2
 
+-- UI
+vim.g.have_nerd_font = true
+vim.o.colorcolumn = '120'
+vim.o.cursorline = true
+vim.cmd("highlight ColorColumn ctermbg=0 guibg=#333333")
+
 -- Do not use swap files
 vim.opt.swapfile = false
 
