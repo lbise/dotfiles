@@ -1,13 +1,17 @@
 local settings = {
 	colorscheme = "tokyonight",
 	lsp = {
+		-- Not used currently ...
 		ensure_installed = {
 			"clangd",
+			"clang-format",
 			"pyright",
 			-- Required version for work..
-			"ruff@0.11.2",
-			"bashls",
-			"lua_ls",
+			--"ruff@0.11.2",
+			"ruff",
+			"bash-language-server",
+			"lua-language-server",
+			"stylua",
 		},
 		-- Servers enable status, can also be a list of settings passed to require('lspconfig')[server].setup(settings = { xxx })
 		servers = {
