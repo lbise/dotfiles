@@ -382,7 +382,7 @@ read: /home/13lbise/andromeda/ai/docs/conventions.md
 #  - zzz
 
 ## Use VI editing mode in the terminal (default: False)
-#vim: false
+vim: true
 
 ## Specify the language to use in the chat (default: None, uses system settings)
 #chat-language: xxx

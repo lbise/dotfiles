@@ -76,3 +76,4 @@ lazy-lock.json
 .aider.chat.history.md
 .aider.input.history
 
+.aider*
