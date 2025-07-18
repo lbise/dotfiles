@@ -62,6 +62,15 @@ local config = {
 				},
 			})
 
+			--local registry = require("mason-registry")
+			--for i, package in pairs(require("core.settings").lsp.ensure_installed) do
+			--    local pkg = registry.get_package(package)
+			--	--vim.notify("Package " .. package, vim.log.levels.ERROR)
+			--    if not pkg:is_installed() then
+			--	    vim.notify("Not installed " .. package, vim.log.levels.ERROR)
+			--    end
+			--end
+
 			for config_server, config_opt in pairs(require("core.settings").lsp.servers) do
 				if not config_opt == false then
 					if type(config_opt) == "table" then
