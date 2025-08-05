@@ -10,7 +10,6 @@
 
 [core]
 	editor = nvim
-	hooksPath = ~/.githooks
 	filemode = false
 	autocrlf = false
 
