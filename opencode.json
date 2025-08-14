@@ -1,14 +1,15 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "azure/o3",
+  "small_model": "azure/o4-mini",
   "provider": {
     "azure": {
       "options": {
-        "resourceName": "{env:AZURE_RESOURCE_NAME}"
+        "resourceName": "{env:AZURE_RESOURCE_NAME}",
+        "apiKey": "{env:AZURE_API_KEY}"
       },
-      "api_key": "{env:AZURE_API_KEY}",
       "models": {}
     }
   },
-  "log_level": "DEBUG"
+  "share": "disabled"
 }
