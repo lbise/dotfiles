@@ -190,12 +190,11 @@ fi
 
 if [[ -n "$IS_WSL" || -n "$WSL_DISTRO_NAME" ]]; then
     # Running WSL
-    echo "- WSL detected"
-    export DISPLAY=$(awk '/nameserver / {print $2; exit}' /etc/resolv.conf 2>/dev/null):0
-    echo "    DISPLAY=$DISPLAY"
-    if [[ $PWD == *"/mnt/c"* ]]; then
-        cd $HOME
-    fi
+    # Use regular x11, requires vcxsrv to be running on Windows
+    # export DISPLAY=$(ip route list default | awk '{print $3}'):0
+    # Use WSLg built-in
+    export DISPLAY=":0"
+    echo "- WSL detected: Setting DISPLAY=$DISPLAY"
 fi
 
 #### MISC ####
