@@ -109,6 +109,7 @@ MACHINE="${MACHINE}.corp.ads"
 if [ "$COPY_KEY" = 1 ]; then
     echo "Copying key to $MACHINE"
     ssh-copy-id -f $USER@$MACHINE
+    ssh-copy-id -f -i ~/.ssh/13lbisex2go_id_rsa $USER@$MACHINE
 fi
 
 echo "Connecting to $MACHINE with args $OPTS $@"
