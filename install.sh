@@ -71,6 +71,9 @@ function rm_symlinks() {
     $RM_RF ~/.gnupg/gpg-agent.conf
     $RM_RF ~/.clang-format
     $RM_RF ~/.aider.conf.yml
+    if [ ! -d ~/.config/opencode ]; then
+        $MKDIR ~/.config/opencode
+    fi
     $RM_RF ~/.config/opencode/opencode.json
     $X_OFF
 }
