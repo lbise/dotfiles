@@ -171,9 +171,13 @@ alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git r
 alias vim=nvim
 alias dotupdate="dotupdate.sh"
 # Docker devenv
-alias dshell="docker exec -it dot-dev zsh"
-alias dvim="docker exec -it dot-dev nvim"
-alias dopencode="docker exec -it dot-dev opencode"
+devenv_img="ch03git.phonak.com/13lbise/devenv:latest"
+devenv_name="devenv"
+alias dpush="docker push $devenv_img"
+alias dpull="docker pull $devenv_img"
+alias dshell="docker exec -it $devenv_name zsh"
+alias dvim="docker exec -it $devenv_name nvim"
+alias dopencode="docker exec -it $devenv_name opencode"
 
 if [ -f "$HOME/.keys" ]; then
     source "$HOME/.keys"
