@@ -1,131 +1,129 @@
 # Development Environment Docker Container
 
-This Docker setup creates a comprehensive development environment container with all the tools and configurations needed for software development.
-
-## What's Included
-
-The development container includes:
-
-- **Base System**: Ubuntu 24.04 with zsh and Oh My Zsh
-- **Editor**: Neovim 0.11.2 with pre-installed plugins and language servers
-- **Languages & Runtimes**:
-  - Python 3 with pip and pipx
-  - Node.js 20.13.1 with npm and npx
-- **Development Tools**:
-  - Build tools (build-essential, cmake, pkg-config)
-  - Search tools (ripgrep, fd-find, fzf)
-  - Git and version control tools
-- **Language Servers**: clangd, pyright, ruff, bash-language-server, lua-language-server, stylua
-- **AI Assistant**: Opencode AI
+This Docker setup provides a comprehensive development environment with tools like Neovim, Python, Node.js, and more, all pre-configured for seamless use.
 
 ## Prerequisites
 
-- Docker installed on your system
-- Docker Compose (usually included with Docker Desktop)
+- **Docker Engine 20.10+**: Required to build and run containers. Install from [docker.com](https://www.docker.com/).
+- **Docker Compose 2.0+**: Used for multi-container orchestration. Note: `docker-compose` (standalone tool, v1.x) vs. `docker compose` (integrated plugin in Docker CLI, v2.0+). This setup uses the modern `docker compose` (v2.0+), which is faster and integrated. If you have Docker Desktop, it's included; otherwise, ensure your Docker installation supports it.
 
 ## Building the Image
 
-From the docker directory, run:
+From the `docker/` directory:
 
 ```bash
-docker-compose build
+docker compose build
 ```
 
-This will:
-1. Build the Docker image using the Dockerfile
-2. Install all development tools and dependencies
-3. Set up Neovim with plugins and language servers
-4. Configure the development environment
+This command:
+- Builds the Docker image using the `Dockerfile`.
+- Installs all tools, dependencies, and configurations.
+- May take several minutes on first run.
 
-### Rebuilding from Scratch
-
-If you need to rebuild the image completely from scratch (ignoring all cached layers):
+For a full rebuild (ignoring cache):
 
 ```bash
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
-This is useful when:
-- You've made significant changes to the Dockerfile
-- You want to ensure all packages are updated to their latest versions
-- You're experiencing build issues that might be related to cached layers
-- You want to force a complete rebuild
+Use this if you've updated the `Dockerfile` or need fresh installs.
 
-Note: This will take longer than a regular build as it downloads and installs everything fresh.
+## Running the Image in the Background
 
-## Running the Container
-
-### Interactive Mode
-
-To start an interactive shell in the container:
+Start the container in detached mode:
 
 ```bash
-docker-compose run --rm dev
+docker compose up -d dev
 ```
 
-This will:
-- Start the container with zsh as the default shell
-- Mount your dotfiles repository at `/home/leodev/gitrepo/leo_dotfiles`
-- Mount the `andromeda` directory at `/home/leodev/andromeda` (if it exists)
-- Set up display forwarding for GUI applications
-- Use host networking for convenient git/ssh access
+- Runs the container in the background.
+- Mounts your dotfiles and workspace directories.
+- Enables host networking for git/SSH access.
 
-### Background Mode
-
-To run the container in the background:
+Check if it's running:
 
 ```bash
-docker-compose up -d dev
+docker compose ps
 ```
 
-### Accessing the Running Container
+## Accessing and Using the Background Container
 
-If running in background, attach to it:
+### Running a Shell
+
+From the host, execute a shell in the running container:
 
 ```bash
-docker attach dot-dev
+docker exec -it dot-dev zsh
 ```
 
-To detach without stopping: `Ctrl+P` then `Ctrl+Q`
+Or using compose:
+
+```bash
+docker compose exec dev zsh
+```
+
+This opens an interactive shell (zsh) inside the container.
+
+### Running Neovim
+
+Edit files directly from the host:
+
+```bash
+docker exec -it dot-dev nvim /path/to/file
+```
+
+Or from inside the container (after accessing via shell):
+
+```bash
+nvim /path/to/file
+```
+
+Neovim is pre-configured with plugins and language servers.
+
+### Running Opencode
+
+Assuming Opencode is available in the container, run it similarly:
+
+```bash
+docker exec -it dot-dev opencode
+```
+
+Or from the container shell:
+
+```bash
+opencode
+```
+
+## What's Included
+
+- **Base System**: Ubuntu 24.04 with zsh and Oh My Zsh.
+- **Editor**: Neovim 0.11.2 with plugins and language servers.
+- **Languages**: Python 3, Node.js 20.13.1.
+- **Tools**: Build tools, search tools, git, language servers, Opencode AI.
 
 ## Directory Structure
 
-Inside the container:
-- `/home/leodev/gitrepo/leo_dotfiles` - Your dotfiles repository (mounted)
-- `/home/leodev/andromeda` - Additional workspace directory (mounted)
-- `/home/leodev/.config/nvim` - Neovim configuration (symlinked to dotfiles)
-- `/home/leodev/.cache` - Persistent cache directory
-
-## Usage Tips
-
-1. **File Changes**: Any changes made to mounted directories persist on your host
-2. **Package Installation**: Use `pipx` for Python tools, `npm -g` for Node.js tools
-3. **Neovim**: All plugins and language servers are pre-installed and ready to use
-4. **Git**: Host networking allows seamless git operations and SSH key usage
-5. **GUI Applications**: Display forwarding is configured for tools that need GUI
+- `/home/leodev/gitrepo/leo_dotfiles`: Mounted dotfiles repo.
+- `/home/leodev/andromeda`: Mounted workspace.
+- `/home/leodev/.config/nvim`: Neovim config.
+- `/home/leodev/.cache`: Persistent cache.
 
 ## Stopping and Cleanup
 
 Stop the container:
+
 ```bash
-docker-compose down
+docker compose down
 ```
 
-Remove the container and image:
+Remove everything:
+
 ```bash
-docker-compose down --rmi all
+docker compose down --rmi all
 ```
-
-## Customization
-
-To modify the development environment:
-1. Edit the `Dockerfile` to add new tools or change versions
-2. Modify `docker-compose.yml` to change mount points or environment variables
-3. Update your dotfiles in the mounted repository to customize shell/editor config
 
 ## Troubleshooting
 
-- **Permission Issues**: The container runs as user `leodev` with sudo access
-- **Network Issues**: Host networking should resolve most connectivity problems
-- **Display Issues**: Ensure your DISPLAY environment variable is set correctly
-- **Volume Mounts**: Make sure the source directories exist on your host system
+- Check logs: `docker compose logs dev`
+- Restart: `docker compose restart dev`
+- Ensure prerequisites are met and directories exist.
