@@ -170,6 +170,10 @@ DOT="$HOME/gitrepo/dotfiles"
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
 alias vim=nvim
 alias dotupdate="dotupdate.sh"
+# Docker devenv
+alias dshell="docker exec -it dot-dev zsh"
+alias dvim="docker exec -it dot-dev nvim"
+alias dopencode="docker exec -it dot-dev opencode"
 
 if [ -f "$HOME/.keys" ]; then
     source "$HOME/.keys"
