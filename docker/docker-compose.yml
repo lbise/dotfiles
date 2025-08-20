@@ -5,7 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: dot-dev
     working_dir: /home/leodev
-    command: zsh
+    command: sleep infinity
+    tty: true
+    stdin_open: true
     volumes:
        - /home/13lbise/gitrepo/leo_dotfiles:/home/leodev/gitrepo/leo_dotfiles:rw
        - /home/13lbise/andromeda:/home/leodev/andromeda:rw
