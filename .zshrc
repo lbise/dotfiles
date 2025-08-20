@@ -173,6 +173,7 @@ alias dotupdate="dotupdate.sh"
 # Docker devenv
 devenv_img="ch03git.phonak.com/13lbise/devenv:latest"
 devenv_name="devenv"
+alias dbuild="docker compose -f ~/gitrepo/leo_dotfiles/docker/docker-compose.build.yml build"
 alias dpush="docker push $devenv_img"
 alias dpull="docker pull $devenv_img"
 alias dshell="docker exec -it $devenv_name zsh"

@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ch03git.phonak.com/13lbise/devenv:latest
     container_name: devenv
     working_dir: /home/leodev
     command: sleep infinity
