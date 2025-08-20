@@ -1,15 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "azure/o3",
-  "small_model": "azure/o4-mini",
-  "provider": {
-    "azure": {
-      "options": {
-        "resourceName": "{env:AZURE_RESOURCE_NAME}",
-        "apiKey": "{env:AZURE_API_KEY}"
-      },
-      "models": {}
-    }
-  },
+  "model": "github-copilot/claude-sonnet-4",
+  "small_model": "github-copilot/gpt-4.1",
   "share": "disabled"
 }
