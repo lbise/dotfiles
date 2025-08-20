@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dot-dev
+    container_name: devenv
     working_dir: /home/leodev
     command: sleep infinity
     tty: true
