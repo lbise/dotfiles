@@ -43,12 +43,11 @@ USER ${UNAME}
 WORKDIR /home/${UNAME}
 
 # ---------- Neovim ---------------------------------------
-ENV NVIM_VERSION="0.11.2"
+ENV NVIM_VERSION="0.11.3"
 
-# Copy Neovim tarball from repo into image and install
 ENV NVIM_DST="/home/${UNAME}/.bin"
 RUN mkdir -p ${NVIM_DST}
-COPY archives/nvim-${NVIM_VERSION}-linux-x86_64.tar.gz /home/${UNAME}/nvim.tar.gz
+RUN wget -q "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-x86_64.tar.gz" -O /home/${UNAME}/nvim.tar.gz
 RUN tar -xf /home/${UNAME}/nvim.tar.gz -C ${NVIM_DST} \
     && rm /home/${UNAME}/nvim.tar.gz
 
@@ -68,9 +67,11 @@ RUN set -eu; \
 
 #---------- Install Neovim plugins ---------------------
 # Temp copy of dotfiles so plugins can be installed
-COPY --chown=${UNAME}:${UNAME} ./nvim /home/${UNAME}/gitrepo/leo_dotfiles/nvim
+RUN mkdir -p /home/${UNAME}/gitrepo
+RUN git clone "https://github.com/lbise/dotfiles.git" "gitrepo/leo_dotfiles"
+# COPY --chown=${UNAME}:${UNAME} /home/${UNAME}/gitrepo/leo_dotfiles/nvim
 RUN mkdir -p /home/${UNAME}/.local/share/nvim
-RUN ls /home/${UNAME}/gitrepo/leo_dotfiles
+RUN ls /home/${UNAME}/.bin
 
 # First ensure the plugin manager is bootstrapped, then sync plugins
 RUN nvim --headless "+Lazy! sync" +qa
