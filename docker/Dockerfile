@@ -24,6 +24,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
   && rm -rf /var/lib/apt/lists/*
 
+# Install fzf documentation files that Oh My Zsh requires
+# Download fzf source to get the key-bindings.zsh file
+RUN mkdir -p /tmp/fzf && \
+    cd /tmp/fzf && \
+    git clone --depth 1 https://github.com/junegunn/fzf.git . && \
+    mkdir -p /usr/share/doc/fzf/examples && \
+    cp shell/key-bindings.zsh /usr/share/doc/fzf/examples/ && \
+    cd / && rm -rf /tmp/fzf
+
 # ---------- Opencode ----------------------------------------------
 RUN npm install -g opencode-ai
 
