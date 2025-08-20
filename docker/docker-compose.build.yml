@@ -12,10 +12,7 @@ services:
     volumes:
        - /home/13lbise/gitrepo/leo_dotfiles:/home/leodev/gitrepo/leo_dotfiles:rw
        - /home/13lbise/andromeda:/home/leodev/andromeda:rw
-       - dotdev-cache:/home/leodev/.cache
     environment:
       - DISPLAY=${DISPLAY}
       - TERM=${TERM}
     network_mode: host  # reuse host network for git / ssh convenience
-volumes:
-  dotdev-cache:
