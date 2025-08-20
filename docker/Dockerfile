@@ -51,6 +51,10 @@ RUN set -eux; \
 USER ${UNAME}
 WORKDIR /home/${UNAME}
 
+# ---------- Opencode ----------------------------------------------
+# Run opencode so packages are retrieved and cached
+RUN opencode run "test"
+
 # ---------- Neovim ---------------------------------------
 ENV NVIM_VERSION="0.11.3"
 
