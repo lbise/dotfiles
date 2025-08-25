@@ -1,0 +1,49 @@
+# Symbolic link configuration
+symlinks:
+  # Core dotfiles that always get linked
+  core:
+    ".vimrc": ".vimrc"
+    "vim": ".vim"
+    ".zshrc": ".zshrc"
+    ".bashrc": ".bashrc"
+    ".ctags": ".ctags"
+    "scripts": ".scripts"
+    ".gdbinit": ".gdbinit"
+    ".gdbinit.d": ".gdbinit.d"
+    ".tmux.conf": ".tmux.conf"
+    "tmux": ".tmux"
+    ".clang-format": ".clang-format"
+    ".aider.conf.yml": ".aider.conf.yml"
+
+  # Config directory files
+  config:
+    "nvim": ".config/nvim"
+    "ruff": ".config/ruff"
+    "ghostty": ".config/ghostty"
+    "opencode.json": ".config/opencode/opencode.json"
+
+  # GPG configuration
+  gpg:
+    "gpg/gpg.conf": ".gnupg/gpg.conf"
+    "gpg/gpg-agent.conf": ".gnupg/gpg-agent.conf"
+
+  # Git configuration (conditional)
+  git:
+    work: ".gitconfigwork"
+    default: ".gitconfig"
+
+  # Application desktop files
+  applications:
+    "ghostty/ghostty.desktop": ".local/share/applications/ghostty.desktop"
+
+# Directories that need to be created if they don't exist
+required_directories:
+  - ".config"
+  - ".config/opencode"
+  - ".gnupg"
+  - ".local/share/applications"
+
+# Directory permissions
+directory_permissions:
+  ".gnupg": "700"
+  ".ssh": "700"

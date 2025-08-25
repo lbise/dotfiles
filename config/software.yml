@@ -1,0 +1,54 @@
+# Software installation configuration
+software:
+  nodejs:
+    version: "20.13.1"
+    platform_template: "node-v{version}-linux-x64"
+    archive_extension: ".tar.xz"
+    install_path: "$HOME/.bin"
+    binary_path: "bin/node"
+    version_check:
+      command: "{install_path}/{platform_template}/bin/node -v"
+      regex: "^v([0-9]+\\.[0-9]+\\.[0-9]+)"
+    source_dir: "archives"
+
+  neovim:
+    version: "0.11.2"
+    platform_template: "nvim-linux-x86_64"
+    archive_template: "nvim-{version}-linux-x86_64"
+    archive_extension: ".tar.gz"
+    install_path: "$HOME/.bin"
+    binary_path: "bin/nvim"
+    version_check:
+      command: "{install_path}/{platform_template}/bin/nvim -v"
+      regex: "^NVIM v([0-9]+\\.[0-9]+\\.[0-9]+)"
+    source_dir: "archives"
+    pre_install:
+      - "killall nvim || true"
+
+  git_credential_manager:
+    archive: "archives/gcm-linux_amd64.2.5.0.deb"
+    check_path: "/usr/local/bin/git-credential-manager"
+    install_command: "sudo dpkg -i {archive}"
+    post_install:
+      - "pass init {gpg_keyid}"
+    conditions:
+      - "not work_install"
+
+  oh_my_zsh:
+    check_path: "$HOME/.oh-my-zsh"
+    install_command: 'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'
+
+  neovim_plugins:
+    source_template: "/mnt/ch03pool/murten_mirror/shannon/packages/bootstrap/nvim_plugins_{md5}.tar.gz"
+    destination: "$HOME/.local/share"
+    check_file: "{destination}/nvim_plugins_installed.txt"
+    vim_plugins:
+      source: "vim_plugins/*"
+      destination: "vim/pack/my-plugins/start"
+    conditions:
+      - "copy_vim"
+
+# Global software configuration
+global:
+  gpg_keyid: "ED0DFB79FF83B277"
+  plugins_md5_file: "archives/plugins.md5"

@@ -1,0 +1,71 @@
+# Environment-specific configurations
+environments:
+  # Docker environment - minimal installation
+  docker:
+    skip_software: true
+    skip_keys: true
+    packages: ["common"]
+    symlinks: ["core", "config"]
+    wsl_only: true
+
+  # WSL (Windows Subsystem for Linux) environment
+  wsl:
+    windows_terminal:
+      enabled: true
+      source: "win/winterm.settings.json"
+      destination_template: "{winhome}/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json"
+    detection:
+      file: "/proc/version"
+      pattern: "microsoft"
+
+  # Work environment
+  work:
+    git_config: "work"
+    skip_gcm: true
+    shell_change: false
+
+  # Development environment profiles
+  profiles:
+    minimal:
+      description: "Minimal installation - symlinks only"
+      skip_packages: true
+      skip_software: true
+      skip_keys: true
+      symlinks: ["core"]
+
+    developer:
+      description: "Full developer setup"
+      packages: ["all"]
+      software: ["nodejs", "neovim", "oh_my_zsh"]
+      symlinks: ["all"]
+
+    server:
+      description: "Server environment - no GUI tools"
+      packages: ["common"]
+      software: ["oh_my_zsh"]
+      symlinks: ["core", "config"]
+      skip_applications: true
+
+# Key management per user
+key_management:
+  users:
+    "13lbise":
+      ssh_key: "id_ed25519_git_sonova"
+      gpg_private: "sonova_private.pgp"
+      gpg_public: "sonova_public.pgp"
+    "leo":
+      ssh_key: "id_rsa"
+      gpg_private: "private.pgp"
+      gpg_public: "public.pgp"
+
+  # Key source paths
+  sources:
+    ssh_dir: "/mnt/c/Users/13lbise/OneDrive - Sonova/.ssh"
+    gpg_dir: "/mnt/c/Users/13lbise/OneDrive - Sonova/.gnupg"
+
+  # File permissions
+  permissions:
+    ssh_private: "600"
+    ssh_public: "644"
+    gpg_private: "600"
+    gpg_public: "644"

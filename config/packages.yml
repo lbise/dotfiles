@@ -1,0 +1,58 @@
+# Package configuration for different operating systems
+packages:
+  common: &common_packages
+    - zsh
+    - fzf
+    - ripgrep
+    - gzip
+    - tmux
+    - curl
+    - wget
+    - unzip
+    - tar
+    - npm
+    - pass
+
+  ubuntu:
+    base: *common_packages
+    additional:
+      - fd-find
+      - pinentry-tty
+      - build-essential
+      - gdb
+    version_specific:
+      "20.04":
+        - ctags
+      "22.04":
+        - universal-ctags
+      "24.04":
+        - python3.12-venv
+
+  macos:
+    base: *common_packages
+    additional:
+      - fd
+      - gpg
+      - universal-ctags
+      - nvim
+    fonts:
+      - font-jetbrains-mono-nerd-font
+
+  arch:
+    base: *common_packages
+    additional:
+      - ctags
+
+# Package manager commands per OS
+package_managers:
+  ubuntu:
+    update: "sudo apt update"
+    install: "sudo apt install -y"
+  macos:
+    update: "brew update -v"
+    upgrade: "brew upgrade -v"
+    install: "brew install"
+    font_tap: "brew tap homebrew/cask-fonts"
+  arch:
+    update: "sudo pacman -Syu"
+    install: "sudo pacman -S --needed"
