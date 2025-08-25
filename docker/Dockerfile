@@ -2,10 +2,16 @@
 
 FROM ubuntu:24.04
 
+# ---------- Build arguments -----------------------------------------
+ARG UID=949479682
+ARG GID=3280
+ARG AZURE_RESOURCE_NAME="AZURE_RESOURCE_NAME_UNSET"
+ARG AZURE_API_KEY="AZURE_API_KEY_UNSET"
+
 # ---------- Base image preparation -----------------------------------------
 ENV \
-    UID="1000" \
-    GID="1000" \
+    UID="${UID}" \
+    GID="${GID}" \
     UNAME="leodev" \
     SHELL="/bin/zsh" \
     TZ=UTC \
@@ -13,7 +19,8 @@ ENV \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
 
-RUN useradd -m -s "${SHELL}" "${UNAME}" \
+RUN groupadd -g "${GID}" "${UNAME}" \
+    && useradd -m -u "${UID}" -g "${GID}" -s "${SHELL}" "${UNAME}" \
     && echo "${UNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv pipx \
     ripgrep fd-find fzf npm \
     xz-utils \
+    xclip \
   && rm -rf /var/lib/apt/lists/*
 
 # Install fzf documentation files that Oh My Zsh requires
@@ -53,7 +61,11 @@ WORKDIR /home/${UNAME}
 
 # ---------- Opencode ----------------------------------------------
 # Run opencode so packages are retrieved and cached
-RUN opencode run "test"
+# This is not perfect, as it seems not all dependencies are loaded this way
+RUN mkdir -p /home/${UNAME}/.local/share/opencode
+COPY --chown=${UID}:${GID} auth.json /home/${UNAME}/.local/share/opencode
+RUN opencode -m azure/o3 run "test"
+#RUN opencode -m github-copilot/gpt-4.1 run "test"
 
 # ---------- Neovim ---------------------------------------
 ENV NVIM_VERSION="0.11.3"
@@ -82,7 +94,6 @@ RUN set -eu; \
 # Temp copy of dotfiles so plugins can be installed
 RUN mkdir -p /home/${UNAME}/gitrepo
 RUN git clone "https://github.com/lbise/dotfiles.git" "gitrepo/leo_dotfiles"
-# COPY --chown=${UNAME}:${UNAME} /home/${UNAME}/gitrepo/leo_dotfiles/nvim
 RUN mkdir -p /home/${UNAME}/.local/share/nvim
 RUN ls /home/${UNAME}/.bin
 

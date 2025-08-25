@@ -14,4 +14,5 @@ services:
       - TERM=${TERM}
       - AZURE_RESOURCE_NAME=${AZURE_RESOURCE_NAME}
       - AZURE_API_KEY=${AZURE_API_KEY}
+      - GITHUB_COPILOT_TOKEN=${GITHUB_COPILOT_TOKEN}
     network_mode: host  # reuse host network for git / ssh convenience

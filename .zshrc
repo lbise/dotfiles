@@ -181,6 +181,7 @@ alias dpull="docker pull $devenv_img"
 alias dshell="docker exec -it $devenv_name zsh"
 alias dvim="docker exec -it $devenv_name nvim"
 alias dopencode="docker exec -it $devenv_name opencode"
+alias dexec="docker exec -it $devenv_name"
 
 if [ -f "$HOME/.keys" ]; then
     source "$HOME/.keys"
