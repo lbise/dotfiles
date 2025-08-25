@@ -15,36 +15,37 @@
     "copyFormatting": "none",
     "copyOnSelect": false,
     "defaultProfile": "{e381fe40-9d15-58b7-99ea-5908cd6561e5}",
+    "firstWindowPreference": "persistedWindowLayout",
     "focusFollowMouse": true,
     "keybindings": 
     [
-        {
-            "id": null,
-            "keys": "ctrl+shift+home"
-        },
         {
             "id": "Terminal.SwitchToTab6",
             "keys": "ctrl+shift+7"
         },
         {
             "id": null,
-            "keys": "ctrl+up"
+            "keys": "ctrl+shift+home"
         },
         {
             "id": "Terminal.OpenNewTabProfile0",
             "keys": "ctrl+alt+1"
         },
         {
+            "id": null,
+            "keys": "ctrl+up"
+        },
+        {
             "id": "Terminal.MoveFocusLeft",
             "keys": "ctrl+shift+h"
         },
         {
-            "id": "User.switchToTab.ED268D78",
-            "keys": "ctrl+shift+9"
-        },
-        {
             "id": "Terminal.MoveFocusRight",
             "keys": "ctrl+shift+l"
+        },
+        {
+            "id": "User.switchToTab.ED268D78",
+            "keys": "ctrl+shift+9"
         },
         {
             "id": "Terminal.FindText",
@@ -59,40 +60,40 @@
             "keys": "alt+shift+h"
         },
         {
-            "id": "Terminal.OpenNewTabProfile1",
-            "keys": "ctrl+alt+2"
-        },
-        {
             "id": "Terminal.OpenNewTabProfile8",
             "keys": "ctrl+alt+9"
         },
         {
-            "id": "Terminal.DuplicatePaneDown",
-            "keys": "ctrl+shift+e"
+            "id": "Terminal.OpenNewTabProfile1",
+            "keys": "ctrl+alt+2"
         },
         {
             "id": "Terminal.OpenNewTabProfile2",
             "keys": "ctrl+alt+3"
         },
         {
-            "id": null,
-            "keys": "ctrl+down"
+            "id": "Terminal.DuplicatePaneDown",
+            "keys": "ctrl+shift+e"
         },
         {
             "id": "Terminal.MoveFocusDown",
             "keys": "ctrl+shift+j"
         },
         {
-            "id": "Terminal.ResizePaneUp",
-            "keys": "alt+shift+k"
+            "id": null,
+            "keys": "ctrl+down"
+        },
+        {
+            "id": "Terminal.SwitchToTab7",
+            "keys": "ctrl+shift+8"
         },
         {
             "id": "Terminal.TogglePaneZoom",
             "keys": "ctrl+shift+r"
         },
         {
-            "id": "Terminal.SwitchToTab7",
-            "keys": "ctrl+shift+8"
+            "id": "Terminal.ResizePaneUp",
+            "keys": "alt+shift+k"
         },
         {
             "id": "Terminal.DuplicatePaneRight",
@@ -107,16 +108,16 @@
             "keys": "ctrl+pgdn"
         },
         {
-            "id": "Terminal.OpenNewTabProfile3",
-            "keys": "ctrl+alt+4"
+            "id": "Terminal.OpenNewTabProfile6",
+            "keys": "ctrl+alt+7"
         },
         {
             "id": "Terminal.ScrollUpPage",
             "keys": "ctrl+pgup"
         },
         {
-            "id": "Terminal.OpenNewTabProfile6",
-            "keys": "ctrl+alt+7"
+            "id": "Terminal.OpenNewTabProfile3",
+            "keys": "ctrl+alt+4"
         },
         {
             "id": "Terminal.SwitchToTab5",
@@ -127,28 +128,28 @@
             "keys": "ctrl+shift+k"
         },
         {
-            "id": "Terminal.ResizePaneDown",
-            "keys": "alt+shift+j"
-        },
-        {
             "id": "Terminal.ClosePane",
             "keys": "ctrl+shift+q"
         },
         {
-            "id": "Terminal.ScrollToBottom",
-            "keys": "ctrl+end"
+            "id": "Terminal.ResizePaneDown",
+            "keys": "alt+shift+j"
         },
         {
             "id": "Terminal.ResizePaneRight",
             "keys": "alt+shift+l"
         },
         {
-            "id": null,
-            "keys": "ctrl+shift+pgup"
+            "id": "Terminal.ScrollToBottom",
+            "keys": "ctrl+end"
         },
         {
             "id": null,
             "keys": "ctrl+shift+pgdn"
+        },
+        {
+            "id": null,
+            "keys": "ctrl+shift+pgup"
         },
         {
             "id": null,
@@ -171,12 +172,12 @@
             "keys": "ctrl+shift+4"
         },
         {
-            "id": "Terminal.SwitchToTab4",
-            "keys": "ctrl+shift+5"
-        },
-        {
             "id": "Terminal.SwitchToTab1",
             "keys": "ctrl+shift+2"
+        },
+        {
+            "id": "Terminal.SwitchToTab4",
+            "keys": "ctrl+shift+5"
         },
         {
             "id": "Terminal.OpenNewTabProfile5",
@@ -205,11 +206,11 @@
     {
         "defaults": 
         {
-            "colorScheme": "One Dark",
+            "colorScheme": "Tokyo Night Storm",
             "font": 
             {
-                "face": "JetBrainsMono Nerd Font",
-                "size": 12
+                "face": "IosevkaTerm Nerd Font",
+                "size": 14
             },
             "padding": "0"
         },
@@ -225,7 +226,7 @@
                 {
                     "light": "One Dark"
                 },
-                "commandline": "wsl",
+                "commandline": "wsl ~",
                 "guid": "{e381fe40-9d15-58b7-99ea-5908cd6561e5}",
                 "hidden": false,
                 "icon": "\\\\wsl.localhost\\Ubuntu-22.04\\home\\13lbise\\gitrepo\\leo_dotfiles\\pictures\\WindowsTerminal\\ubuntu-logo32.png",
@@ -283,13 +284,29 @@
                 "name": "Windows PowerShell"
             },
             {
+                "altGrAliasing": true,
+                "antialiasingMode": "grayscale",
+                "closeOnExit": "automatic",
                 "colorScheme": 
                 {
                     "light": "One Dark"
                 },
+                "commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+                "cursorShape": "bar",
+                "elevate": true,
+                "guid": "{cb7acf8e-4670-4990-a2da-79a184f32119}",
+                "hidden": false,
+                "historySize": 9001,
+                "icon": "ms-appx:///ProfileIcons/{61c54bbd-c2c6-5271-96e7-009a87ff44bf}.png",
+                "name": "Windows PowerShell (admin)",
+                "snapOnInput": true,
+                "startingDirectory": "%USERPROFILE%",
+                "useAcrylic": false
+            },
+            {
                 "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
-                "hidden": true,
-                "name": "Invite de commandes"
+                "hidden": false,
+                "name": "Command Prompt"
             }
         ]
     },
