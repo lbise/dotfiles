@@ -63,7 +63,7 @@ WORKDIR /home/${UNAME}
 # Run opencode so packages are retrieved and cached
 # This is not perfect, as it seems not all dependencies are loaded this way
 RUN mkdir -p /home/${UNAME}/.local/share/opencode
-COPY --chown=${UID}:${GID} auth.json /home/${UNAME}/.local/share/opencode
+#COPY --chown=${UID}:${GID} auth.json /home/${UNAME}/.local/share/opencode
 RUN opencode -m azure/o3 run "test"
 #RUN opencode -m github-copilot/gpt-4.1 run "test"
 
@@ -82,20 +82,17 @@ ENV PATH="${NVIM_DST}/nvim-linux-x86_64/bin:${PATH}"
 # ---------- Oh My Zsh ----------------------------------------------
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
-# ---------- Symlinks ---------------------
-ENV XDG_CONFIG_HOME="/home/${UNAME}/.config"
-RUN set -eu; \
-    ln -sf /home/${UNAME}/gitrepo/leo_dotfiles/.zshrc /home/${UNAME}/.zshrc; \
-    mkdir -p ${XDG_CONFIG_HOME}/opencode; \
-    ln -sf /home/${UNAME}/gitrepo/leo_dotfiles/opencode.json ${XDG_CONFIG_HOME}/opencode/opencode.json; \
-    ln -sf /home/${UNAME}/gitrepo/leo_dotfiles/nvim ${XDG_CONFIG_HOME}/nvim
-
-#---------- Install Neovim plugins ---------------------
-# Temp copy of dotfiles so plugins can be installed
+# ---------- Setup dotfiles symlinks using YAML-driven system ---------------------
+# Temp copy of dotfiles so the YAML system can be used
 RUN mkdir -p /home/${UNAME}/gitrepo
 RUN git clone "https://github.com/lbise/dotfiles.git" "gitrepo/leo_dotfiles"
+
+# Use the new YAML-driven symlink setup with minimal profile (perfect for Docker)
+RUN cd /home/${UNAME}/gitrepo/leo_dotfiles && \
+    ./install-yaml.sh --profile minimal
+
+#---------- Install Neovim plugins ---------------------
 RUN mkdir -p /home/${UNAME}/.local/share/nvim
-RUN ls /home/${UNAME}/.bin
 
 # First ensure the plugin manager is bootstrapped, then sync plugins
 RUN nvim --headless "+Lazy! sync" +qa
@@ -103,4 +100,7 @@ RUN nvim --headless "+Lazy! sync" +qa
 # Install Mason tools after plugins are available
 RUN nvim --headless "+MasonInstall clangd clang-format pyright ruff@0.11.2 bash-language-server lua-language-server stylua" +qa
 
+# Clean up the temporary clone again
 RUN rm -rf /home/${UNAME}/gitrepo/leo_dotfiles
+
+RUN echo "Run dshell, opencode auth login and login to get depencencies for github copilot"

@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# Complete Docker-friendly installation script
+# Complete Docker-friendly installation script using YAML config
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "Starting Docker-friendly dotfiles installation..."
+echo "Starting Docker-friendly dotfiles installation using YAML config..."
 
-# First install packages
-"$SCRIPT_DIR/docker-install-packages.sh"
+# Use the new YAML-driven system with minimal profile (perfect for Docker)
+cd "$DOTFILES_DIR"
+./install-yaml.sh --profile minimal --wslonly
 
-# Then setup symlinks
-"$SCRIPT_DIR/docker-setup-symlinks.sh"
-
-echo "Docker installation completed!"
+echo "YAML-driven Docker installation completed!"

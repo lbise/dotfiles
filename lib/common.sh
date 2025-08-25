@@ -7,7 +7,7 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$LIB_DIR")"
 
 # Common command aliases
-RM_RF="sudo rm -rf"
+RM_RF="rm -rf"
 LN_SF="ln -sf"
 SH_C="sh -c"
 CHSH_S="chsh -s"
@@ -63,7 +63,7 @@ apply_test_mode() {
     fi
 
     if [ "$LINK_ONLY" = 1 ]; then
-        RM_RF="sudo rm -rf"
+        RM_RF="rm -rf"
         LN_SF="ln -sf"
     fi
 }
