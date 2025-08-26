@@ -7,10 +7,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 create_required_directories() {
     print_section "Creating required directories"
-    
+
     # Get required directories from config
     local dirs=$(get_yaml_array "symlinks.yml" "required_directories")
-    
+
     while IFS= read -r dir; do
         if [ -n "$dir" ]; then
             local full_path="$HOME/$dir"
@@ -20,7 +20,7 @@ create_required_directories() {
             fi
         fi
     done <<< "$dirs"
-    
+
     # Set directory permissions
     $CHMOD 700 "$HOME/.gnupg" 2>/dev/null || true
     if [ -d "$HOME/.ssh" ]; then
@@ -31,7 +31,7 @@ create_required_directories() {
 remove_existing_symlinks() {
     print_section "Removing existing dotfiles"
     $X_ON
-    
+
     # Remove core symlinks
     local core_links=$(get_symlinks "core")
     while IFS='|' read -r source target; do
@@ -39,7 +39,7 @@ remove_existing_symlinks() {
             $RM_RF "$HOME/$target"
         fi
     done <<< "$core_links"
-    
+
     # Remove config symlinks
     local config_links=$(get_symlinks "config")
     while IFS='|' read -r source target; do
@@ -47,7 +47,7 @@ remove_existing_symlinks() {
             $RM_RF "$HOME/$target"
         fi
     done <<< "$config_links"
-    
+
     # Remove other categories
     for category in gpg applications; do
         local links=$(get_symlinks "$category")
@@ -57,14 +57,14 @@ remove_existing_symlinks() {
             fi
         done <<< "$links"
     done
-    
+
     $X_OFF
 }
 
 create_symlinks_from_config() {
     print_section "Creating symbolic links from YAML config"
     $X_ON
-    
+
     # Create core symlinks
     local core_links=$(get_symlinks "core")
     while IFS='|' read -r source target; do
@@ -73,7 +73,7 @@ create_symlinks_from_config() {
             $LN_SF "$DOTFILES_DIR/$source" "$HOME/$target"
         fi
     done <<< "$core_links"
-    
+
     # Create config symlinks
     local config_links=$(get_symlinks "config")
     while IFS='|' read -r source target; do
@@ -82,14 +82,14 @@ create_symlinks_from_config() {
             $LN_SF "$DOTFILES_DIR/$source" "$HOME/$target"
         fi
     done <<< "$config_links"
-    
+
     # Handle git config (conditional)
     if [ "$WORK_INSTALL" = 1 ]; then
         $LN_SF "$DOTFILES_DIR/.gitconfigwork" "$HOME/.gitconfig"
     else
         $LN_SF "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
     fi
-    
+
     # Create GPG symlinks
     local gpg_links=$(get_symlinks "gpg")
     while IFS='|' read -r source target; do
@@ -98,7 +98,7 @@ create_symlinks_from_config() {
             $LN_SF "$DOTFILES_DIR/$source" "$HOME/$target"
         fi
     done <<< "$gpg_links"
-    
+
     # Create application symlinks (if directory exists)
     if [ -d "$HOME/.local/share/applications" ]; then
         local app_links=$(get_symlinks "applications")
@@ -109,7 +109,7 @@ create_symlinks_from_config() {
             fi
         done <<< "$app_links"
     fi
-    
+
     $X_OFF
 }
 

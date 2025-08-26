@@ -25,6 +25,7 @@ local config = {
 	},
 	{
 		"CopilotC-Nvim/CopilotChat.nvim",
+		enabled = false,
 		dependencies = {
 			{ "zbirenbaum/copilot.lua" },
 			{ "nvim-lua/plenary.nvim", branch = "master" }, -- for curl, log and async functions
@@ -38,6 +39,7 @@ local config = {
 	},
 	{
 		"olimorris/codecompanion.nvim",
+		enabled = false,
 		dependencies = {
 			"nvim-lua/plenary.nvim",
 			"nvim-treesitter/nvim-treesitter",
