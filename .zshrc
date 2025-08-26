@@ -173,15 +173,45 @@ alias dotupdate="dotupdate.sh"
 # Docker devenv
 devenv_img="ch03git.phonak.com/13lbise/devenv:latest"
 devenv_name="devenv"
-alias dbuild="docker compose -f ~/gitrepo/leo_dotfiles/docker/docker-compose.build.yml build"
-alias dup="docker compose -f ~/gitrepo/leo_dotfiles/docker/docker-compose.run.yml up -d"
-alias ddown="docker compose -f ~/gitrepo/leo_dotfiles/docker/docker-compose.run.yml down -d"
+devenv_dotfiles="~/gitrepo/leo_dotfiles"
+
+# Docker compose shortcuts
+alias dbuild="docker compose -f $devenv_dotfiles/docker/docker-compose.build.yml build"
+alias dup="docker compose -f $devenv_dotfiles/docker/docker-compose.run.yml up -d"
+alias ddown="docker compose -f $devenv_dotfiles/docker/docker-compose.run.yml down"
+alias dlogs="docker compose -f $devenv_dotfiles/docker/docker-compose.run.yml logs -f"
+alias drestart="ddown && dup"
+
+# Docker image management
 alias dpush="docker push $devenv_img"
 alias dpull="docker pull $devenv_img"
+alias dbuild-push="$devenv_dotfiles/scripts/devenv_build.sh"
+
+# Container interaction
 alias dshell="docker exec -it $devenv_name zsh"
 alias dvim="docker exec -it $devenv_name nvim"
 alias dopencode="docker exec -it $devenv_name opencode"
 alias dexec="docker exec -it $devenv_name"
+
+# Docker utilities
+alias dps="docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+alias dpsa="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+alias dimages="docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}'"
+alias dclean="docker system prune -f"
+alias dclean-all="docker system prune -af && docker volume prune -f"
+
+# Quick status check
+alias dstatus="echo '=== Running Containers ===' && dps && echo '\n=== Images ===' && dimages"
+
+# Quick container health check
+alias dhealth="docker exec -it $devenv_name ps aux | head -10"
+
+# Copy files to/from container
+alias dcp-to="docker cp" # Usage: dcp-to file.txt devenv:/home/leodev/
+alias dcp-from="docker cp" # Usage: dcp-from devenv:/home/leodev/file.txt ./
+
+# Container resource usage
+alias dstats="docker stats --no-stream"
 
 if [ -f "$HOME/.keys" ]; then
     source "$HOME/.keys"
