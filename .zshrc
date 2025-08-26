@@ -187,11 +187,25 @@ alias dpush="docker push $devenv_img"
 alias dpull="docker pull $devenv_img"
 alias dbuild-push="$devenv_dotfiles/scripts/devenv_build.sh"
 
-# Container interaction
-alias dshell="docker exec -it $devenv_name zsh"
-alias dvim="docker exec -it $devenv_name nvim"
-alias dopencode="docker exec -it $devenv_name opencode"
-alias dexec="docker exec -it $devenv_name"
+# Container interaction functions with smart working directory mapping
+# Helper function to execute commands in container with proper working directory
+_docker_exec_with_workdir() {
+    local host_path="$(pwd)"
+    local container_path="$(echo "$host_path" | sed 's|/home/13lbise|/home/leodev|')"
+
+    # Check if the mapped path exists in container, fallback to /home/leodev if not
+    if docker exec $devenv_name test -d "$container_path" 2>/dev/null; then
+        docker exec -it -w "$container_path" $devenv_name "$@"
+    else
+        docker exec -it -w "/home/leodev" $devenv_name "$@"
+    fi
+}
+
+# Docker container interaction functions
+dshell() { _docker_exec_with_workdir zsh "$@"; }
+dvim() { _docker_exec_with_workdir nvim "$@"; }
+dopencode() { _docker_exec_with_workdir opencode "$@"; }
+dexec() { _docker_exec_with_workdir "$@"; }
 
 # Docker utilities
 alias dps="docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
