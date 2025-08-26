@@ -36,7 +36,8 @@ docker run -d \
   --interactive \
   --network host \
   -e DISPLAY="$DISPLAY" \
-  -e TERM="$TERM" \
+  -e TERM=xterm-256color \
+  -e COLORTERM=truecolor \
   -e http_proxy="$HTTP_PROXY" \
   -e https_proxy="$HTTPS_PROXY" \
   -e no_proxy="$NO_PROXY" \
