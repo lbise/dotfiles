@@ -9,8 +9,11 @@ services:
     volumes:
        - /home/13lbise/gitrepo/leo_dotfiles:/home/leodev/gitrepo/leo_dotfiles:rw
        - /home/13lbise/andromeda:/home/leodev/andromeda:rw
+       - /tmp/.X11-unix:/tmp/.X11-unix:rw
+       - /home/13lbise/.Xauthority:/home/leodev/.Xauthority:ro
     environment:
       - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/home/leodev/.Xauthority
       - TERM=xterm-256color
       - COLORTERM=${COLORTERM:-truecolor}
       - AZURE_RESOURCE_NAME=${AZURE_RESOURCE_NAME}

@@ -36,6 +36,7 @@ docker run -d \
   --interactive \
   --network host \
   -e DISPLAY="$DISPLAY" \
+  -e XAUTHORITY=/home/leodev/.Xauthority \
   -e TERM=xterm-256color \
   -e COLORTERM=truecolor \
   -e http_proxy="$HTTP_PROXY" \
@@ -46,6 +47,8 @@ docker run -d \
   --user "$(id -u):$(id -g)" \
   -v /home/13lbise/gitrepo/leo_dotfiles:/home/leodev/gitrepo/leo_dotfiles:rw \
   -v /home/13lbise/andromeda:/home/leodev/andromeda:rw \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  -v /home/13lbise/.Xauthority:/home/leodev/.Xauthority:ro \
   "$IMAGE" \
   sleep infinity
 
