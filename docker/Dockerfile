@@ -32,6 +32,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xclip \
   && rm -rf /var/lib/apt/lists/*
 
+# ---------- Language Servers ----------------------------------------------
+# Install latest clangd from GitHub releases
+RUN set -eux; \
+    CLANGD_VERSION=$(curl -s https://api.github.com/repos/clangd/clangd/releases/latest | grep '"tag_name"' | cut -d'"' -f4); \
+    wget -q "https://github.com/clangd/clangd/releases/download/${CLANGD_VERSION}/clangd-linux-${CLANGD_VERSION}.zip" -O /tmp/clangd.zip; \
+    unzip -q /tmp/clangd.zip -d /tmp/; \
+    mv /tmp/clangd_${CLANGD_VERSION}/bin/clangd /usr/local/bin/clangd; \
+    chmod +x /usr/local/bin/clangd; \
+    rm -rf /tmp/clangd.zip /tmp/clangd_${CLANGD_VERSION}
+
+# Install pyright via npm
+RUN npm install -g pyright
+
 # Install fzf documentation files that Oh My Zsh requires
 # Download fzf source to get the key-bindings.zsh file
 RUN mkdir -p /tmp/fzf && \
