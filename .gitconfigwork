@@ -76,7 +76,6 @@
 [credential]
 	helper = /usr/local/bin/git-credential-manager
 	credentialStore = gpg
-	guiPrompt = false
 	useHttpPath = true
 [commit]
 	gpgsign = true
