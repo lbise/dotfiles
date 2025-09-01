@@ -147,20 +147,28 @@ install_opencode() {
         mkdir -p "$OPENCODE_BIN_DIR/bin"
     fi
     
+    # Check if cache already exists - if so, preserve it
+    local cache_exists=false
     if [[ -d "$OPENCODE_CACHE_DIR" ]]; then
-        log "Removing old opencode cache..."
-        rm -rf "$OPENCODE_CACHE_DIR"
+        log "Existing opencode cache found at $OPENCODE_CACHE_DIR - preserving it"
+        cache_exists=true
+    else
         mkdir -p "$OPENCODE_CACHE_DIR"
     fi
 
     # Move opencode to installation directories
-    log "Installing opencode cache to $OPENCODE_CACHE_DIR..."
-    # Copy cache directory to ~/.cache/opencode
-    if [[ -d "$extract_dir/.cache/opencode" ]]; then
-        cp -r "$extract_dir/.cache/opencode"/* "$OPENCODE_CACHE_DIR/"
-    elif [[ -d "$extract_dir/.cache" ]]; then
-        # If the structure is different, copy the whole .cache content
-        cp -r "$extract_dir/.cache"/* "$OPENCODE_CACHE_DIR/"
+    # Handle cache installation - only install if cache doesn't already exist
+    if [[ $cache_exists == false ]]; then
+        log "Installing opencode cache to $OPENCODE_CACHE_DIR..."
+        # Copy cache directory to ~/.cache/opencode
+        if [[ -d "$extract_dir/.cache/opencode" ]]; then
+            cp -r "$extract_dir/.cache/opencode"/* "$OPENCODE_CACHE_DIR/"
+        elif [[ -d "$extract_dir/.cache" ]]; then
+            # If the structure is different, copy the whole .cache content
+            cp -r "$extract_dir/.cache"/* "$OPENCODE_CACHE_DIR/"
+        fi
+    else
+        log "Skipping cache installation - preserving existing cache"
     fi
     
     log "Installing opencode configuration to $OPENCODE_INSTALL_DIR..."
@@ -171,7 +179,7 @@ install_opencode() {
         fi
     done
 
-    # Install binary to ~/.opencode/bin/
+    # Install binary to ~/.opencode/bin/ (always update the binary)
     log "Installing opencode binary to $OPENCODE_BIN_DIR/bin/..."
     cp "$extract_dir/.opencode/bin/opencode" "$OPENCODE_BIN_DIR/bin/opencode"
     chmod +x "$OPENCODE_BIN_DIR/bin/opencode"
