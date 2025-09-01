@@ -121,12 +121,16 @@ install_opencode() {
     log "Extracting $archive_name..."
     tar -xzf "$archive_path" -C "$temp_dir"
 
-    # Find the extracted opencode directory
-    local opencode_dir
-    opencode_dir=$(find "$temp_dir" -type d -name "opencode*" | head -1)
-
-    if [[ -z "$opencode_dir" || ! -d "$opencode_dir" ]]; then
-        error "Could not find opencode directory in archive"
+    # The archive extracts to the current directory with .opencode and .cache at root level
+    local extract_dir="$temp_dir"
+    
+    # Verify the required directories exist
+    if [[ ! -d "$extract_dir/.opencode" ]]; then
+        error "Could not find .opencode directory in archive"
+    fi
+    
+    if [[ ! -f "$extract_dir/.opencode/bin/opencode" ]]; then
+        error "Could not find opencode binary at .opencode/bin/opencode"
     fi
 
     # Remove old installation if it exists
@@ -135,7 +139,7 @@ install_opencode() {
         rm -rf "$OPENCODE_INSTALL_DIR"
         mkdir -p "$OPENCODE_INSTALL_DIR"
     fi
-    
+
     if [[ -d "$OPENCODE_BIN_DIR" ]]; then
         log "Removing old opencode binary..."
         rm -rf "$OPENCODE_BIN_DIR"
@@ -144,23 +148,22 @@ install_opencode() {
 
     # Move opencode to installation directories
     log "Installing opencode configuration to $OPENCODE_INSTALL_DIR..."
-    cp -r "$opencode_dir"/* "$OPENCODE_INSTALL_DIR/"
+    # Copy cache and other config files to ~/.local/share/opencode
+    if [[ -d "$extract_dir/.cache" ]]; then
+        cp -r "$extract_dir/.cache" "$OPENCODE_INSTALL_DIR/"
+    fi
     
+    # Copy any other files that might be config-related (excluding .opencode which has the binary)
+    for item in "$extract_dir"/*; do
+        if [[ -f "$item" ]] && [[ $(basename "$item") != "install.sh" ]]; then
+            cp "$item" "$OPENCODE_INSTALL_DIR/"
+        fi
+    done
+
     # Install binary to ~/.opencode/bin/
     log "Installing opencode binary to $OPENCODE_BIN_DIR/bin/..."
-    if [[ -f "$opencode_dir/bin/opencode" ]]; then
-        cp "$opencode_dir/bin/opencode" "$OPENCODE_BIN_DIR/bin/opencode"
-        chmod +x "$OPENCODE_BIN_DIR/bin/opencode"
-    else
-        # Look for alternative binary location
-        local alt_bin=$(find "$opencode_dir" -name "opencode" -type f -executable | head -1)
-        if [[ -n "$alt_bin" ]]; then
-            cp "$alt_bin" "$OPENCODE_BIN_DIR/bin/opencode"
-            chmod +x "$OPENCODE_BIN_DIR/bin/opencode"
-        else
-            error "Could not find opencode binary in archive"
-        fi
-    fi
+    cp "$extract_dir/.opencode/bin/opencode" "$OPENCODE_BIN_DIR/bin/opencode"
+    chmod +x "$OPENCODE_BIN_DIR/bin/opencode"
 
     # Create symlink in PATH
     local opencode_bin="$OPENCODE_BIN_DIR/bin/opencode"
@@ -181,22 +184,22 @@ install_opencode() {
 
 get_latest_clangd_release() {
     log "Fetching latest clangd release info..."
-    
+
     local api_url="https://api.github.com/repos/clangd/clangd/releases/latest"
     local release_info
-    
+
     if ! release_info=$(curl -s "$api_url"); then
         error "Failed to fetch clangd release information"
     fi
-    
+
     # Extract download URL for linux x86_64
     local download_url
     download_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | test("clangd-linux-.*\\.zip$")) | .browser_download_url' | head -1)
-    
+
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
         error "Could not find clangd linux release download URL"
     fi
-    
+
     echo "$download_url"
 }
 
@@ -211,20 +214,20 @@ get_installed_clangd_version() {
 
 install_clangd() {
     log "Installing clangd from GitHub releases..."
-    
+
     # Get download URL
     local download_url
     download_url=$(get_latest_clangd_release)
-    
+
     # Extract version from URL (e.g., clangd-linux-18.1.3.zip)
     local version
     version=$(echo "$download_url" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-    
+
     if [[ -z "$version" ]]; then
         log "⚠ Could not determine clangd version from URL: $download_url"
         version="unknown"
     fi
-    
+
     # Check if already installed
     local installed_version
     installed_version=$(get_installed_clangd_version)
@@ -232,52 +235,52 @@ install_clangd() {
         log "✓ clangd $version is already installed"
         return 0
     fi
-    
+
     # Create installation directory
     mkdir -p "$CLANGD_INSTALL_DIR" "$INSTALL_DIR"
-    
+
     # Create temporary download directory
     local temp_dir
     temp_dir=$(mktemp -d)
     trap "rm -rf '$temp_dir'" RETURN
-    
+
     local zip_file="$temp_dir/clangd.zip"
-    
+
     log "Downloading clangd $version..."
     if ! curl -L -o "$zip_file" "$download_url"; then
         error "Failed to download clangd from $download_url"
     fi
-    
+
     log "Extracting clangd..."
     if ! unzip -q "$zip_file" -d "$temp_dir"; then
         error "Failed to extract clangd archive"
     fi
-    
+
     # Find the clangd binary in the extracted content
     local clangd_bin
     clangd_bin=$(find "$temp_dir" -name "clangd" -type f -executable | head -1)
-    
+
     if [[ -z "$clangd_bin" || ! -f "$clangd_bin" ]]; then
         error "Could not find clangd binary in downloaded archive"
     fi
-    
+
     # Remove old installation if it exists
     if [[ -d "$CLANGD_INSTALL_DIR" ]]; then
         log "Removing old clangd installation..."
         rm -rf "$CLANGD_INSTALL_DIR"
         mkdir -p "$CLANGD_INSTALL_DIR"
     fi
-    
+
     # Install clangd
     log "Installing clangd to $CLANGD_INSTALL_DIR..."
     local clangd_dir
     clangd_dir=$(dirname "$clangd_bin")
     cp -r "$clangd_dir"/* "$CLANGD_INSTALL_DIR/"
-    
+
     # Create symlink in PATH
     local symlink_path="$INSTALL_DIR/clangd"
     local target_bin="$CLANGD_INSTALL_DIR/clangd"
-    
+
     if [[ -f "$target_bin" ]]; then
         log "Creating symlink: $symlink_path -> $target_bin"
         ln -sf "$target_bin" "$symlink_path"
@@ -291,7 +294,7 @@ install_clangd() {
             error "Could not find clangd binary after installation"
         fi
     fi
-    
+
     log "✓ clangd $version installed successfully"
 }
 
