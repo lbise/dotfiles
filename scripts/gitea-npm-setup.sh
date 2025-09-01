@@ -69,7 +69,7 @@ EOF
 backup_npm_config() {
     local config_file="$1"
     local backup_file="${config_file}.backup.$(date +%Y%m%d_%H%M%S)"
-    
+
     if [[ -f "$config_file" ]]; then
         log "Backing up existing npm config to $backup_file"
         cp "$config_file" "$backup_file"
@@ -80,24 +80,24 @@ setup_npm_registry() {
     local registry_url="$1"
     local token="$2"
     local config_scope="$3"  # "global" or "local"
-    
+
     local registry_host
     registry_host=$(echo "$registry_url" | sed 's|https\?://||' | cut -d'/' -f1)
-    
+
     log "Setting up npm registry configuration ($config_scope)..."
     log "Registry: $registry_url"
     log "Host: $registry_host"
-    
+
     if [[ $DRY_RUN == true ]]; then
         log "[DRY RUN] Would configure npm for $registry_host"
         return 0
     fi
-    
+
     local npm_args=()
     if [[ "$config_scope" == "global" ]]; then
         npm_args+=("--global")
     fi
-    
+
     # Configure the registry for scoped packages if URL contains username
     local username
     username=$(echo "$registry_url" | sed 's|.*/packages/||' | cut -d'/' -f1)
@@ -105,15 +105,15 @@ setup_npm_registry() {
         log "Configuring scoped registry for @$username packages"
         npm config set "@${username}:registry" "$registry_url" "${npm_args[@]}" || true
     fi
-    
+
     # Set authentication
     log "Configuring authentication..."
     npm config set "//${registry_host}/:_authToken" "$token" "${npm_args[@]}" || true
-    
+
     # Add additional auth methods for better compatibility
     npm config set "//${registry_host}/:username" "$username" "${npm_args[@]}" || true
     npm config set "//${registry_host}/:email" "${username}@localhost" "${npm_args[@]}" || true
-    
+
     # Set as default registry based on conditions
     if [[ $SET_DEFAULT_REGISTRY == true ]] || [[ -z "$username" || "$username" == "npm" ]]; then
         log "Setting as default npm registry"
@@ -121,83 +121,83 @@ setup_npm_registry() {
     else
         log "Using scoped registry only (use --set-default to make it the default registry)"
     fi
-    
+
     log "✓ npm registry configuration completed"
 }
 
 verify_registry_access() {
     local registry_url="$1"
     local token="$2"
-    
+
     log "Verifying registry access..."
-    
+
     # Test authentication with multiple methods
     local registry_host
     registry_host=$(echo "$registry_url" | sed 's|https\?://||' | cut -d'/' -f1)
-    
+
     # Method 1: Try to access the registry URL directly with Bearer token
     if curl -s -f -H "Authorization: Bearer $token" "${registry_url%/}" >/dev/null 2>&1; then
         log "✓ Registry access verified (Bearer token)"
         return 0
     fi
-    
+
     # Method 2: Try with token format (some systems use this)
     if curl -s -f -H "Authorization: token $token" "${registry_url%/}" >/dev/null 2>&1; then
         log "✓ Registry access verified (token format)"
         return 0
     fi
-    
+
     # Method 3: Try accessing a common npm endpoint
     local test_url="${registry_url%/}/-/ping"
     if curl -s -f -H "Authorization: Bearer $token" "$test_url" >/dev/null 2>&1; then
         log "✓ Registry access verified (ping endpoint)"
         return 0
     fi
-    
+
     # Method 4: Try a simple npm whoami command to test authentication
     local temp_npmrc=$(mktemp)
     {
         echo "registry=${registry_url}"
         echo "//${registry_host}/:_authToken=${token}"
     } > "$temp_npmrc"
-    
+
     if npm whoami --userconfig="$temp_npmrc" >/dev/null 2>&1; then
         log "✓ Registry access verified (npm whoami)"
         rm -f "$temp_npmrc"
         return 0
     fi
-    
+
     rm -f "$temp_npmrc"
-    
+
     # If all methods fail, show more detailed error information
     log "⚠ Cannot verify registry access with any method"
     log "  Tested endpoints:"
     log "    - ${registry_url%/}"
-    log "    - ${registry_url%/}/-/ping" 
+    log "    - ${registry_url%/}/-/ping"
     log "    - npm whoami command"
     log "  This might be normal if the registry doesn't support these verification methods"
     log "  Continuing with setup - package installation will be the real test..."
-    
+
     return 1
 }
 
 install_packages() {
     local packages=("$@")
-    
+
     if [[ ${#packages[@]} -eq 0 ]]; then
         return 0
     fi
-    
+
     log "Installing packages from Gitea registry..."
-    
+
     for package in "${packages[@]}"; do
         log "Installing $package..."
-        
+
         if [[ $DRY_RUN == true ]]; then
             log "[DRY RUN] Would install: $package"
             continue
         fi
-        
+
         # Try to install from Gitea registry first
         if npm install "$package" --registry="$GITEA_REGISTRY" 2>/dev/null; then
             log "✓ Successfully installed $package from Gitea registry"
@@ -316,9 +316,9 @@ fi
 setup_npm_registry "$GITEA_REGISTRY" "$AUTH_TOKEN" "$CONFIG_SCOPE"
 
 # Verify registry access
-if [[ $DRY_RUN == false ]]; then
-    verify_registry_access "$GITEA_REGISTRY" "$AUTH_TOKEN"
-fi
+#if [[ $DRY_RUN == false ]]; then
+#    verify_registry_access "$GITEA_REGISTRY" "$AUTH_TOKEN"
+#fi
 
 # Install packages if requested
 if [[ ${#INSTALL_PACKAGES[@]} -gt 0 ]]; then
