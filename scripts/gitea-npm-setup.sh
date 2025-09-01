@@ -131,17 +131,54 @@ verify_registry_access() {
     
     log "Verifying registry access..."
     
-    # Test authentication with a simple HTTP request
+    # Test authentication with multiple methods
     local registry_host
     registry_host=$(echo "$registry_url" | sed 's|https\?://||' | cut -d'/' -f1)
     
-    if curl -s -f -H "Authorization: token $token" "${registry_url%/}" >/dev/null 2>&1; then
-        log "✓ Registry access verified"
+    # Method 1: Try to access the registry URL directly with Bearer token
+    if curl -s -f -H "Authorization: Bearer $token" "${registry_url%/}" >/dev/null 2>&1; then
+        log "✓ Registry access verified (Bearer token)"
         return 0
-    else
-        log "⚠ Cannot verify registry access, but continuing..."
-        return 1
     fi
+    
+    # Method 2: Try with token format (some systems use this)
+    if curl -s -f -H "Authorization: token $token" "${registry_url%/}" >/dev/null 2>&1; then
+        log "✓ Registry access verified (token format)"
+        return 0
+    fi
+    
+    # Method 3: Try accessing a common npm endpoint
+    local test_url="${registry_url%/}/-/ping"
+    if curl -s -f -H "Authorization: Bearer $token" "$test_url" >/dev/null 2>&1; then
+        log "✓ Registry access verified (ping endpoint)"
+        return 0
+    fi
+    
+    # Method 4: Try a simple npm whoami command to test authentication
+    local temp_npmrc=$(mktemp)
+    {
+        echo "registry=${registry_url}"
+        echo "//${registry_host}/:_authToken=${token}"
+    } > "$temp_npmrc"
+    
+    if npm whoami --userconfig="$temp_npmrc" >/dev/null 2>&1; then
+        log "✓ Registry access verified (npm whoami)"
+        rm -f "$temp_npmrc"
+        return 0
+    fi
+    
+    rm -f "$temp_npmrc"
+    
+    # If all methods fail, show more detailed error information
+    log "⚠ Cannot verify registry access with any method"
+    log "  Tested endpoints:"
+    log "    - ${registry_url%/}"
+    log "    - ${registry_url%/}/-/ping" 
+    log "    - npm whoami command"
+    log "  This might be normal if the registry doesn't support these verification methods"
+    log "  Continuing with setup - package installation will be the real test..."
+    
+    return 1
 }
 
 install_packages() {
