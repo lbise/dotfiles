@@ -30,7 +30,7 @@ UBUNTU_COMMON_PACKAGES="fd-find pinentry-tty build-essential gdb"
 MAC_PACKAGES="fd gpg universal-ctags nvim"
 
 # Software versions and paths
-NVIM_PLUGINS_MD5=$(cat "$DOTFILES_DIR/archives/plugins.md5")
+NVIM_PLUGINS_MD5=$(cat "$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../archives)/plugins.md5")
 GPG_KEYID="ED0DFB79FF83B277"
 
 # Global flags (set by main install script)

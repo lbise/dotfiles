@@ -4,7 +4,7 @@ set -e
 PLUGINS_DIR="$HOME/.local/share"
 PLUGINS="$PLUGINS_DIR/nvim"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
-DST="$DIR/../archives"
+DST="."
 COPY="/mnt/z/shannon/packages/bootstrap"
 
 if [ ! -d "$PLUGINS" ]; then

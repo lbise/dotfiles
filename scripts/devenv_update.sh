@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
-ARCHIVES_DIR="$DOTFILES_DIR/archives"
+ARCHIVES_DIR="$(cd "$SCRIPT_DIR" && realpath ../archives)"
 INSTALL_DIR="$HOME/.local/bin"
 OPENCODE_INSTALL_DIR="$HOME/.local/share/opencode"
 

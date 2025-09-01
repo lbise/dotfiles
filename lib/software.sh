@@ -9,7 +9,7 @@ install_nodejs() {
     NODE_VERSION="20.13.1"
     NODE_VER_REGEX="^v([0-9]+.[0-9]+.[0-9]+)"
     NODE_NAME="node-v$NODE_VERSION-linux-x64"
-    NODE_OUT="$DOTFILES_DIR/archives"
+    NODE_OUT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../archives)"
     NODE_SRC="$NODE_OUT/$NODE_NAME"
     NODE_DST="$HOME/.bin"
     NODE_BIN="$NODE_DST/$NODE_NAME/bin/node"
@@ -46,7 +46,7 @@ install_nodejs() {
 
 install_gcm_home() {
     print_section "Installing git credential manager"
-    GCM_ARCHIVE="$DOTFILES_DIR/archives/gcm-linux_amd64.2.5.0.deb"
+    GCM_ARCHIVE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../archives)/gcm-linux_amd64.2.5.0.deb"
 
     if [ ! -f "/usr/local/bin/git-credential-manager" ]; then
         sudo dpkg -i "$GCM_ARCHIVE"
@@ -59,7 +59,7 @@ install_gcm_home() {
 install_neovim() {
     NVIM_VERSION="0.11.2"
     NVIM_VER_REGEX="^NVIM v([0-9]+.[0-9]+.[0-9]+)"
-    NVIM_OUT="$DOTFILES_DIR/archives"
+    NVIM_OUT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../archives)"
     NVIM_DIR="nvim-linux-x86_64"
     NVIM_SRC="$NVIM_OUT/$NVIM_DIR"
     NVIM_DST="$HOME/.bin"
