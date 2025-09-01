@@ -10,6 +10,8 @@ DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 ARCHIVES_DIR="$(cd "$SCRIPT_DIR" && realpath ../archives)"
 INSTALL_DIR="$HOME/.local/bin"
 OPENCODE_INSTALL_DIR="$HOME/.local/share/opencode"
+OPENCODE_BIN_DIR="$HOME/.opencode"
+CLANGD_INSTALL_DIR="$HOME/.local/share/clangd"
 
 # Gitea configuration
 GITEA_REGISTRY="https://ch03git.phonak.com/api/packages/13lbise/npm/"
@@ -30,7 +32,7 @@ check_dependencies() {
     local missing_deps=()
 
     # Check for required commands
-    for cmd in curl tar npm; do
+    for cmd in curl tar npm jq unzip; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             missing_deps+=("$cmd")
         fi
@@ -110,7 +112,7 @@ install_opencode() {
     fi
 
     # Create installation directories
-    mkdir -p "$INSTALL_DIR" "$OPENCODE_INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR" "$OPENCODE_INSTALL_DIR" "$OPENCODE_BIN_DIR/bin"
 
     # Create temporary extraction directory
     local temp_dir=$(mktemp -d)
@@ -129,37 +131,168 @@ install_opencode() {
 
     # Remove old installation if it exists
     if [[ -d "$OPENCODE_INSTALL_DIR" ]]; then
-        log "Removing old opencode installation..."
+        log "Removing old opencode configuration..."
         rm -rf "$OPENCODE_INSTALL_DIR"
         mkdir -p "$OPENCODE_INSTALL_DIR"
     fi
+    
+    if [[ -d "$OPENCODE_BIN_DIR" ]]; then
+        log "Removing old opencode binary..."
+        rm -rf "$OPENCODE_BIN_DIR"
+        mkdir -p "$OPENCODE_BIN_DIR/bin"
+    fi
 
-    # Move opencode to installation directory
-    log "Installing opencode to $OPENCODE_INSTALL_DIR..."
+    # Move opencode to installation directories
+    log "Installing opencode configuration to $OPENCODE_INSTALL_DIR..."
     cp -r "$opencode_dir"/* "$OPENCODE_INSTALL_DIR/"
+    
+    # Install binary to ~/.opencode/bin/
+    log "Installing opencode binary to $OPENCODE_BIN_DIR/bin/..."
+    if [[ -f "$opencode_dir/bin/opencode" ]]; then
+        cp "$opencode_dir/bin/opencode" "$OPENCODE_BIN_DIR/bin/opencode"
+        chmod +x "$OPENCODE_BIN_DIR/bin/opencode"
+    else
+        # Look for alternative binary location
+        local alt_bin=$(find "$opencode_dir" -name "opencode" -type f -executable | head -1)
+        if [[ -n "$alt_bin" ]]; then
+            cp "$alt_bin" "$OPENCODE_BIN_DIR/bin/opencode"
+            chmod +x "$OPENCODE_BIN_DIR/bin/opencode"
+        else
+            error "Could not find opencode binary in archive"
+        fi
+    fi
 
     # Create symlink in PATH
-    local opencode_bin="$OPENCODE_INSTALL_DIR/bin/opencode"
+    local opencode_bin="$OPENCODE_BIN_DIR/bin/opencode"
     local symlink_path="$INSTALL_DIR/opencode"
 
     if [[ -f "$opencode_bin" ]]; then
         log "Creating symlink: $symlink_path -> $opencode_bin"
         ln -sf "$opencode_bin" "$symlink_path"
     else
-        # Look for alternative binary locations
-        local alt_bin=$(find "$OPENCODE_INSTALL_DIR" -name "opencode" -type f -executable | head -1)
-        if [[ -n "$alt_bin" ]]; then
-            log "Creating symlink: $symlink_path -> $alt_bin"
-            ln -sf "$alt_bin" "$symlink_path"
-        else
-            log "⚠ Could not find opencode binary in installation"
-        fi
+        log "⚠ Could not find opencode binary at $opencode_bin"
     fi
 
     # Save version info
     echo "$version" > "$OPENCODE_INSTALL_DIR/version"
 
     log "✓ opencode $version installed successfully"
+}
+
+get_latest_clangd_release() {
+    log "Fetching latest clangd release info..."
+    
+    local api_url="https://api.github.com/repos/clangd/clangd/releases/latest"
+    local release_info
+    
+    if ! release_info=$(curl -s "$api_url"); then
+        error "Failed to fetch clangd release information"
+    fi
+    
+    # Extract download URL for linux x86_64
+    local download_url
+    download_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | test("clangd-linux-.*\\.zip$")) | .browser_download_url' | head -1)
+    
+    if [[ -z "$download_url" || "$download_url" == "null" ]]; then
+        error "Could not find clangd linux release download URL"
+    fi
+    
+    echo "$download_url"
+}
+
+get_installed_clangd_version() {
+    local clangd_bin="$INSTALL_DIR/clangd"
+    if [[ -f "$clangd_bin" ]]; then
+        "$clangd_bin" --version 2>/dev/null | head -1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo ""
+    else
+        echo ""
+    fi
+}
+
+install_clangd() {
+    log "Installing clangd from GitHub releases..."
+    
+    # Get download URL
+    local download_url
+    download_url=$(get_latest_clangd_release)
+    
+    # Extract version from URL (e.g., clangd-linux-18.1.3.zip)
+    local version
+    version=$(echo "$download_url" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+    
+    if [[ -z "$version" ]]; then
+        log "⚠ Could not determine clangd version from URL: $download_url"
+        version="unknown"
+    fi
+    
+    # Check if already installed
+    local installed_version
+    installed_version=$(get_installed_clangd_version)
+    if [[ -n "$installed_version" && "$installed_version" == "$version" ]]; then
+        log "✓ clangd $version is already installed"
+        return 0
+    fi
+    
+    # Create installation directory
+    mkdir -p "$CLANGD_INSTALL_DIR" "$INSTALL_DIR"
+    
+    # Create temporary download directory
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    trap "rm -rf '$temp_dir'" RETURN
+    
+    local zip_file="$temp_dir/clangd.zip"
+    
+    log "Downloading clangd $version..."
+    if ! curl -L -o "$zip_file" "$download_url"; then
+        error "Failed to download clangd from $download_url"
+    fi
+    
+    log "Extracting clangd..."
+    if ! unzip -q "$zip_file" -d "$temp_dir"; then
+        error "Failed to extract clangd archive"
+    fi
+    
+    # Find the clangd binary in the extracted content
+    local clangd_bin
+    clangd_bin=$(find "$temp_dir" -name "clangd" -type f -executable | head -1)
+    
+    if [[ -z "$clangd_bin" || ! -f "$clangd_bin" ]]; then
+        error "Could not find clangd binary in downloaded archive"
+    fi
+    
+    # Remove old installation if it exists
+    if [[ -d "$CLANGD_INSTALL_DIR" ]]; then
+        log "Removing old clangd installation..."
+        rm -rf "$CLANGD_INSTALL_DIR"
+        mkdir -p "$CLANGD_INSTALL_DIR"
+    fi
+    
+    # Install clangd
+    log "Installing clangd to $CLANGD_INSTALL_DIR..."
+    local clangd_dir
+    clangd_dir=$(dirname "$clangd_bin")
+    cp -r "$clangd_dir"/* "$CLANGD_INSTALL_DIR/"
+    
+    # Create symlink in PATH
+    local symlink_path="$INSTALL_DIR/clangd"
+    local target_bin="$CLANGD_INSTALL_DIR/clangd"
+    
+    if [[ -f "$target_bin" ]]; then
+        log "Creating symlink: $symlink_path -> $target_bin"
+        ln -sf "$target_bin" "$symlink_path"
+    else
+        # Try to find clangd in the installation directory
+        target_bin=$(find "$CLANGD_INSTALL_DIR" -name "clangd" -type f -executable | head -1)
+        if [[ -n "$target_bin" ]]; then
+            log "Creating symlink: $symlink_path -> $target_bin"
+            ln -sf "$target_bin" "$symlink_path"
+        else
+            error "Could not find clangd binary after installation"
+        fi
+    fi
+    
+    log "✓ clangd $version installed successfully"
 }
 
 setup_gitea_npm() {
@@ -244,6 +377,15 @@ verify_installation() {
         log "⚠ pyright not found in PATH"
     fi
 
+    # Check clangd
+    if command -v clangd >/dev/null 2>&1; then
+        local clangd_version
+        clangd_version=$(clangd --version 2>/dev/null | head -1 || echo "version unknown")
+        log "✓ clangd: $clangd_version"
+    else
+        log "⚠ clangd not found in PATH"
+    fi
+
     # Check if PATH includes our install directory
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         log "⚠ $INSTALL_DIR is not in PATH. Add this to your shell profile:"
@@ -261,6 +403,9 @@ main() {
     local opencode_archive
     opencode_archive=$(find_latest_opencode_archive)
     install_opencode "$opencode_archive"
+
+    # Install clangd from GitHub releases
+    install_clangd
 
     # Setup npm for Gitea registry
     if setup_gitea_npm; then
@@ -281,8 +426,12 @@ main() {
     log "• Restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
     log "• Verify opencode: opencode --version"
     log "• Verify pyright: pyright --version"
-    log "• Installation location: $OPENCODE_INSTALL_DIR"
-    log "• Binaries location: $INSTALL_DIR"
+    log "• Verify clangd: clangd --version"
+    log "• Installation locations:"
+    log "  - Configuration: $OPENCODE_INSTALL_DIR"
+    log "  - Binary: $OPENCODE_BIN_DIR/bin"
+    log "  - Symlink: $INSTALL_DIR"
+    log "  - clangd: $CLANGD_INSTALL_DIR"
 }
 
 # Run main function
