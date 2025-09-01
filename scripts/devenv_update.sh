@@ -11,6 +11,7 @@ ARCHIVES_DIR="$(cd "$SCRIPT_DIR" && realpath ../archives)"
 INSTALL_DIR="$HOME/.local/bin"
 OPENCODE_INSTALL_DIR="$HOME/.local/share/opencode"
 OPENCODE_BIN_DIR="$HOME/.opencode"
+OPENCODE_CACHE_DIR="$HOME/.cache/opencode"
 CLANGD_INSTALL_DIR="$HOME/.local/share/clangd"
 
 # Gitea configuration
@@ -112,7 +113,7 @@ install_opencode() {
     fi
 
     # Create installation directories
-    mkdir -p "$INSTALL_DIR" "$OPENCODE_INSTALL_DIR" "$OPENCODE_BIN_DIR/bin"
+    mkdir -p "$INSTALL_DIR" "$OPENCODE_INSTALL_DIR" "$OPENCODE_BIN_DIR/bin" "$OPENCODE_CACHE_DIR"
 
     # Create temporary extraction directory
     local temp_dir=$(mktemp -d)
@@ -139,21 +140,31 @@ install_opencode() {
         rm -rf "$OPENCODE_INSTALL_DIR"
         mkdir -p "$OPENCODE_INSTALL_DIR"
     fi
-
+    
     if [[ -d "$OPENCODE_BIN_DIR" ]]; then
         log "Removing old opencode binary..."
         rm -rf "$OPENCODE_BIN_DIR"
         mkdir -p "$OPENCODE_BIN_DIR/bin"
     fi
+    
+    if [[ -d "$OPENCODE_CACHE_DIR" ]]; then
+        log "Removing old opencode cache..."
+        rm -rf "$OPENCODE_CACHE_DIR"
+        mkdir -p "$OPENCODE_CACHE_DIR"
+    fi
 
     # Move opencode to installation directories
-    log "Installing opencode configuration to $OPENCODE_INSTALL_DIR..."
-    # Copy cache and other config files to ~/.local/share/opencode
-    if [[ -d "$extract_dir/.cache" ]]; then
-        cp -r "$extract_dir/.cache" "$OPENCODE_INSTALL_DIR/"
+    log "Installing opencode cache to $OPENCODE_CACHE_DIR..."
+    # Copy cache directory to ~/.cache/opencode
+    if [[ -d "$extract_dir/.cache/opencode" ]]; then
+        cp -r "$extract_dir/.cache/opencode"/* "$OPENCODE_CACHE_DIR/"
+    elif [[ -d "$extract_dir/.cache" ]]; then
+        # If the structure is different, copy the whole .cache content
+        cp -r "$extract_dir/.cache"/* "$OPENCODE_CACHE_DIR/"
     fi
     
-    # Copy any other files that might be config-related (excluding .opencode which has the binary)
+    log "Installing opencode configuration to $OPENCODE_INSTALL_DIR..."
+    # Copy any other config files (excluding .opencode and .cache)
     for item in "$extract_dir"/*; do
         if [[ -f "$item" ]] && [[ $(basename "$item") != "install.sh" ]]; then
             cp "$item" "$OPENCODE_INSTALL_DIR/"
@@ -433,6 +444,7 @@ main() {
     log "• Installation locations:"
     log "  - Configuration: $OPENCODE_INSTALL_DIR"
     log "  - Binary: $OPENCODE_BIN_DIR/bin"
+    log "  - Cache: $OPENCODE_CACHE_DIR"
     log "  - Symlink: $INSTALL_DIR"
     log "  - clangd: $CLANGD_INSTALL_DIR"
 }
