@@ -75,10 +75,13 @@ WORKDIR /home/${UNAME}
 # ---------- Opencode ----------------------------------------------
 # Run opencode so packages are retrieved and cached
 # This is not perfect, as it seems not all dependencies are loaded this way
-RUN mkdir -p /home/${UNAME}/.local/share/opencode
-#COPY --chown=${UID}:${GID} auth.json /home/${UNAME}/.local/share/opencode
+# Pre-install AI SDK packages that opencode dynamically installs at runtime
+RUN mkdir -p /home/leodev/.cache/opencode
+# Run azure prompt which does not require any login to see if everything works
 RUN opencode -m azure/o3 run "test"
-#RUN opencode -m github-copilot/gpt-4.1 run "test"
+# Opencode MUST be run at least once before doing this as the cache folder is recreated when starting
+#RUN cd /home/leodev/.cache/opencode && npm init -y
+#RUN cd /home/leodev/.cache/opencode && npm install --exact @ai-sdk/openai-compatible@latest @ai-sdk/azure@latest @ai-sdk/anthropic@latest @ai-sdk/openai@latest @ai-sdk/google@latest @ai-sdk/amazon-bedrock@latest
 
 # ---------- Neovim ---------------------------------------
 ENV NVIM_VERSION="0.11.3"

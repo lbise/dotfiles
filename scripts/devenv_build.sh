@@ -111,6 +111,12 @@ main() {
         exit 1
     fi
 
+    # Once opencode is authed, run a test
+    if ! docker exec -it "${TEMP_CONTAINER_NAME}" opencode -m github-copilot/gpt-4.1 run "test"; then
+        error "Failed to run opencode test"
+        exit 1
+    fi
+
     # Step 4: Commit the configured container
     echo ""
     log "Committing configured container to new image..."
