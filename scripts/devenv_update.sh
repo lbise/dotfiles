@@ -33,7 +33,7 @@ check_dependencies() {
     local missing_deps=()
 
     # Check for required commands
-    for cmd in curl tar npm jq unzip; do
+    for cmd in curl tar npm unzip; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             missing_deps+=("$cmd")
         fi
@@ -203,11 +203,11 @@ get_latest_clangd_release() {
         error "Failed to fetch clangd release information"
     fi
 
-    # Extract download URL for linux x86_64
+    # Extract download URL for linux x86_64 using shell text processing
     local download_url
-    download_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | test("clangd-linux-.*\\.zip$")) | .browser_download_url' | head -1)
-
-    if [[ -z "$download_url" || "$download_url" == "null" ]]; then
+    download_url=$(echo "$release_info" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*clangd-linux-[^"]*\.zip"' | grep -o 'https://[^"]*' | head -1)
+    
+    if [[ -z "$download_url" ]]; then
         error "Could not find clangd linux release download URL"
     fi
 
