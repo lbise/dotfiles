@@ -13,6 +13,7 @@ GLOBAL_CONFIG=false
 INSTALL_PACKAGES=()
 FALLBACK_REGISTRY="https://registry.npmjs.org"
 DRY_RUN=false
+SET_DEFAULT_REGISTRY=false
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
@@ -34,6 +35,7 @@ Options:
   --global                Configure npm globally instead of locally
   --no-backup             Don't backup existing npm configuration
   --fallback REGISTRY     Fallback registry for packages not in Gitea (default: https://registry.npmjs.org)
+  --set-default           Set Gitea registry as the default npm registry (not just scoped)
   --dry-run              Show what would be configured without actually doing it
   --help, -h             Show this help message
 
@@ -45,11 +47,11 @@ Examples:
   # Setup npm to use Gitea registry
   $0 https://ch03git.phonak.com/api/packages/13lbise/npm/ \$GITEA_TOKEN
 
-  # Setup and install specific packages
-  $0 --install lodash --install express https://gitea.example.com/api/packages/user/npm/
+  # Setup and install specific packages with default registry
+  $0 --install lodash --install express --set-default https://gitea.example.com/api/packages/user/npm/
 
-  # Global configuration
-  $0 --global https://gitea.example.com/api/packages/user/npm/ \$GITEA_TOKEN
+  # Global configuration as default registry
+  $0 --global --set-default https://gitea.example.com/api/packages/user/npm/ \$GITEA_TOKEN
 
   # Dry run to see what would be configured
   $0 --dry-run https://gitea.example.com/api/packages/user/npm/
@@ -112,10 +114,12 @@ setup_npm_registry() {
     npm config set "//${registry_host}/:username" "$username" "${npm_args[@]}" || true
     npm config set "//${registry_host}/:email" "${username}@localhost" "${npm_args[@]}" || true
     
-    # Set as default registry if no specific scope
-    if [[ -z "$username" || "$username" == "npm" ]]; then
+    # Set as default registry based on conditions
+    if [[ $SET_DEFAULT_REGISTRY == true ]] || [[ -z "$username" || "$username" == "npm" ]]; then
         log "Setting as default npm registry"
         npm config set "registry" "$registry_url" "${npm_args[@]}" || true
+    else
+        log "Using scoped registry only (use --set-default to make it the default registry)"
     fi
     
     log "✓ npm registry configuration completed"
@@ -196,6 +200,10 @@ while [[ $# -gt 0 ]]; do
             BACKUP_CONFIG=false
             shift
             ;;
+        --set-default)
+            SET_DEFAULT_REGISTRY=true
+            shift
+            ;;
         --fallback)
             FALLBACK_REGISTRY="$2"
             shift 2
@@ -249,6 +257,7 @@ log "Starting Gitea npm setup process..."
 log "Gitea Registry: $GITEA_REGISTRY"
 log "Fallback Registry: $FALLBACK_REGISTRY"
 log "Global Config: $GLOBAL_CONFIG"
+log "Set Default Registry: $SET_DEFAULT_REGISTRY"
 log "Packages to Install: ${INSTALL_PACKAGES[*]:-none}"
 log "Dry Run: $DRY_RUN"
 
