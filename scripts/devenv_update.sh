@@ -76,15 +76,34 @@ find_latest_opencode_archive() {
 }
 
 version_greater() {
-    # Simple version comparison - assumes semantic versioning
+    # Proper semantic version comparison
     local v1="$1"
     local v2="$2"
 
-    # Convert versions to comparable numbers (simple approach)
-    local v1_num=$(echo "$v1" | sed 's/\.//g' | sed 's/^0*//')
-    local v2_num=$(echo "$v2" | sed 's/\.//g' | sed 's/^0*//')
+    # Split versions into components
+    IFS='.' read -ra v1_parts <<< "$v1"
+    IFS='.' read -ra v2_parts <<< "$v2"
 
-    [[ ${v1_num:-0} -gt ${v2_num:-0} ]]
+    # Pad shorter version with zeros
+    local max_len=$((${#v1_parts[@]} > ${#v2_parts[@]} ? ${#v1_parts[@]} : ${#v2_parts[@]}))
+    
+    for ((i=0; i<max_len; i++)); do
+        local v1_part=${v1_parts[i]:-0}
+        local v2_part=${v2_parts[i]:-0}
+        
+        # Remove leading zeros and compare numerically
+        v1_part=$((10#$v1_part))
+        v2_part=$((10#$v2_part))
+        
+        if [[ $v1_part -gt $v2_part ]]; then
+            return 0  # v1 > v2
+        elif [[ $v1_part -lt $v2_part ]]; then
+            return 1  # v1 < v2
+        fi
+        # If equal, continue to next component
+    done
+    
+    return 1  # versions are equal
 }
 
 get_installed_opencode_version() {

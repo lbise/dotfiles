@@ -503,6 +503,18 @@ log "Creating tarball: $PACKAGE_NAME"
 cd "$TEMP_DIR"
 tar -czf "$OUTPUT_PATH" .
 
+# Move to archives directory if we're in the dotfiles repository
+DOTFILES_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ARCHIVES_DIR="$DOTFILES_DIR/archives"
+
+if [[ -d "$ARCHIVES_DIR" && "$OUTPUT_DIR" == "$DOTFILES_DIR" ]]; then
+    FINAL_PATH="$ARCHIVES_DIR/$PACKAGE_NAME"
+    log "Moving package to archives directory..."
+    mv "$OUTPUT_PATH" "$FINAL_PATH"
+    OUTPUT_PATH="$FINAL_PATH"
+    log "Package moved to: $OUTPUT_PATH"
+fi
+
 # Get package size
 PACKAGE_SIZE=$(du -h "$OUTPUT_PATH" | cut -f1)
 
