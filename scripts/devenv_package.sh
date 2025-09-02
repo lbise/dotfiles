@@ -118,20 +118,17 @@ package_local() {
         log "Updated package name: $PACKAGE_NAME"
     fi
     
-    # Copy cached dependencies
+    # Copy cached dependencies (only from ~/.cache/opencode)
     log "Copying cached dependencies..."
     local cache_found=false
-    for cache_dir in "$HOME/.cache/opencode" "$HOME/.local/share/opencode" "/tmp/opencode-cache"; do
-        if [[ -d "$cache_dir" ]]; then
-            log "Found cache directory: $cache_dir"
-            cp -r "$cache_dir" "$temp_dir/.cache/"
-            cache_found=true
-            break
-        fi
-    done
+    if [[ -d "$HOME/.cache/opencode" ]]; then
+        log "Found cache directory: $HOME/.cache/opencode"
+        cp -r "$HOME/.cache/opencode" "$temp_dir/.cache/"
+        cache_found=true
+    fi
     
     if [[ "$cache_found" == false ]]; then
-        log "WARNING: No cached dependencies found. Creating empty cache directory."
+        log "WARNING: No cached dependencies found at ~/.cache/opencode. Creating empty cache directory."
         mkdir -p "$temp_dir/.cache/opencode"
     fi
 }
@@ -230,7 +227,7 @@ package_container() {
         error "opencode executable not found in container at /usr/local/bin/opencode"
     fi
 
-    # Copy cached dependencies
+    # Copy cached dependencies (only from container's cache directory)
     log "Copying cached dependencies..."
     if docker exec "$CONTAINER_NAME" test -d /home/leodev/.cache/opencode; then
         docker cp "$CONTAINER_NAME:/home/leodev/.cache/opencode" "$temp_dir/.cache/"
@@ -249,8 +246,10 @@ usage() {
     cat <<EOF
 Usage: $0 [OPTIONS] [output_directory]
 
-Package or install opencode with all dependencies for offline deployment.
+Package opencode with all dependencies for offline deployment.
 Can package from local machine (default) or Docker container.
+Only packages the binary (~/.opencode/bin/opencode) and cache (~/.cache/opencode).
+The ~/.local/share/opencode folder is excluded and left untouched.
 
 Options:
   --package             Create a package (default mode)
@@ -279,12 +278,14 @@ Package Output:
   Creates opencode-offline-YYYYMMDD_HHMMSS.tar.gz containing:
   - ~/.opencode/bin/opencode (executable)
   - ~/.cache/opencode/ (cached dependencies)
+  Note: ~/.local/share/opencode is excluded and preserved
 
 Install Output:
   Extracts and installs opencode to:
   - ~/.opencode/bin/opencode
   - ~/.cache/opencode/
   - Updates PATH in shell RC file
+  Note: ~/.local/share/opencode is left untouched
 EOF
 }
 
@@ -444,10 +445,12 @@ This package contains a pre-built opencode installation with all dependencies fo
 
 ## Contents
 
-- \`.opencode/bin/opencode\` - The opencode executable
-- \`.cache/opencode/\` - Pre-installed AI SDK dependencies
-- \`install.sh\` - Installation script
-- \`README.md\` - This file
+- `.opencode/bin/opencode` - The opencode executable
+- `.cache/opencode/` - Pre-installed AI SDK dependencies
+- `install.sh` - Installation script
+- `README.md` - This file
+
+Note: This package only includes the binary and cache. The ~/.local/share/opencode folder is excluded and will remain untouched during installation.
 
 ## Installation
 
@@ -496,6 +499,7 @@ opencode auth login
 - Created: $(date)
 - Source: $SOURCE_INFO
 - Includes pre-cached AI SDK dependencies for offline use
+- Excludes ~/.local/share/opencode folder (preserved during installation)
 EOF
 
 # Create the tarball

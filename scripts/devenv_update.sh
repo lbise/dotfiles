@@ -9,7 +9,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 ARCHIVES_DIR="$(cd "$SCRIPT_DIR" && realpath ../archives)"
 INSTALL_DIR="$HOME/.local/bin"
-OPENCODE_INSTALL_DIR="$HOME/.local/share/opencode"
 OPENCODE_BIN_DIR="$HOME/.opencode"
 OPENCODE_CACHE_DIR="$HOME/.cache/opencode"
 CLANGD_INSTALL_DIR="$HOME/.local/share/clangd"
@@ -107,7 +106,7 @@ version_greater() {
 }
 
 get_installed_opencode_version() {
-    local version_file="$OPENCODE_INSTALL_DIR/version"
+    local version_file="$OPENCODE_BIN_DIR/version"
     if [[ -f "$version_file" ]]; then
         cat "$version_file"
     else
@@ -132,7 +131,7 @@ install_opencode() {
     fi
 
     # Create installation directories
-    mkdir -p "$INSTALL_DIR" "$OPENCODE_INSTALL_DIR" "$OPENCODE_BIN_DIR/bin" "$OPENCODE_CACHE_DIR"
+    mkdir -p "$INSTALL_DIR" "$OPENCODE_BIN_DIR/bin" "$OPENCODE_CACHE_DIR"
 
     # Create temporary extraction directory
     local temp_dir=$(mktemp -d)
@@ -154,12 +153,6 @@ install_opencode() {
     fi
 
     # Remove old installation if it exists
-    if [[ -d "$OPENCODE_INSTALL_DIR" ]]; then
-        log "Removing old opencode configuration..."
-        rm -rf "$OPENCODE_INSTALL_DIR"
-        mkdir -p "$OPENCODE_INSTALL_DIR"
-    fi
-    
     if [[ -d "$OPENCODE_BIN_DIR" ]]; then
         log "Removing old opencode binary..."
         rm -rf "$OPENCODE_BIN_DIR"
@@ -190,14 +183,6 @@ install_opencode() {
         log "Skipping cache installation - preserving existing cache"
     fi
     
-    log "Installing opencode configuration to $OPENCODE_INSTALL_DIR..."
-    # Copy any other config files (excluding .opencode and .cache)
-    for item in "$extract_dir"/*; do
-        if [[ -f "$item" ]] && [[ $(basename "$item") != "install.sh" ]]; then
-            cp "$item" "$OPENCODE_INSTALL_DIR/"
-        fi
-    done
-
     # Install binary to ~/.opencode/bin/ (always update the binary)
     log "Installing opencode binary to $OPENCODE_BIN_DIR/bin/..."
     cp "$extract_dir/.opencode/bin/opencode" "$OPENCODE_BIN_DIR/bin/opencode"
@@ -215,7 +200,7 @@ install_opencode() {
     fi
 
     # Save version info
-    echo "$version" > "$OPENCODE_INSTALL_DIR/version"
+    echo "$version" > "$OPENCODE_BIN_DIR/version"
 
     log "✓ opencode $version installed successfully"
 }
@@ -469,7 +454,6 @@ main() {
     log "• Verify pyright: pyright --version"
     log "• Verify clangd: clangd --version"
     log "• Installation locations:"
-    log "  - Configuration: $OPENCODE_INSTALL_DIR"
     log "  - Binary: $OPENCODE_BIN_DIR/bin"
     log "  - Cache: $OPENCODE_CACHE_DIR"
     log "  - Symlink: $INSTALL_DIR"
