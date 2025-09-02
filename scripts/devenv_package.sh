@@ -438,6 +438,9 @@ if [[ $LOCAL_MODE == false ]]; then
     fi
 fi
 
+PACKAGE_BASENAME=$(basename "$PACKAGE_NAME")
+CURRENT_DATE=$(date)
+
 cat > "$TEMP_DIR/README.md" << EOF
 # OpenCode Offline Package
 
@@ -445,10 +448,10 @@ This package contains a pre-built opencode installation with all dependencies fo
 
 ## Contents
 
-- `.opencode/bin/opencode` - The opencode executable
-- `.cache/opencode/` - Pre-installed AI SDK dependencies
-- `install.sh` - Installation script
-- `README.md` - This file
+- \`.opencode/bin/opencode\` - The opencode executable
+- \`.cache/opencode/\` - Pre-installed AI SDK dependencies
+- \`install.sh\` - Installation script
+- \`README.md\` - This file
 
 Note: This package only includes the binary and cache. The ~/.local/share/opencode folder is excluded and will remain untouched during installation.
 
@@ -456,7 +459,7 @@ Note: This package only includes the binary and cache. The ~/.local/share/openco
 
 1. Extract this package:
    \`\`\`bash
-   tar -xzf $(basename "$PACKAGE_NAME")
+   tar -xzf $PACKAGE_BASENAME
    cd opencode-offline-*
    \`\`\`
 
@@ -483,7 +486,7 @@ If you prefer manual installation:
 
 2. Add to your PATH:
    \`\`\`bash
-   export PATH="\$HOME/.opencode/bin:\$PATH"
+   export PATH="\\\$HOME/.opencode/bin:\\\$PATH"
    \`\`\`
 
 ## Usage
@@ -496,7 +499,7 @@ opencode auth login
 
 ## Package Info
 
-- Created: $(date)
+- Created: $CURRENT_DATE
 - Source: $SOURCE_INFO
 - Includes pre-cached AI SDK dependencies for offline use
 - Excludes ~/.local/share/opencode folder (preserved during installation)
