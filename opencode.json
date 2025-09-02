@@ -24,10 +24,4 @@
       }
     },
   },
-  "command": {
-    "start_ticket": {
-      "template": "Start working on a new ticket. First fetch redmine ticket $ARGUMENTS, set the ticket as in progress. Then create a new git branch using the following format: $ARGUMENTS_title.",
-      "description": "Start working on a new ticket",
-    },
-  }
 }
