@@ -5,7 +5,7 @@ local settings = {
 		ensure_installed = {
 			"clangd",
 			"clang-format",
-			"pyright",
+			"basedpyright",
 			-- Required version for work..
 			--"ruff@0.11.2",
 			"ruff",
@@ -35,7 +35,7 @@ local settings = {
 					"configure.ac",
 				},
 			},
-			pyright = {
+			basedpyright = {
 				settings = {
 					python = {
 						analysis = {
