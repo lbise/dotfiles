@@ -1,6 +1,9 @@
 [color]
 	excludesfile = h:/.gitignore_global
 	ui = auto
+    branch = auto
+    diff = auto
+    status = auto
 
 [color "diff"]
 	meta = blue
@@ -103,4 +106,8 @@
 [credential "https://dev.azure.com"]
 	useHttpPath = true
 [credential "https://ch03git.phonak.com"]
-	provider = generic
+    provider = generic
+[help]
+    autocorrect = 1
+[push]
+  autoSetupRemote = true
