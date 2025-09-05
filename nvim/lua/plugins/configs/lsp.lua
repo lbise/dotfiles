@@ -40,7 +40,7 @@ local config = {
 			require("mason").setup()
 
 			vim.diagnostic.config({
-				virtual_text = { current_line = true },
+				virtual_text = false,
 				underline = true,
 				update_in_insert = true,
 				severity_sort = true,
@@ -92,6 +92,15 @@ local config = {
 		dependencies = {
 			"nvim-tree/nvim-web-devicons",
 		},
+	},
+	{
+		"rachartier/tiny-inline-diagnostic.nvim",
+		event = "VeryLazy",
+		priority = 1000,
+		config = function()
+			require("tiny-inline-diagnostic").setup()
+			vim.diagnostic.config({ virtual_text = false }) -- Disable default virtual text
+		end,
 	},
 	{
 		"stevearc/conform.nvim",

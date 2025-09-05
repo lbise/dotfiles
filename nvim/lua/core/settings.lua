@@ -39,7 +39,7 @@ local settings = {
 				settings = {
 					basedpyright = {
 						analysis = {
-						    typeCheckingMode = "recommended",
+						    typeCheckingMode = "strict",
 							extraPaths = {
 								vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
