@@ -12,6 +12,7 @@ packages:
     - tar
     - npm
     - pass
+    - git-delta
 
   ubuntu:
     base: *common_packages
