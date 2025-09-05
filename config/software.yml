@@ -34,6 +34,13 @@ software:
     conditions:
       - "not work_install"
 
+  git_delta:
+    version: "0.18.2"
+    download_url: "https://github.com/dandavison/delta/releases/download/{version}/git-delta_{version}_amd64.deb"
+    archive: "archives/git-delta_{version}_amd64.deb"
+    check_path: "/usr/local/bin/delta"
+    install_command: "sudo dpkg -i {archive}"
+
   oh_my_zsh:
     check_path: "$HOME/.oh-my-zsh"
     install_command: 'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'

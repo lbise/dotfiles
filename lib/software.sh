@@ -56,6 +56,27 @@ install_gcm_home() {
     fi
 }
 
+install_git_delta() {
+    print_section "Installing git delta"
+    DELTA_VERSION="0.18.2"
+    DELTA_ARCHIVE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../archives)/git-delta_${DELTA_VERSION}_amd64.deb"
+    DELTA_URL="https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/git-delta_${DELTA_VERSION}_amd64.deb"
+
+    if ! which delta >/dev/null 2>&1; then
+        echo "Installing git delta v$DELTA_VERSION..."
+        
+        # Download if archive doesn't exist
+        if [ ! -f "$DELTA_ARCHIVE" ]; then
+            echo "Downloading git delta from $DELTA_URL..."
+            curl -L -o "$DELTA_ARCHIVE" "$DELTA_URL"
+        fi
+        
+        sudo dpkg -i "$DELTA_ARCHIVE"
+    else
+        echo "git delta already installed!"
+    fi
+}
+
 install_neovim() {
     NVIM_VERSION="0.11.2"
     NVIM_VER_REGEX="^NVIM v([0-9]+.[0-9]+.[0-9]+)"
@@ -179,6 +200,7 @@ install_software() {
     if [ "$WSL_ONLY" != 1 ]; then
         install_neovim
         install_nodejs  # Required by pyright
+        install_git_delta
         
         # Only install GCM for non-work installations
         if [ "$WORK_INSTALL" = 0 ]; then
