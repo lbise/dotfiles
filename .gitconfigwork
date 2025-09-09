@@ -106,6 +106,7 @@
 [credential "https://dev.azure.com"]
 	useHttpPath = true
 [credential "https://ch03git.phonak.com"]
+    user = 13lbise
     provider = generic
 [help]
     autocorrect = 1
