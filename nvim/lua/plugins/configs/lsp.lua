@@ -1,13 +1,26 @@
 local function get_ruff_config()
 	if vim.fn.expand("$USER") == "13lbise" then
 		-- Check for andromeda style file
-		local style_path = vim.fn.expand("$HOME/andromeda/pyproject.toml")
+		local style_path = vim.fn.expand("$ANDROMEDA_ROOT/pyproject.toml")
 		if vim.fn.filereadable(style_path) then
 			return style_path
 		end
 	end
 
 	return ""
+end
+
+local function get_clang_format_config()
+	local user_path = vim.fn.expand("$HOME") .. "/.clang-format"
+
+	if vim.fn.expand("$USER") == "13lbise" then
+		local andromeda_path = vim.fn.expand("$ANDROMEDA_ROOT/hooks/.clang-format")
+		if vim.fn.filereadable(andromeda_path) then
+			return andromeda_path
+		end
+	end
+
+	return user_path
 end
 
 local config = {
@@ -142,7 +155,7 @@ local config = {
 						-- Any additional configuration for Clang Format can go here
 						-- Use format from a file
 						args = {
-							"--style=file:" .. vim.fn.expand("$HOME") .. "/.clang-format",
+							"--style=file:" .. get_clang_format_config(),
 						},
 					},
 				},
