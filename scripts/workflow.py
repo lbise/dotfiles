@@ -103,6 +103,16 @@ class RedmineClient:
 
         return response.json() if response.content else {}
 
+    def add_note_to_issue(self, issue_id: int, note: str) -> dict:
+        # Add a note/comment to an issue
+        url = f'{self.base_url}/issues/{issue_id}.json'
+        update_data = {'issue': {'notes': note}}
+
+        response = self.session.put(url, json=update_data)
+        response.raise_for_status()
+
+        return response.json() if response.content else {}
+
 
 class WorkflowManager:
     def __init__(self, redmine_url: str, api_key: str):
@@ -156,6 +166,16 @@ class WorkflowManager:
                     # If no good place to cut, just truncate and remove trailing hyphen
                     branch_name = truncated.rstrip('-')
         return branch_name.lower()
+
+    def _sanitize_filename(self, subject: str, ticket_number: int) -> str:
+        # Remove characters that are not allowed in filenames
+        sanitized = re.sub(r'[<>:"/\\|?*]', '', subject)
+        # Replace spaces with hyphens and collapse multiple hyphens
+        sanitized = re.sub(r'\s+', '-', sanitized.strip())
+        sanitized = re.sub(r'-+', '-', sanitized)
+        # Create filename with ticket number prefix
+        filename = f'{ticket_number}-{sanitized}'
+        return filename
 
     def _create_git_branch(self, branch_name: str) -> bool:
         try:
@@ -247,14 +267,17 @@ class WorkflowManager:
         return markdown_content
 
     def _write_ticket_markdown(
-        self, issue_data: dict, ticket_number: int, branch_name: Optional[str] = None
+        self, issue_data: dict, ticket_number: int, ticket_subject: Optional[str] = None
     ) -> None:
         try:
             notes_dir = self._ensure_notes_directory()
             markdown_content = self._generate_ticket_markdown(issue_data, ticket_number)
 
-            if branch_name:
-                filename = f'{branch_name}.md'
+            if ticket_subject:
+                sanitized_filename = self._sanitize_filename(
+                    ticket_subject, ticket_number
+                )
+                filename = f'{sanitized_filename}.md'
             else:
                 filename = f'ticket_{ticket_number}.md'
             filepath = os.path.join(notes_dir, filename)
@@ -268,13 +291,12 @@ class WorkflowManager:
                 f'Warning: Could not create ticket markdown file - {e}', file=sys.stderr
             )
 
-    def view_ticket(self, ticket_number: int) -> None:
+    def view_ticket(self, ticket_number: int, print_url: bool = True) -> None:
         try:
             issue_data = self.redmine.get_issue(ticket_number)
             issue = issue_data['issue']
 
             print(f'Ticket #{ticket_number}')
-            print(f'URL: {self.redmine.base_url}/issues/{ticket_number}')
             print(f'Subject: {issue["subject"]}')
             print(f'Status: {issue["status"]["name"]}')
             print(f'Priority: {issue["priority"]["name"]}')
@@ -338,6 +360,15 @@ class WorkflowManager:
             print(f'Error: Failed to connect to Redmine server - {e}', file=sys.stderr)
             sys.exit(1)
 
+        # Print ticket URL for easy access (if requested)
+        if print_url:
+            self._print_ticket_url(ticket_number)
+
+    def _print_ticket_url(self, ticket_number: int) -> None:
+        """Print the ticket URL for easy access."""
+        ticket_url = f'{self.redmine.base_url}/issues/{ticket_number}'
+        print(f'\n🔗 Ticket URL: {ticket_url}')
+
     def start_ticket(self, ticket_number: int) -> None:
         print(f'Starting work on ticket #{ticket_number}')
 
@@ -350,25 +381,20 @@ class WorkflowManager:
             print(f'Error: Could not fetch ticket information - {e}', file=sys.stderr)
             sys.exit(1)
 
-        self.view_ticket(ticket_number)
+        self.view_ticket(ticket_number, print_url=False)
 
         # Create git branch and markdown file only if in a git repository
         if self._is_git_repository():
             branch_name = self._sanitize_branch_name(ticket_subject, ticket_number)
             print(f'\nDetected git repository. Creating branch: {branch_name}')
             if self._create_git_branch(branch_name):
-                # Get the current git branch name after creating/switching to it
-                current_branch = self._get_current_git_branch()
-                if current_branch:
-                    print('\nCreating ticket notes markdown file...')
-                    self._write_ticket_markdown(
-                        issue_data, ticket_number, current_branch
-                    )
-                else:
-                    print(
-                        'Warning: Could not determine current git branch name',
-                        file=sys.stderr,
-                    )
+                print('\nCreating ticket notes markdown file...')
+                self._write_ticket_markdown(issue_data, ticket_number, ticket_subject)
+            else:
+                print(
+                    'Warning: Could not create or switch to git branch',
+                    file=sys.stderr,
+                )
         else:
             print(
                 '\nNot in a git repository. Skipping branch and markdown file creation.'
@@ -394,6 +420,9 @@ class WorkflowManager:
                 )
         except requests.exceptions.RequestException as e:
             print(f'Warning: Could not update ticket status - {e}', file=sys.stderr)
+
+        # Print ticket URL for easy access
+        self._print_ticket_url(ticket_number)
 
     def summary_tickets(
         self,
@@ -565,6 +594,33 @@ class WorkflowManager:
             print(f'Error: Failed to connect to Redmine server - {e}', file=sys.stderr)
             sys.exit(1)
 
+    def add_note(self, ticket_number: int, note: str) -> None:
+        try:
+            print(f'Adding note to ticket #{ticket_number}...')
+            self.redmine.add_note_to_issue(ticket_number, note)
+            print(f'✓ Note added to ticket #{ticket_number}')
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                print(f'Error: Ticket #{ticket_number} not found', file=sys.stderr)
+            elif e.response.status_code == 401:
+                print(
+                    'Error: Authentication failed. Check your API key', file=sys.stderr
+                )
+            elif e.response.status_code == 422:
+                print('Error: Could not add note - invalid request', file=sys.stderr)
+            else:
+                print(
+                    f'Error: HTTP {e.response.status_code} - {e.response.text}',
+                    file=sys.stderr,
+                )
+            sys.exit(1)
+        except requests.exceptions.RequestException as e:
+            print(f'Error: Failed to connect to Redmine server - {e}', file=sys.stderr)
+            sys.exit(1)
+
+        # Print ticket URL for easy access
+        self._print_ticket_url(ticket_number)
+
 
 def get_api_key(args_api_key: Optional[str]) -> str:
     if args_api_key:
@@ -632,6 +688,13 @@ def main():
         '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
     )
 
+    note_parser = subparsers.add_parser('note', help='Add a note to a ticket')
+    note_parser.add_argument('ticket_number', type=int, help='Redmine ticket number')
+    note_parser.add_argument('note', help='Note text to add to the ticket')
+    note_parser.add_argument(
+        '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -652,6 +715,8 @@ def main():
         )
     elif args.command == 'report':
         workflow.generate_report()
+    elif args.command == 'note':
+        workflow.add_note(args.ticket_number, args.note)
 
 
 if __name__ == '__main__':
