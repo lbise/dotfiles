@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
+import subprocess
 import sys
 from typing import Optional
 
@@ -47,17 +49,23 @@ class RedmineClient:
                 return user
         return None
 
-    def get_issues_by_assigned_user(self, user_id: int, limit: int = 100, status_filter: Optional[str] = None, priority_filter: Optional[str] = None) -> dict:
+    def get_issues_by_assigned_user(
+        self,
+        user_id: int,
+        limit: int = 100,
+        status_filter: Optional[str] = None,
+        priority_filter: Optional[str] = None,
+    ) -> dict:
         url = f'{self.base_url}/issues.json'
         params = {
             'assigned_to_id': str(user_id),
             'limit': str(limit),
             'sort': 'priority:desc',
         }
-        
+
         # Note: Redmine API filtering by status/priority names is handled client-side
         # since the API typically expects IDs rather than names
-            
+
         response = self.session.get(url, params=params)
         response.raise_for_status()
         return response.json()
@@ -67,10 +75,10 @@ class RedmineClient:
         url = f'{self.base_url}/issues/{issue_id}.json'
         response = self.session.get(url)
         response.raise_for_status()
-        
+
         # Get the issue to determine available status transitions
-        issue_data = response.json()
-        
+        response.json()  # We get the response but don't need to store it
+
         # For simplicity, we'll use a common mapping of status names to likely IDs
         # This may need to be adjusted based on your Redmine configuration
         status_mapping = {
@@ -79,30 +87,186 @@ class RedmineClient:
             'resolved': 3,
             'feedback': 4,
             'closed': 5,
-            'rejected': 6
+            'rejected': 6,
         }
-        
+
         status_id = status_mapping.get(status_name.lower())
         if not status_id:
             raise ValueError(f'Unknown status: {status_name}')
-        
+
         # Update the issue
         update_url = f'{self.base_url}/issues/{issue_id}.json'
-        update_data = {
-            'issue': {
-                'status_id': status_id
-            }
-        }
-        
+        update_data = {'issue': {'status_id': status_id}}
+
         response = self.session.put(update_url, json=update_data)
         response.raise_for_status()
-        
+
         return response.json() if response.content else {}
 
 
 class WorkflowManager:
     def __init__(self, redmine_url: str, api_key: str):
         self.redmine = RedmineClient(redmine_url, api_key)
+
+    def _is_git_repository(self) -> bool:
+        try:
+            subprocess.run(
+                ['git', 'rev-parse', '--git-dir'],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return False
+
+    def _get_current_git_branch(self) -> Optional[str]:
+        try:
+            result = subprocess.run(
+                ['git', 'branch', '--show-current'],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return result.stdout.strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
+    def _sanitize_branch_name(self, subject: str, ticket_number: int) -> str:
+        # Remove special characters and replace spaces with hyphens
+        sanitized = re.sub(r'[^\w\s-]', '', subject)
+        sanitized = re.sub(r'\s+', '-', sanitized.strip())
+        # Ensure it starts with the ticket number
+        branch_name = f'{ticket_number}-{sanitized}'
+        # Limit length to 32 characters without cutting words
+        if len(branch_name) > 32:
+            # Find the last complete word that fits
+            truncated = branch_name[:32]
+            # If it ends with a hyphen, that's fine
+            if truncated.endswith('-'):
+                branch_name = truncated.rstrip('-')
+            else:
+                # Find the last hyphen to avoid cutting a word
+                last_hyphen = truncated.rfind('-')
+                if last_hyphen > len(
+                    str(ticket_number)
+                ):  # Ensure we keep at least the ticket number
+                    branch_name = truncated[:last_hyphen]
+                else:
+                    # If no good place to cut, just truncate and remove trailing hyphen
+                    branch_name = truncated.rstrip('-')
+        return branch_name.lower()
+
+    def _create_git_branch(self, branch_name: str) -> bool:
+        try:
+            # Check if branch already exists
+            result = subprocess.run(
+                ['git', 'branch', '--list', branch_name], capture_output=True, text=True
+            )
+            if branch_name in result.stdout:
+                # Branch exists, checkout to it
+                subprocess.run(
+                    ['git', 'checkout', branch_name],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                print(f'✓ Switched to existing git branch: {branch_name}')
+                return True
+
+            # Create and checkout the new branch
+            subprocess.run(
+                ['git', 'checkout', '-b', branch_name],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            print(f'✓ Created and switched to git branch: {branch_name}')
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f'Warning: Could not create git branch - {e}', file=sys.stderr)
+            return False
+
+    def _ensure_notes_directory(self) -> str:
+        notes_dir = os.path.join(os.getcwd(), 'ai_notes', 'tickets')
+        os.makedirs(notes_dir, exist_ok=True)
+        return notes_dir
+
+    def _generate_ticket_markdown(self, issue_data: dict, ticket_number: int) -> str:
+        issue = issue_data['issue']
+        ticket_url = f'{self.redmine.base_url}/issues/{ticket_number}'
+
+        markdown_content = f"""# Ticket #{ticket_number}: {issue['subject']}
+
+## Details
+- **URL**: {ticket_url}
+- **Status**: {issue['status']['name']}
+- **Priority**: {issue['priority']['name']}
+- **Assigned to**: {issue.get('assigned_to', {}).get('name', 'Unassigned')}
+- **Project**: {issue['project']['name']}
+"""
+
+        if issue.get('created_on'):
+            markdown_content += f'- **Created**: {issue["created_on"]}\n'
+        if issue.get('updated_on'):
+            markdown_content += f'- **Updated**: {issue["updated_on"]}\n'
+
+        if issue.get('description'):
+            markdown_content += f'\n## Description\n{issue["description"]}\n'
+
+        # Add custom fields if they exist
+        if issue.get('custom_fields'):
+            markdown_content += '\n## Custom Fields\n'
+            for field in issue['custom_fields']:
+                value = field.get('value', 'Not set')
+                if isinstance(value, list):
+                    value = ', '.join(str(v) for v in value)
+                markdown_content += f'- **{field["name"]}**: {value}\n'
+
+        # Add notes/comments if they exist
+        if issue.get('journals'):
+            markdown_content += '\n## Notes/Comments\n'
+            for journal in issue['journals']:
+                if journal.get('notes'):
+                    user = journal.get('user', {}).get('name', 'Unknown user')
+                    created_on = journal.get('created_on', 'Unknown date')
+                    markdown_content += f'\n### {user} on {created_on}\n'
+                    markdown_content += f'{journal["notes"]}\n'
+
+                # Show field changes in journals
+                if journal.get('details'):
+                    for detail in journal['details']:
+                        if detail.get('property') == 'attr':
+                            field_name = detail.get('name', 'Unknown field')
+                            old_value = detail.get('old_value', '')
+                            new_value = detail.get('new_value', '')
+                            markdown_content += f'- Changed {field_name}: "{old_value}" → "{new_value}"\n'
+
+        markdown_content += '\n## Work Notes\n\n<!-- Add your work notes here -->\n'
+
+        return markdown_content
+
+    def _write_ticket_markdown(
+        self, issue_data: dict, ticket_number: int, branch_name: Optional[str] = None
+    ) -> None:
+        try:
+            notes_dir = self._ensure_notes_directory()
+            markdown_content = self._generate_ticket_markdown(issue_data, ticket_number)
+
+            if branch_name:
+                filename = f'{branch_name}.md'
+            else:
+                filename = f'ticket_{ticket_number}.md'
+            filepath = os.path.join(notes_dir, filename)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(markdown_content)
+
+            print(f'✓ Created ticket notes: {filepath}')
+        except Exception as e:
+            print(
+                f'Warning: Could not create ticket markdown file - {e}', file=sys.stderr
+            )
 
     def view_ticket(self, ticket_number: int) -> None:
         try:
@@ -176,8 +340,40 @@ class WorkflowManager:
 
     def start_ticket(self, ticket_number: int) -> None:
         print(f'Starting work on ticket #{ticket_number}')
+
+        # Get ticket information first to get the subject and full data
+        try:
+            issue_data = self.redmine.get_issue(ticket_number)
+            issue = issue_data['issue']
+            ticket_subject = issue['subject']
+        except Exception as e:
+            print(f'Error: Could not fetch ticket information - {e}', file=sys.stderr)
+            sys.exit(1)
+
         self.view_ticket(ticket_number)
-        
+
+        # Create git branch and markdown file only if in a git repository
+        if self._is_git_repository():
+            branch_name = self._sanitize_branch_name(ticket_subject, ticket_number)
+            print(f'\nDetected git repository. Creating branch: {branch_name}')
+            if self._create_git_branch(branch_name):
+                # Get the current git branch name after creating/switching to it
+                current_branch = self._get_current_git_branch()
+                if current_branch:
+                    print('\nCreating ticket notes markdown file...')
+                    self._write_ticket_markdown(
+                        issue_data, ticket_number, current_branch
+                    )
+                else:
+                    print(
+                        'Warning: Could not determine current git branch name',
+                        file=sys.stderr,
+                    )
+        else:
+            print(
+                '\nNot in a git repository. Skipping branch and markdown file creation.'
+            )
+
         # Update ticket status to "In Progress"
         try:
             print(f'\nUpdating ticket #{ticket_number} status to "In Progress"...')
@@ -187,17 +383,31 @@ class WorkflowManager:
             print(f'Warning: Could not update ticket status - {e}', file=sys.stderr)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 422:
-                print(f'Warning: Could not update ticket status - invalid status transition', file=sys.stderr)
+                print(
+                    'Warning: Could not update ticket status - invalid status transition',
+                    file=sys.stderr,
+                )
             else:
-                print(f'Warning: Could not update ticket status - HTTP {e.response.status_code}', file=sys.stderr)
+                print(
+                    f'Warning: Could not update ticket status - HTTP {e.response.status_code}',
+                    file=sys.stderr,
+                )
         except requests.exceptions.RequestException as e:
             print(f'Warning: Could not update ticket status - {e}', file=sys.stderr)
 
-    def summary_tickets(self, username: Optional[str] = None, status_filter: Optional[str] = None, priority_filter: Optional[str] = None) -> None:
+    def summary_tickets(
+        self,
+        username: Optional[str] = None,
+        status_filter: Optional[str] = None,
+        priority_filter: Optional[str] = None,
+    ) -> None:
         try:
             if username:
-                print(f'Warning: User lookup by username is not supported due to API restrictions. Using current user instead.', file=sys.stderr)
-            
+                print(
+                    'Warning: User lookup by username is not supported due to API restrictions. Using current user instead.',
+                    file=sys.stderr,
+                )
+
             # Always use current user from API since user lookup by name is forbidden
             current_user_data = self.redmine.get_current_user()
             user_data = current_user_data['user']
@@ -207,27 +417,44 @@ class WorkflowManager:
                 display_name = user_data.get('login', 'Unknown User')
 
             # Get issues assigned to the user
-            issues_data = self.redmine.get_issues_by_assigned_user(user_id, status_filter=status_filter, priority_filter=priority_filter)
+            issues_data = self.redmine.get_issues_by_assigned_user(
+                user_id, status_filter=status_filter, priority_filter=priority_filter
+            )
             issues = issues_data.get('issues', [])
 
             # Parse comma-separated filters
             status_list = []
             if status_filter:
-                status_list = [s.strip().lower() for s in status_filter.split(',') if s.strip()]
-            
+                status_list = [
+                    s.strip().lower() for s in status_filter.split(',') if s.strip()
+                ]
+
             priority_list = []
             if priority_filter:
-                priority_list = [p.strip().lower() for p in priority_filter.split(',') if p.strip()]
+                priority_list = [
+                    p.strip().lower() for p in priority_filter.split(',') if p.strip()
+                ]
 
             # Apply client-side filtering since Redmine API filtering by name is complex
             if status_list:
-                issues = [issue for issue in issues if issue['status']['name'].lower() in status_list]
-            
+                issues = [
+                    issue
+                    for issue in issues
+                    if issue['status']['name'].lower() in status_list
+                ]
+
             if priority_list:
-                issues = [issue for issue in issues if issue['priority']['name'].lower() in priority_list]
+                issues = [
+                    issue
+                    for issue in issues
+                    if issue['priority']['name'].lower() in priority_list
+                ]
+
+            # Sort issues by status name
+            issues.sort(key=lambda issue: issue['status']['name'])
 
             if not issues:
-                filter_desc = ""
+                filter_desc = ''
                 if status_list or priority_list:
                     filters = []
                     if status_list:
@@ -240,7 +467,7 @@ class WorkflowManager:
                 print(f'No tickets assigned to {display_name}{filter_desc}')
                 return
 
-            filter_desc = ""
+            filter_desc = ''
             if status_list or priority_list:
                 filters = []
                 if status_list:
@@ -302,12 +529,15 @@ class WorkflowManager:
             # Filter for In Progress and Resolved status
             report_statuses = ['in progress', 'resolved']
             filtered_issues = [
-                issue for issue in issues 
+                issue
+                for issue in issues
                 if issue['status']['name'].lower() in report_statuses
             ]
 
             if not filtered_issues:
-                print('<p>No tickets with "In Progress" or "Resolved" status found.</p>')
+                print(
+                    '<p>No tickets with "In Progress" or "Resolved" status found.</p>'
+                )
                 return
 
             print('<ul>')
@@ -315,9 +545,9 @@ class WorkflowManager:
                 issue_id = issue['id']
                 subject = issue['subject']
                 ticket_url = f'{self.redmine.base_url}/issues/{issue_id}'
-                
+
                 print(f'<li>{subject} (<a href="{ticket_url}">#{issue_id}</a>)</li>')
-            
+
             print('</ul>')
 
         except requests.exceptions.HTTPError as e:
@@ -395,7 +625,8 @@ def main():
     )
 
     report_parser = subparsers.add_parser(
-        'report', help='Generate weekly report in HTML format for In Progress and Resolved tickets'
+        'report',
+        help='Generate weekly report in HTML format for In Progress and Resolved tickets',
     )
     report_parser.add_argument(
         '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
@@ -416,7 +647,9 @@ def main():
     elif args.command == 'view':
         workflow.view_ticket(args.ticket_number)
     elif args.command == 'summary':
-        workflow.summary_tickets(args.user, getattr(args, 'status', None), getattr(args, 'priority', None))
+        workflow.summary_tickets(
+            args.user, getattr(args, 'status', None), getattr(args, 'priority', None)
+        )
     elif args.command == 'report':
         workflow.generate_report()
 
