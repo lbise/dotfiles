@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
-ARCHIVES_DIR="$(cd "$SCRIPT_DIR" && realpath ../archives)"
+ARCHIVES_DIR="/mnt/ch03pool/murten_mirror/shannon/linux/tools/opencode"
 INSTALL_DIR="$HOME/.local/bin"
 OPENCODE_BIN_DIR="$HOME/.opencode"
 OPENCODE_CACHE_DIR="$HOME/.cache/opencode"
@@ -85,15 +85,15 @@ version_greater() {
 
     # Pad shorter version with zeros
     local max_len=$((${#v1_parts[@]} > ${#v2_parts[@]} ? ${#v1_parts[@]} : ${#v2_parts[@]}))
-    
+
     for ((i=0; i<max_len; i++)); do
         local v1_part=${v1_parts[i]:-0}
         local v2_part=${v2_parts[i]:-0}
-        
+
         # Remove leading zeros and compare numerically
         v1_part=$((10#$v1_part))
         v2_part=$((10#$v2_part))
-        
+
         if [[ $v1_part -gt $v2_part ]]; then
             return 0  # v1 > v2
         elif [[ $v1_part -lt $v2_part ]]; then
@@ -101,7 +101,7 @@ version_greater() {
         fi
         # If equal, continue to next component
     done
-    
+
     return 1  # versions are equal
 }
 
@@ -142,12 +142,12 @@ install_opencode() {
 
     # The archive extracts to the current directory with .opencode and .cache at root level
     local extract_dir="$temp_dir"
-    
+
     # Verify the required directories exist
     if [[ ! -d "$extract_dir/.opencode" ]]; then
         error "Could not find .opencode directory in archive"
     fi
-    
+
     if [[ ! -f "$extract_dir/.opencode/bin/opencode" ]]; then
         error "Could not find opencode binary at .opencode/bin/opencode"
     fi
@@ -158,7 +158,7 @@ install_opencode() {
         rm -rf "$OPENCODE_BIN_DIR"
         mkdir -p "$OPENCODE_BIN_DIR/bin"
     fi
-    
+
     # Check if cache already exists - if so, preserve it
     local cache_exists=false
     if [[ -d "$OPENCODE_CACHE_DIR" ]]; then
@@ -182,7 +182,7 @@ install_opencode() {
     else
         log "Skipping cache installation - preserving existing cache"
     fi
-    
+
     # Install binary to ~/.opencode/bin/ (always update the binary)
     log "Installing opencode binary to $OPENCODE_BIN_DIR/bin/..."
     cp "$extract_dir/.opencode/bin/opencode" "$OPENCODE_BIN_DIR/bin/opencode"
@@ -218,7 +218,7 @@ get_latest_clangd_release() {
     # Extract download URL for linux x86_64 using shell text processing
     local download_url
     download_url=$(echo "$release_info" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*clangd-linux-[^"]*\.zip"' | grep -o 'https://[^"]*' | head -1)
-    
+
     if [[ -z "$download_url" ]]; then
         error "Could not find clangd linux release download URL"
     fi

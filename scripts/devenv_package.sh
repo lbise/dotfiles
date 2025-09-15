@@ -67,9 +67,9 @@ install_package() {
 
 package_local() {
     local temp_dir="$1"
-    
+
     log "Packaging opencode from local machine..."
-    
+
     # Find opencode executable
     local opencode_path=""
     if command -v opencode >/dev/null 2>&1; then
@@ -85,15 +85,15 @@ package_local() {
             fi
         done
     fi
-    
+
     if [[ -z "$opencode_path" ]]; then
         error "opencode executable not found on local machine. Please install opencode first."
     fi
-    
+
     # Create directory structure
     mkdir -p "$temp_dir/.opencode/bin"
     mkdir -p "$temp_dir/.cache"
-    
+
     # Copy opencode executable
     log "Copying opencode executable..."
     if [[ -L "$opencode_path" ]]; then
@@ -105,19 +105,19 @@ package_local() {
         cp "$opencode_path" "$temp_dir/.opencode/bin/opencode"
     fi
     chmod +x "$temp_dir/.opencode/bin/opencode"
-    
+
     # Get opencode version and update package name
     log "Getting opencode version..."
     local opencode_version=$("$opencode_path" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
     log "OpenCode version: $opencode_version"
-    
+
     # Update package name with version
     if [[ "$opencode_version" != "unknown" ]]; then
         PACKAGE_NAME="opencode-v${opencode_version}-offline-${TIMESTAMP}.tar.gz"
         OUTPUT_PATH="$OUTPUT_DIR/$PACKAGE_NAME"
         log "Updated package name: $PACKAGE_NAME"
     fi
-    
+
     # Copy cached dependencies (only from ~/.cache/opencode)
     log "Copying cached dependencies..."
     local cache_found=false
@@ -126,7 +126,7 @@ package_local() {
         cp -r "$HOME/.cache/opencode" "$temp_dir/.cache/"
         cache_found=true
     fi
-    
+
     if [[ "$cache_found" == false ]]; then
         log "WARNING: No cached dependencies found at ~/.cache/opencode. Creating empty cache directory."
         mkdir -p "$temp_dir/.cache/opencode"
@@ -135,9 +135,9 @@ package_local() {
 
 package_container() {
     local temp_dir="$1"
-    
+
     log "Packaging opencode from Docker container..."
-    
+
     # Auto-detect image if not specified and no container name given
     if [[ -z "$IMAGE_NAME" && "$CONTAINER_NAME" == "opencode-package-temp" ]]; then
         log "Auto-detecting Docker image with opencode..."
@@ -158,19 +158,19 @@ package_container() {
         IMAGE_NAME=$(echo "$candidate_images" | head -1)
         log "Using image: $IMAGE_NAME"
     fi
-    
+
     # Handle container vs image mode
     local using_existing_container=false
     if [[ "$CONTAINER_NAME" != "opencode-package-temp" ]]; then
         # Using existing container
         log "Using existing container: $CONTAINER_NAME"
         using_existing_container=true
-        
+
         # Check if container exists and is running
         if ! docker container ls -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
             error "Container '$CONTAINER_NAME' not found"
         fi
-        
+
         # Start container if it's not running
         if ! docker container ls --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
             log "Starting container: $CONTAINER_NAME"
@@ -181,19 +181,19 @@ package_container() {
         if [[ -z "$IMAGE_NAME" ]]; then
             error "No image specified and no suitable images found"
         fi
-        
+
         # Check if Docker image exists
         if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${IMAGE_NAME}$"; then
             error "Docker image '$IMAGE_NAME' not found. Available images:"
             docker images --format "table {{.Repository}}:{{.Tag}}" | grep -v "<none>"
             exit 1
         fi
-        
+
         # Start container to extract files
         log "Starting temporary container from image: $IMAGE_NAME"
         docker run -d --name "$CONTAINER_NAME" "$IMAGE_NAME" sleep 3600
     fi
-    
+
     # Create directory structure
     mkdir -p "$temp_dir/.opencode/bin"
     mkdir -p "$temp_dir/.cache"
@@ -235,7 +235,7 @@ package_container() {
         log "WARNING: No cached dependencies found at /home/leodev/.cache/opencode"
         mkdir -p "$temp_dir/.cache/opencode"
     fi
-    
+
     # Clean up temporary container (only if we created it)
     if [[ "$using_existing_container" == false ]]; then
         trap "docker rm -f '$CONTAINER_NAME' 2>/dev/null || true" EXIT
@@ -265,7 +265,7 @@ Examples:
   # Package mode (default - from local machine)
   $0                                        # Package from local machine, save to current directory
   $0 /tmp/packages                          # Package from local machine, save to /tmp/packages
-  
+
   # Package from Docker container
   $0 --container my-devenv-container        # Package from named container
   $0 --image my-devenv:latest /tmp/packages # Package from image, save to /tmp/packages
@@ -510,17 +510,20 @@ log "Creating tarball: $PACKAGE_NAME"
 cd "$TEMP_DIR"
 tar -czf "$OUTPUT_PATH" .
 
-# Move to archives directory if we're in the dotfiles repository
-DOTFILES_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ARCHIVES_DIR="$DOTFILES_DIR/archives"
-
-if [[ -d "$ARCHIVES_DIR" && "$OUTPUT_DIR" == "$DOTFILES_DIR" ]]; then
-    FINAL_PATH="$ARCHIVES_DIR/$PACKAGE_NAME"
-    log "Moving package to archives directory..."
-    mv "$OUTPUT_PATH" "$FINAL_PATH"
-    OUTPUT_PATH="$FINAL_PATH"
-    log "Package moved to: $OUTPUT_PATH"
+# Move to pool
+POOL_DIR="/mnt/ch03pool/murten_mirror/shannon/linux/tools/opencode"
+if [ ! -d $POOL_DIR ]; then
+    log "Pool not accessible, cannot copy archive to $POOL_DIR"
+    sudo mount -a
+    if [ ! -d $POOL_DIR ]; then
+        log "Cannot mount pool, aborting..."
+        exit 1
+    fi
 fi
+
+log "Moving package to $POOL_DIR..."
+mv "$OUTPUT_PATH" "$POOL_DIR"
+OUTPUT_PATH="$POOL_DIR"
 
 # Get package size
 PACKAGE_SIZE=$(du -h "$OUTPUT_PATH" | cut -f1)
