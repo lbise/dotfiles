@@ -17,11 +17,21 @@
     "mcp-redmine": {
       "type": "local",
       "command": ["uvx", "--from", "mcp-redmine==2025.07.09.120802", "--refresh-package", "mcp-redmine", "mcp-redmine"],
-      "enabled": true,
+      "enabled": false,
       "environment": {
         "REDMINE_URL": "https://ch03rdteam.phonak.com/redmine/",
         "REDMINE_API_KEY": "{env:REDMINE_API_KEY}",
       }
     },
   },
+  "formatter" : {
+    "clang-format" : {
+      "command": ["/home/shannon/_tools/venv/dev_bc562bc153ab202c94114ea86b475908/bin/clang-format", "--style-file={env:$ANDROMEDA_ROOT}/hooks/.clang-format", "-i $FILE"],
+      "extensions" : [".c", ".cpp", ".h", ".hpp", ".ino", ".unity"]
+    },
+    "ruff" : {
+      "command": ["ruff", "format", "$FILE", "--config {env:$ANDROMEDA_ROOT}/pyproject.toml"],
+      "extensions" : [".py", ".pyi"]
+    }
+  }
 }
