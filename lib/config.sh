@@ -114,29 +114,20 @@ get_package_manager_command() {
 
 # Get symlinks configuration
 get_symlinks() {
-    local category="$1"
     local config_file="symlinks.yml"
     
-    if [ "$category" = "all" ]; then
-        # Get all symlink categories
-        for cat in core config gpg applications; do
-            get_symlinks "$cat"
-        done
-        return
-    fi
-    
-    # Extract symlinks for specific category
-    awk "
-        /^[[:space:]]*${category}:/ { in_section = 1; next }
-        in_section && /^[[:space:]]*[a-zA-Z]/ && !/^[[:space:]]*\"/ { in_section = 0 }
-        in_section && /^[[:space:]]*\".*\":/ { 
-            line = \$0
-            gsub(/^[[:space:]]*\"/, \"\", line)
-            gsub(/\":[[:space:]]*\"/, \"|\", line)
-            gsub(/\"$/, \"\", line)
+    # Extract all symlinks from the simplified format
+    awk '
+        /^[[:space:]]*symlinks:/ { in_section = 1; next }
+        in_section && /^[[:space:]]*[a-zA-Z]/ && !/^[[:space:]]*"/ { in_section = 0 }
+        in_section && /^[[:space:]]*".*":/ { 
+            line = $0
+            gsub(/^[[:space:]]*"/, "", line)
+            gsub(/":[[:space:]]*"/, "|", line)
+            gsub(/"$/, "", line)
             print line
         }
-    " "$CONFIG_DIR/$config_file"
+    ' "$CONFIG_DIR/$config_file"
 }
 
 # Get software configuration

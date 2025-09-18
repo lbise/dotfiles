@@ -1,49 +1,34 @@
 # Symbolic link configuration
+# Simple source -> destination mapping
 symlinks:
-  # Core dotfiles that always get linked
-  core:
-    ".vimrc": ".vimrc"
-    "vim": ".vim"
-    ".zshrc": ".zshrc"
-    ".bashrc": ".bashrc"
-    ".ctags": ".ctags"
-    "scripts": ".scripts"
-    ".gdbinit": ".gdbinit"
-    ".gdbinit.d": ".gdbinit.d"
-    ".tmux.conf": ".tmux.conf"
-    "tmux": ".tmux"
-    ".clang-format": ".clang-format"
-    ".aider.conf.yml": ".aider.conf.yml"
+  # Core dotfiles
+  ".vimrc": ".vimrc"
+  "vim": ".vim"
+  ".zshrc": ".zshrc"
+  ".bashrc": ".bashrc"
+  ".ctags": ".ctags"
+  "scripts": ".scripts"
+  ".gdbinit": ".gdbinit"
+  ".gdbinit.d": ".gdbinit.d"
+  ".tmux.conf": ".tmux.conf"
+  "tmux": ".tmux"
+  ".clang-format": ".clang-format"
+  ".aider.conf.yml": ".aider.conf.yml"
 
   # Config directory files
-  config:
-    "nvim": ".config/nvim"
-    "ruff": ".config/ruff"
-    "ghostty": ".config/ghostty"
-    "opencode.json": ".config/opencode/opencode.json"
+  "nvim": ".config/nvim"
+  "ruff": ".config/ruff"
+  "ghostty": ".config/ghostty"
+  "opencode.json": ".config/opencode/opencode.json"
 
   # GPG configuration
-  gpg:
-    "gpg/gpg.conf": ".gnupg/gpg.conf"
-    "gpg/gpg-agent.conf": ".gnupg/gpg-agent.conf"
-
-  # Git configuration (conditional)
-  git:
-    work: ".gitconfigwork"
-    default: ".gitconfig"
+  "gpg/gpg.conf": ".gnupg/gpg.conf"
+  "gpg/gpg-agent.conf": ".gnupg/gpg-agent.conf"
 
   # Application desktop files
-  applications:
-    "ghostty/ghostty.desktop": ".local/share/applications/ghostty.desktop"
+  "ghostty/ghostty.desktop": ".local/share/applications/ghostty.desktop"
 
-# Directories that need to be created if they don't exist
-required_directories:
-  - ".config"
-  - ".config/opencode"
-  - ".gnupg"
-  - ".local/share/applications"
-
-# Directory permissions
+# Directory permissions (applied after symlink creation)
 directory_permissions:
   ".gnupg": "700"
   ".ssh": "700"
