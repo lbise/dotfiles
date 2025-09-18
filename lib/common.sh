@@ -29,8 +29,6 @@ COMMON_PACKAGES="zsh fzf ripgrep gzip tmux curl wget unzip tar npm pass"
 UBUNTU_COMMON_PACKAGES="fd-find pinentry-tty build-essential gdb"
 MAC_PACKAGES="fd gpg universal-ctags nvim"
 
-# Software versions and paths
-NVIM_PLUGINS_MD5=$(cat "$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../archives)/plugins.md5")
 GPG_KEYID="ED0DFB79FF83B277"
 
 # Global flags (set by main install script)
@@ -95,5 +93,5 @@ export DOTFILES_DIR LIB_DIR
 export RM_RF LN_SF SH_C CHSH_S X_ON X_OFF CHMOD CP MV MKDIR UNTAR
 export ONEDRIVE_PATH KEYS_SSH_DIR KEYS_GPG_DIR
 export COMMON_PACKAGES UBUNTU_COMMON_PACKAGES MAC_PACKAGES
-export NVIM_PLUGINS_MD5 GPG_KEYID
+export GPG_KEYID
 export TEST_MODE LINK_ONLY WORK_INSTALL COPY_VIM WSL_ONLY WSL

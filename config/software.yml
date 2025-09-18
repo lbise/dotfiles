@@ -45,17 +45,6 @@ software:
     check_path: "$HOME/.oh-my-zsh"
     install_command: 'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'
 
-  neovim_plugins:
-    source_template: "/mnt/ch03pool/murten_mirror/shannon/packages/bootstrap/nvim_plugins_{md5}.tar.gz"
-    destination: "$HOME/.local/share"
-    check_file: "{destination}/nvim_plugins_installed.txt"
-    vim_plugins:
-      source: "vim_plugins/*"
-      destination: "vim/pack/my-plugins/start"
-    conditions:
-      - "copy_vim"
-
 # Global software configuration
 global:
   gpg_keyid: "ED0DFB79FF83B277"
-  plugins_md5_file: "archives/plugins.md5"

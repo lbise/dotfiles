@@ -24,7 +24,6 @@ function print_usage() {
             -w|--work: Perform installation for work environment
             -k|--keys: Folder to find keys to install
             -s|--wslonly: Perform WSL installation only
-            -c|--copyvim: Copy VIM plugins (Used when no internet access available)
 
         Profiles:
             minimal:   Symlinks only
