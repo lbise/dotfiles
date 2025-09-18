@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Main install script for Leo's dotfiles - modular version
+# Leo's dotfiles install script
 set -euo pipefail
 
 # Get the directory where this script is located
@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source all modules
 source "$SCRIPT_DIR/lib/common.sh"
+source "$SCRIPT_DIR/lib/config.sh"
 source "$SCRIPT_DIR/lib/symlinks.sh"
 source "$SCRIPT_DIR/lib/packages.sh"
 source "$SCRIPT_DIR/lib/software.sh"
@@ -14,54 +15,88 @@ source "$SCRIPT_DIR/lib/keys.sh"
 source "$SCRIPT_DIR/lib/environment.sh"
 
 function print_usage() {
-    USAGE="$(basename "$0") [-h|--help] [-l|--linkonly] [-t|--test] -- Install dotfiles
+    USAGE="$(basename "$0") [-h|--help] [-p|--profile PROFILE] [-t|--test] -- Install dotfiles using config files
 
         where:
             -h|--help: Print this help
-            -l|--linkonly: Only perform symlink setup. Do not install packages.
-            -w|--work: Perform installation for work.
-            -k|--keys: Folder to find keys to install
-            -s|--wslonly: Perform WSL installation only.
+            -p|--profile PROFILE: Use predefined profile (minimal, developer, server)
             -t|--test: Do not perform any operation just print
-            -c|--copyvim: Copy VIM plugins (Used when no internet access available)"
+            -w|--work: Perform installation for work environment
+            -k|--keys: Folder to find keys to install
+            -s|--wslonly: Perform WSL installation only
+            -c|--copyvim: Copy VIM plugins (Used when no internet access available)
+
+        Profiles:
+            minimal:   Symlinks only
+            developer: Full development setup
+            server:    Server environment (no GUI tools)"
     echo "$USAGE"
 }
 
-function install_common() {
-    print_section "Installing common items"
+function install_from_profile() {
+    local profile="$1"
 
-    # Install software components
-    install_software
+    print_section "Installing using profile: $profile"
 
-    # Setup symlinks
-    setup_symlinks
+    case "$profile" in
+        "minimal")
+            export SKIP_PACKAGES=1
+            export SKIP_SOFTWARE=1
+            export SKIP_KEYS=1
+            setup_symlinks
+            ;;
+        "server")
+            export SKIP_APPLICATIONS=1
+            install_packages
+            install_software
+            setup_symlinks
+            ;;
+        "developer"|"")
+            # Full installation
+            install_packages
+            install_software
+            setup_symlinks
+            install_keys
+            install_environment
+            ;;
+        *)
+            echo "Unknown profile: $profile"
+            echo "Available profiles: minimal, developer, server"
+            exit 1
+            ;;
+    esac
 }
 
-function install_ubuntu() {
-    install_ubuntu_packages
-    install_common
-}
+function test_yaml_config() {
+    print_section "Testing YAML configuration parsing"
 
-function install_macos() {
-    install_macos_packages  
-    install_common
-}
+    echo "=== Common packages ==="
+    get_yaml_array "packages.yml" "common"
 
-function install_arch() {
-    install_arch_packages
-    install_common
+    echo "=== Ubuntu additional packages ==="
+    get_yaml_array "packages.yml" "ubuntu.additional"
+
+    echo "=== Node.js version ==="
+    get_software_config "nodejs" "version"
+
+    echo "=== Core symlinks ==="
+    get_symlinks "core"
+
+    echo "=== Package manager commands ==="
+    echo "Ubuntu update: $(get_package_manager_command "ubuntu" "update")"
+    echo "Ubuntu install: $(get_package_manager_command "ubuntu" "install")"
 }
 
 echo "#########################################################################"
-echo "Leo's dotfiles install script (modular version)"
+echo "Leo's dotfiles install script"
 echo "#########################################################################"
 
 # Initialize global variables
 TEST_MODE=0
-LINK_ONLY=0
 WORK_INSTALL=0
 COPY_VIM=0
 WSL_ONLY=0
+PROFILE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -70,9 +105,9 @@ while [[ $# -gt 0 ]]; do
             TEST_MODE=1
             shift
             ;;
-        -l|--linkonly)
-            LINK_ONLY=1
-            shift
+        -p|--profile)
+            PROFILE="$2"
+            shift 2
             ;;
         -w|--work)
             WORK_INSTALL=1
@@ -91,6 +126,10 @@ while [[ $# -gt 0 ]]; do
             COPY_VIM=1
             shift
             ;;
+        --test-yaml)
+            test_yaml_config
+            exit 0
+            ;;
         -h|--help)
             print_usage
             exit 0
@@ -102,7 +141,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Export variables for use by modules
-export TEST_MODE LINK_ONLY WORK_INSTALL COPY_VIM WSL_ONLY
+export TEST_MODE WORK_INSTALL COPY_VIM WSL_ONLY
 
 # Detect OS and WSL
 detect_os
@@ -111,37 +150,15 @@ detect_wsl
 # Apply test mode overrides
 apply_test_mode
 
-# Handle link-only mode
-if [ "$LINK_ONLY" = 1 ]; then
-    setup_symlinks
-    echo "#########################################################################"
-    echo "Symlink setup completed"
-    echo "#########################################################################"
-    exit 0
+# Load YAML configuration
+load_config
+
+# Run installation based on profile or default
+if [ -n "$PROFILE" ]; then
+    install_from_profile "$PROFILE"
+else
+    install_from_profile "developer"
 fi
-
-# Main installation based on OS
-case "$OS" in
-    "Ubuntu")
-        install_ubuntu
-        ;;
-    "Darwin")
-        install_macos
-        ;;
-    "Arch Linux")
-        install_arch
-        ;;
-    *)
-        echo "Unsupported OS: $OS"
-        exit 1
-        ;;
-esac
-
-# Install keys
-install_keys
-
-# Install environment-specific components
-install_environment
 
 echo "#########################################################################"
 echo "Installation completed"

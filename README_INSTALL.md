@@ -1,6 +1,6 @@
-# YAML-Driven Installation System
+# Installation System
 
-This system provides a declarative approach to managing dotfiles installation using YAML configuration files.
+This system provides a declarative approach to managing dotfiles installation using configuration files.
 
 ## 🎯 **Key Benefits**
 
@@ -24,9 +24,9 @@ config/
 
 ### Basic Installation
 ```bash
-./install-yaml.sh                    # Full developer setup
-./install-yaml.sh --test             # Dry run
-./install-yaml.sh --profile minimal  # Symlinks only
+./install.sh                    # Full developer setup
+./install.sh --test             # Dry run
+./install.sh --profile minimal  # Symlinks only
 ```
 
 ### Profiles
@@ -92,13 +92,13 @@ Perfect for Docker environments:
 ```dockerfile
 # Dockerfile
 COPY . /dotfiles
-RUN /dotfiles/install-yaml.sh --profile minimal --wslonly
+RUN /dotfiles/install.sh --profile minimal --wslonly
 ```
 
 Or use environment-specific configs:
 ```bash
 # Will automatically use docker environment settings
-ENVIRONMENT=docker ./install-yaml.sh
+ENVIRONMENT=docker ./install.sh
 ```
 
 ## 🔧 **Advanced Features**
@@ -131,21 +131,21 @@ packages:
 
 ```bash
 # Test YAML parsing
-./install-yaml.sh --test-yaml
+./install.sh --test-yaml
 
 # Test specific profiles
-./install-yaml.sh --test --profile minimal
-./install-yaml.sh --test --profile server
+./install.sh --test --profile minimal
+./install.sh --test --profile server
 
 # Test environment detection
-WORK_INSTALL=1 ./install-yaml.sh --test
+WORK_INSTALL=1 ./install.sh --test
 ```
 
 ## 🏗️ **Architecture**
 
 - **lib/config.sh**: YAML parser (pure bash, no dependencies)
 - **lib/*-yaml.sh**: YAML-driven implementation modules
-- **install-yaml.sh**: Main entry point with profile support
+- **install.sh**: Main entry point with profile support
 - **config/*.yml**: Declarative configuration files
 
 This system maintains backward compatibility while providing a modern, maintainable approach to dotfiles management.

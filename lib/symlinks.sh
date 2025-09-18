@@ -1,86 +1,126 @@
 #!/usr/bin/env bash
-# Symbolic link management for dotfiles installation
+# YAML-driven symbolic link management for dotfiles installation
 
-# Source common variables and functions
+# Source common variables and configuration utilities
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
-rm_symlinks() {
-    print_section "Deleting existing dotfiles"
+create_required_directories() {
+    print_section "Creating required directories"
+
+    # Get required directories from config
+    local dirs=$(get_yaml_array "symlinks.yml" "required_directories")
+
+    while IFS= read -r dir; do
+        if [ -n "$dir" ]; then
+            local full_path="$HOME/$dir"
+            if [ ! -d "$full_path" ]; then
+                echo "Creating directory: $full_path"
+                $MKDIR -p "$full_path"
+            fi
+        fi
+    done <<< "$dirs"
+
+    # Set directory permissions
+    $CHMOD 700 "$HOME/.gnupg" 2>/dev/null || true
+    if [ -d "$HOME/.ssh" ]; then
+        $CHMOD 700 "$HOME/.ssh"
+    fi
+}
+
+remove_existing_symlinks() {
+    print_section "Removing existing dotfiles"
     $X_ON
-    $RM_RF ~/.vimrc
-    $RM_RF ~/.vim
-    $RM_RF ~/.gitconfig
-    $RM_RF ~/.githooks
-    $RM_RF ~/.zshrc
-    $RM_RF ~/.bashrc
-    $RM_RF ~/.ctags
-    $RM_RF ~/.scripts
-    $RM_RF ~/.gdbinit
-    $RM_RF ~/.gdbinit.d
-    $RM_RF ~/.tmux.conf
-    $RM_RF ~/.tmux
-    $RM_RF ~/.config/nvim
-    $RM_RF ~/.config/ruff
-    $RM_RF ~/.config/ghostty
-    $RM_RF ~/.local/share/applications/ghostty.desktop
-    if [ ! -d ~/.gnupg ]; then
-        $MKDIR ~/.gnupg
-        $CHMOD 700 ~/.gnupg
-    fi
-    $RM_RF ~/.gnupg/gpg.conf
-    $RM_RF ~/.gnupg/gpg-agent.conf
-    $RM_RF ~/.clang-format
-    $RM_RF ~/.aider.conf.yml
-    if [ ! -d ~/.config/opencode ]; then
-        $MKDIR ~/.config/opencode
-    fi
-    $RM_RF ~/.config/opencode/opencode.json
+
+    # Remove core symlinks
+    local core_links=$(get_symlinks "core")
+    while IFS='|' read -r source target; do
+        if [ -n "$source" ] && [ -n "$target" ]; then
+            $RM_RF "$HOME/$target"
+        fi
+    done <<< "$core_links"
+
+    # Remove config symlinks
+    local config_links=$(get_symlinks "config")
+    while IFS='|' read -r source target; do
+        if [ -n "$source" ] && [ -n "$target" ]; then
+            $RM_RF "$HOME/$target"
+        fi
+    done <<< "$config_links"
+
+    # Remove other categories
+    for category in gpg applications; do
+        local links=$(get_symlinks "$category")
+        while IFS='|' read -r source target; do
+            if [ -n "$source" ] && [ -n "$target" ]; then
+                $RM_RF "$HOME/$target"
+            fi
+        done <<< "$links"
+    done
+
     $X_OFF
 }
 
-ln_symlinks() {
-    print_section "Create symbolic links"
+create_symlinks_from_config() {
+    print_section "Creating symbolic links from YAML config"
     $X_ON
-    $LN_SF "$DOTFILES_DIR/.vimrc" ~/.vimrc
-    $LN_SF "$DOTFILES_DIR/vim" ~/.vim
+
+    # Create core symlinks
+    local core_links=$(get_symlinks "core")
+    while IFS='|' read -r source target; do
+        if [ -n "$source" ] && [ -n "$target" ]; then
+            echo "Linking: $source -> $target"
+            $LN_SF "$DOTFILES_DIR/$source" "$HOME/$target"
+        fi
+    done <<< "$core_links"
+
+    # Create config symlinks
+    local config_links=$(get_symlinks "config")
+    while IFS='|' read -r source target; do
+        if [ -n "$source" ] && [ -n "$target" ]; then
+            echo "Linking: $source -> $target"
+            $LN_SF "$DOTFILES_DIR/$source" "$HOME/$target"
+        fi
+    done <<< "$config_links"
+
+    # Handle git config (conditional)
     if [ "$WORK_INSTALL" = 1 ]; then
-        $LN_SF "$DOTFILES_DIR/.gitconfigwork" ~/.gitconfig
+        $LN_SF "$DOTFILES_DIR/.gitconfigwork" "$HOME/.gitconfig"
     else
-        $LN_SF "$DOTFILES_DIR/.gitconfig" ~/.gitconfig
+        $LN_SF "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
     fi
-    $LN_SF "$DOTFILES_DIR/githooks" ~/.githooks
-    $LN_SF "$DOTFILES_DIR/.zshrc" ~/.zshrc
-    $LN_SF "$DOTFILES_DIR/.bashrc" ~/.bashrc
-    $LN_SF "$DOTFILES_DIR/.ctags" ~/.ctags
-    $LN_SF "$DOTFILES_DIR/scripts" ~/.scripts
-    $LN_SF "$DOTFILES_DIR/.gdbinit" ~/.gdbinit
-    $LN_SF "$DOTFILES_DIR/.gdbinit.d" ~/.gdbinit.d
-    $LN_SF "$DOTFILES_DIR/.tmux.conf" ~/.tmux.conf
-    $LN_SF "$DOTFILES_DIR/tmux" ~/.tmux
-    if [ ! -d ~/.config ]; then
-        $MKDIR ~/.config
+
+    # Create GPG symlinks
+    local gpg_links=$(get_symlinks "gpg")
+    while IFS='|' read -r source target; do
+        if [ -n "$source" ] && [ -n "$target" ]; then
+            echo "Linking: $source -> $target"
+            $LN_SF "$DOTFILES_DIR/$source" "$HOME/$target"
+        fi
+    done <<< "$gpg_links"
+
+    # Create application symlinks (if directory exists)
+    if [ -d "$HOME/.local/share/applications" ]; then
+        local app_links=$(get_symlinks "applications")
+        while IFS='|' read -r source target; do
+            if [ -n "$source" ] && [ -n "$target" ]; then
+                echo "Linking: $source -> $target"
+                $LN_SF "$DOTFILES_DIR/$source" "$HOME/$target"
+            fi
+        done <<< "$app_links"
     fi
-    $LN_SF "$DOTFILES_DIR/nvim" ~/.config/nvim
-    $LN_SF "$DOTFILES_DIR/ruff" ~/.config/ruff
-    $LN_SF "$DOTFILES_DIR/ghostty" ~/.config/ghostty
-    $LN_SF "$DOTFILES_DIR/gpg/gpg.conf" ~/.gnupg/gpg.conf
-    $LN_SF "$DOTFILES_DIR/gpg/gpg-agent.conf" ~/.gnupg/gpg-agent.conf
-    $LN_SF "$DOTFILES_DIR/.clang-format" ~/.clang-format
-    $LN_SF "$DOTFILES_DIR/.aider.conf.yml" ~/.aider.conf.yml
-    $LN_SF "$DOTFILES_DIR/opencode.json" ~/.config/opencode/opencode.json
-    if [ -d ~/.local/share/applications/ ]; then
-        $LN_SF "$DOTFILES_DIR/ghostty/ghostty.desktop" ~/.local/share/applications/ghostty.desktop
-    fi
+
     $X_OFF
 }
 
-setup_symlinks() {
-    rm_symlinks
-    ln_symlinks
+setup_symlinks_yaml() {
+    create_required_directories
+    remove_existing_symlinks
+    create_symlinks_from_config
 }
 
 # Allow this script to be run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     apply_test_mode
-    setup_symlinks
+    setup_symlinks_yaml
 fi
