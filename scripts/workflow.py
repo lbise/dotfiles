@@ -569,6 +569,7 @@ class WorkflowManager:
                 )
                 return
 
+            print('<h3>LeB (5d)</h3>')
             print('<ul>')
             for issue in filtered_issues:
                 issue_id = issue['id']
