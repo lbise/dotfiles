@@ -20,6 +20,8 @@ symlinks:
   "ruff": ".config/ruff"
   "ghostty": ".config/ghostty"
   "opencode.json": ".config/opencode/opencode.json"
+  "opencode/agents": ".config/opencode/agent"
+  "opencode/commands": ".config/opencode/command"
 
   # GPG configuration
   "gpg/gpg.conf": ".gnupg/gpg.conf"
