@@ -622,6 +622,43 @@ class WorkflowManager:
         # Print ticket URL for easy access
         self._print_ticket_url(ticket_number)
 
+    def set_ticket_status(self, ticket_number: int, status: str) -> None:
+        try:
+            print(f'Setting ticket #{ticket_number} status to "{status}"...')
+            self.redmine.update_issue(ticket_number, status)
+            print(f'✓ Ticket #{ticket_number} status updated to "{status}"')
+        except ValueError as e:
+            print(f'Error: {e}', file=sys.stderr)
+            print(
+                'Available statuses: new, in progress, resolved, feedback, closed, rejected',
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                print(f'Error: Ticket #{ticket_number} not found', file=sys.stderr)
+            elif e.response.status_code == 401:
+                print(
+                    'Error: Authentication failed. Check your API key', file=sys.stderr
+                )
+            elif e.response.status_code == 422:
+                print(
+                    'Error: Could not update ticket status - invalid status transition',
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f'Error: HTTP {e.response.status_code} - {e.response.text}',
+                    file=sys.stderr,
+                )
+            sys.exit(1)
+        except requests.exceptions.RequestException as e:
+            print(f'Error: Failed to connect to Redmine server - {e}', file=sys.stderr)
+            sys.exit(1)
+
+        # Print ticket URL for easy access
+        self._print_ticket_url(ticket_number)
+
 
 def get_api_key(args_api_key: Optional[str]) -> str:
     if args_api_key:
@@ -696,6 +733,20 @@ def main():
         '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
     )
 
+    set_status_parser = subparsers.add_parser(
+        'set-status', help='Set ticket status directly'
+    )
+    set_status_parser.add_argument(
+        'ticket_number', type=int, help='Redmine ticket number'
+    )
+    set_status_parser.add_argument(
+        'status',
+        help='Target status (e.g., "new", "in progress", "resolved", "closed")',
+    )
+    set_status_parser.add_argument(
+        '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -718,6 +769,8 @@ def main():
         workflow.generate_report()
     elif args.command == 'note':
         workflow.add_note(args.ticket_number, args.note)
+    elif args.command == 'set-status':
+        workflow.set_ticket_status(args.ticket_number, args.status)
 
 
 if __name__ == '__main__':
