@@ -33,5 +33,10 @@
       "command": ["ruff", "format", "$FILE", "--config {env:$ANDROMEDA_ROOT}/pyproject.toml"],
       "extensions" : [".py", ".pyi"]
     }
+  },
+  "lsp": {
+    "clangd": {
+      "disabled": true
+    }
   }
 }
