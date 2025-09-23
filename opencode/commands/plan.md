@@ -116,3 +116,5 @@ Key Components:
 - [main component 3]
 ...
 ```
+
+Next: Execute the plan: /execute `PLAN` (In a new session!)

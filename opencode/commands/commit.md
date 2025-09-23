@@ -3,9 +3,11 @@ description: Commit changes using git
 agent: build
 ---
 
+# Commit
+
 Your task is to help the user to generate a commit message and commit the changes using git.
 
-## Guidelines
+## Instructions
 
 - DO NOT add any ads such as "Generated with [Claude Code](https://claude.ai/code)"
 - Checks which files are staged with git status

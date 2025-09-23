@@ -43,7 +43,7 @@ keywords: [comma-separated keywords for research]
 
 # Implementation Plan
 
-TODO: Run: /plan [plan path] (In a new session!)
+TODO
 
 ```
 
@@ -51,3 +51,5 @@ TODO: Run: /plan [plan path] (In a new session!)
 
 * Summarize what you just did
 * Display the full path to the plan document
+
+Next: Create the plan: /plan `PLAN` (In a new session!)
