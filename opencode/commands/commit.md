@@ -5,25 +5,18 @@ agent: build
 
 # Commit
 
-Your task is to help the user to generate a commit message and commit the changes using git.
+Your task is to help the user commit the current changes.
 
 ## Instructions
 
-- DO NOT add any ads such as "Generated with [Claude Code](https://claude.ai/code)"
-- Checks which files are staged with git status
-- If 0 files are staged, automatically adds all modified and new files with git add
-- Performs a git diff to understand what changes are being committed
-- Analyzes the diff to determine if multiple distinct logical changes are present
-- If multiple distinct changes are detected, suggests breaking the commit into multiple smaller commits
-- For each commit (or the single commit if not split), creates a commit message using the following rules
-- The redmine ticket number does not need to be added to the title or the body as this is done by a hoook
+- Use imperative mood in commit messages and description
+- Group related changes together
+- Keep commits focused and atomic when possible
+- Title should be a clear summary, max 72 characters
+- Use the body to detail the changes to the different files. Explain why the changes were done, not just what changes were done
+- Bullet points should be concise and high-level
 
-## Format
-
-* The commit message MUST start by a tag using the following format: "[<category>] Commit message"
-* The category should be determined roughly by what was changed, (i.e. changes to prj/rcu/lib/dmtxng should be labeled dmtx)
-
-## Example Titles
+Some examples of commit messages:
 
 ```
 [DmTx] Fix broken unity tests due to missing mock
@@ -32,31 +25,18 @@ Your task is to help the user to generate a commit message and commit the change
 [DSP/ISS] Increased DCCM ROM memory needed by some test apps
 ```
 
-## Rules
+## Workflow
 
-* title starts with a capital and is lowercase, no period at the end.
-* Title should be a clear summary, max 72 characters.
-* Use the body to detail the changes to the different files. Explain why the changes were done, not just what changes were done.
-* Bullet points should be concise and high-level.
+1. Start by reviewing the conversation history to understand what was accomplished.
+2. Review the list of changed files by running `git status -s`
+3. Use `git diff <file>` to see exactly what was changed and get more context. Only do this if needed
+4. Consider if the changes should be in a single or multiple logicla commits
+5. Identify which files belong together
+6. Draft clear, descriptive commit messages using the format: `[<category>] <description>`
+7. Present plan to the user. List the files you plan to add to each commit as well as the commit messages and descriptions.
+8. Ask the user to confirm before continuing with the commits
+9. Create commits, use `git add <files>` with your planned commit messages and descriptions
 
-Avoid
+## Report
 
-* Vague titles like: "update", "fix stuff"
-* Overly long or unfocused titles
-* Excessive detail in bullet points
-
-## Best Practices for Commits
-
-- Atomic commits: Each commit should contain related changes that serve a single purpose
-- Split large changes: If changes touch multiple concerns, split them into separate commits
-- Present tense, imperative mood: Write commit messages as commands (e.g., "add feature" not "added feature")
-
-## Guidelines for Splitting Commits
-
-When analyzing the diff, consider splitting commits based on these criteria:
-
-- Different concerns: Changes to unrelated parts of the codebase
-- Different types of changes: Mixing features, fixes, refactoring, etc.
-- File patterns: Changes to different types of files (e.g., source code vs documentation)
-- Logical grouping: Changes that would be easier to understand or review separately
-- Size: Very large changes that would be clearer if broken down
+Show the result with `git log -n [N]`
