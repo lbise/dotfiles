@@ -4,6 +4,7 @@
   "model": "github-copilot/claude-sonnet-4",
   "small_model": "github-copilot/gpt-4.1",
   "share": "disabled",
+  "instructions": ["ai_notes/conventions.md"],
   "provider": {
     "azure": {
       "options": {
