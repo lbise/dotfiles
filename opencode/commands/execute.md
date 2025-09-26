@@ -24,7 +24,7 @@ PLAN: $ARGUMENTS
 1. If the user did not provide `PLAN` document. STOP and ask the user for the plan
 2. Read the plan completely and check for any existing checkmarks
 3. Consider the steps involved in the plan. Think deeply about how the pieces fit together and derive a detailed todo list from the plan's phases and requirements.
-4. Implement each phase sequentially
+4. Implement each phase sequentially. Once a task is implemented STOP and provide a summary of what was done to the user. Wait for confirmation before continuing to the next one.
 5. Verify each phase using the success criteria checks. Fix any issues before proceeding.
 6. Update the `PLAN` with checkmarks for completed items
 7. Handle any mismatches or issues by presenting them clearly and asking for guidance if needed.

@@ -53,7 +53,7 @@ PLAN: $ARGUMENTS
 ## Implementation Approach
 [High-level strategy and reasoning]
 
-## Task 1: [Descriptive Name]
+## Task 1: [Descriptive Name] [TODO]
 
 ### Overview
 [What this task accomplishes]
