@@ -684,7 +684,7 @@ def get_redmine_url() -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Workflow management tool')
+    parser = argparse.ArgumentParser(description='Redmine tool')
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
     start_parser = subparsers.add_parser('start', help='Start work on a ticket')
