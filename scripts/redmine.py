@@ -212,7 +212,25 @@ class WorkflowManager:
         os.makedirs(notes_dir, exist_ok=True)
         return notes_dir
 
-    def _generate_ticket_markdown(self, issue_data: dict, ticket_number: int) -> str:
+    def _separate_journal_entries(self, journals: list) -> tuple[list, list]:
+        """Separate journal entries into comments and field changes."""
+        comments = []
+        field_changes = []
+
+        for journal in journals:
+            # Check if this journal has user comments
+            if journal.get('notes'):
+                comments.append(journal)
+
+            # Check if this journal has field changes
+            if journal.get('details'):
+                field_changes.append(journal)
+
+        return comments, field_changes
+
+    def _generate_ticket_markdown(
+        self, issue_data: dict, ticket_number: int, show_history: bool = False
+    ) -> str:
         issue = issue_data['issue']
         ticket_url = f'{self.redmine.base_url}/issues/{ticket_number}'
 
@@ -243,18 +261,26 @@ class WorkflowManager:
                     value = ', '.join(str(v) for v in value)
                 markdown_content += f'- **{field["name"]}**: {value}\n'
 
-        # Add notes/comments if they exist
+        # Add journals (separated into comments and field changes)
         if issue.get('journals'):
-            markdown_content += '\n## Notes/Comments\n'
-            for journal in issue['journals']:
-                if journal.get('notes'):
+            comments, field_changes = self._separate_journal_entries(issue['journals'])
+
+            # Add user comments
+            if comments:
+                markdown_content += '\n## Comments\n'
+                for journal in comments:
                     user = journal.get('user', {}).get('name', 'Unknown user')
                     created_on = journal.get('created_on', 'Unknown date')
                     markdown_content += f'\n### {user} on {created_on}\n'
                     markdown_content += f'{journal["notes"]}\n'
 
-                # Show field changes in journals
-                if journal.get('details'):
+            # Add field changes only if history is requested
+            if show_history and field_changes:
+                markdown_content += '\n## Field Changes\n'
+                for journal in field_changes:
+                    user = journal.get('user', {}).get('name', 'Unknown user')
+                    created_on = journal.get('created_on', 'Unknown date')
+                    markdown_content += f'\n### {user} on {created_on}\n'
                     for detail in journal['details']:
                         if detail.get('property') == 'attr':
                             field_name = detail.get('name', 'Unknown field')
@@ -267,11 +293,17 @@ class WorkflowManager:
         return markdown_content
 
     def _write_ticket_markdown(
-        self, issue_data: dict, ticket_number: int, ticket_subject: Optional[str] = None
+        self,
+        issue_data: dict,
+        ticket_number: int,
+        ticket_subject: Optional[str] = None,
+        show_history: bool = False,
     ) -> None:
         try:
             notes_dir = self._ensure_notes_directory()
-            markdown_content = self._generate_ticket_markdown(issue_data, ticket_number)
+            markdown_content = self._generate_ticket_markdown(
+                issue_data, ticket_number, show_history
+            )
 
             if ticket_subject:
                 sanitized_filename = self._sanitize_filename(
@@ -291,7 +323,9 @@ class WorkflowManager:
                 f'Warning: Could not create ticket markdown file - {e}', file=sys.stderr
             )
 
-    def view_ticket(self, ticket_number: int, print_url: bool = True) -> None:
+    def view_ticket(
+        self, ticket_number: int, print_url: bool = True, show_history: bool = False
+    ) -> None:
         try:
             issue_data = self.redmine.get_issue(ticket_number)
             issue = issue_data['issue']
@@ -322,18 +356,28 @@ class WorkflowManager:
                         value = ', '.join(str(v) for v in value)
                     print(f'  {field["name"]}: {value}')
 
-            # Display journals (notes/comments)
+            # Display journals (separated into comments and field changes)
             if issue.get('journals'):
-                print('\nNotes/Comments:')
-                for journal in issue['journals']:
-                    if journal.get('notes'):
+                comments, field_changes = self._separate_journal_entries(
+                    issue['journals']
+                )
+
+                # Display user comments
+                if comments:
+                    print('\nComments:')
+                    for journal in comments:
                         user = journal.get('user', {}).get('name', 'Unknown user')
                         created_on = journal.get('created_on', 'Unknown date')
                         print(f'\n--- {user} on {created_on} ---')
                         print(journal['notes'])
 
-                    # Show field changes in journals
-                    if journal.get('details'):
+                # Display field changes only if history is requested
+                if show_history and field_changes:
+                    print('\nField Changes:')
+                    for journal in field_changes:
+                        user = journal.get('user', {}).get('name', 'Unknown user')
+                        created_on = journal.get('created_on', 'Unknown date')
+                        print(f'\n--- {user} on {created_on} ---')
                         for detail in journal['details']:
                             if detail.get('property') == 'attr':
                                 field_name = detail.get('name', 'Unknown field')
@@ -696,6 +740,11 @@ def main():
     view_parser = subparsers.add_parser('view', help='View ticket details')
     view_parser.add_argument('ticket_number', type=int, help='Redmine ticket number')
     view_parser.add_argument(
+        '--history',
+        action='store_true',
+        help='Show field change history in addition to comments',
+    )
+    view_parser.add_argument(
         '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
     )
 
@@ -760,7 +809,7 @@ def main():
     if args.command == 'start':
         workflow.start_ticket(args.ticket_number)
     elif args.command == 'view':
-        workflow.view_ticket(args.ticket_number)
+        workflow.view_ticket(args.ticket_number, show_history=args.history)
     elif args.command == 'summary':
         workflow.summary_tickets(
             args.user, getattr(args, 'status', None), getattr(args, 'priority', None)
