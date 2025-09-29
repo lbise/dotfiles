@@ -131,7 +131,7 @@ install_opencode() {
     fi
 
     # Create installation directories
-    mkdir -p "$INSTALL_DIR" "$OPENCODE_BIN_DIR/bin" "$OPENCODE_CACHE_DIR"
+    mkdir -p "$INSTALL_DIR" "$OPENCODE_BIN_DIR/bin"
 
     # Create temporary extraction directory
     local temp_dir=$(mktemp -d)
