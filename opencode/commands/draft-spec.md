@@ -37,7 +37,6 @@ Ask specific, targeted questions based on the information gathered up to now in 
 
 1. Review known information
 2. Ask the user questions to refine context
-    * Continue asking until either (a) all key sections of the spec can be filled in, or (b) the user indicates no more info is available.
     * For bugs:
         - What specific behavior are you seeing?
         - What should happen instead?
@@ -49,9 +48,10 @@ Ask specific, targeted questions based on the information gathered up to now in 
         - What specific code or architecture needs improvement?
         - What would be the ideal state after cleanup?
         - Any specific patterns or anti-patterns to address?
-3. Generally ask the user if he has any other meaningful information to add
-4. Take a moment to think about how the user's answers affect the original request
-5. Identify gaps: Look for areas that could benefit from more detail or clarification
+    * Continue asking until either (a) all key sections of the spec can be filled in, or (b) the user indicates no more info is available.
+4. Identify gaps: Look for areas that could benefit from more detail or clarification and ask the user
+5. Generally ask the user if he has any other meaningful information to add
+6. Take a moment to think about how the user's answers affect the original request
 
 ### Step 3: Context Extraction
 
