@@ -8,12 +8,12 @@ tools:
   glob: true
   list: true
   bash: true
-  edit: true
+  edit: false
   write: true
   patch: true
   todoread: true
   todowrite: true
-  webfetch: true
+  webfetch: false
 ---
 
 This is a test
