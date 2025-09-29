@@ -112,7 +112,12 @@ Extract and organize information
     - Testing patterns to consider
     - Integration patterns with other systems
 
-### Step 4: Document Creation
+### Step 4: Setup Development Environment
+
+1. Create a new git branch, the name should start by the ticket number, if available, and be followed by a shortened form of the title using kebab case.
+2. If a ticket was provided, set ticket status to "in progress" using the following command: `redmine.py set-status <ticket> "in progress"`
+
+### Step 5: Document Creation
 
 1. Create a subdirectory in `OUTPUT_PATH` to store all documents
     - Directory name should start by ticket number if provided followed by a short form subject using kebab case
@@ -173,7 +178,7 @@ Note: Paths exclude "searchable/" even if found there
 [Any additional notes for research/planning]
 ```
 
-### Step 5: Verification
+### Step 6: Verification
 
 1. Review the document to ensure all critical information is captured
 2. Check that the requirements are clear and achievable
@@ -185,11 +190,6 @@ Note: Paths exclude "searchable/" even if found there
     - Add a new section: `## Follow-up Research [timestamp]`
     - Spawn new sub-agents as needed for additional investigation
     - Continue updating the document
-
-### Step 6: Setup Development Environment
-
-1. Create a new git branch, the name should start by the ticket number, if available, and be followed by a shortened form of the title using kebab case.
-2. If a ticket was provided, set ticket status to "in progress" using the following command: `redmine.py set-status <ticket> "in progress"`
 
 Use the todowrite tool to create a structured task list for the 6 steps above, marking each as pending initially.
 
