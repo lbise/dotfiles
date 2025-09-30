@@ -1,40 +1,161 @@
 ---
-description: Create a concise engineering implementation plan based on user requirements and save it
-agent: build
+description: Create an implementation plan
 ---
 
 # Plan
 
-Create a detailed implementation plan for a new feature, bugfix, or refactor based on user requirements. Use the available information provided in the `PLAN` document. Analyze the request, think through the implementation approach, and add comprehensive specification to the `PLAN` document that can be used as a blueprint for actual development work.
+Create a detailed implementation plan for a new feature, bugfix, or refactor based on user inputs. You should be skeptical, thorough, and work collaboratively with the user to produce high-quality technical specifications.
 
 ## Variables
 
-PLAN: $ARGUMENTS
+RESEARCH: $ARGUMENTS
 
 ## Instructions
 
-- Carefully analyze the user's input provided in `PLAN`
+- CRITICAL: YOUR ONLY JOB IS TO CREATE THE IMPLEMENTATION PLAN BASED ON RESEARCH
 - Think deeply about the best approach to implement the requested functionality or solve the problem
 - Be Skeptical: Question vague requirements, identify potential issues and ask "why" and "what about"
 - Be Interactive: Do not write the full plan in one shot, allow course corrections, work collaboratively
-- Track Progress: Use `todowrite`tool to track planning tasks
 - Ensure the plan is detailed enough that another developer could follow it to implement the solution
 - Include code examples or pseudo-code where appropriate to clarify complex concepts
 - Structure the document with clear sections and proper markdown formatting
+- If you encounter open questions during planning, STOP
+- The implementation plan must be complete and actionable
+- Every decision must be made before finalizing the plan
 
 ## Workflow
 
-1. If `PLAN` is not provided. Stop directly and ask user to provide the missing input.
-2. Start by reading the provided plan using the read tool. Read the document completely so you have the full context.
-2. Analyze Requirements - THINK HARD and parse the document content to understand the core problem and desired outcome
-3. Design Solution - Develop technical approach including architecture decisions and implementation strategy
-    - If there are multiple options, present all options with pros and cons and any open questions and ask the user which approach should be taken
-4. Validate Plan - Propose a plan structure listing the main phases and what it accomplishes.
-    - Ask the user to confirm that the plan makes sense before continuing
-5. Document Plan - Structure a comprehensive markdown document using the following structure:
+### Step 0: Introduction
 
+1. Check if `RESEARCH` document is provided.
+    - If a file path was provided as a parameter, skip the default message
+    - Immediately read any provided files FULLY
+    - Begin the analysis process
+
+2. If not parameters were provided respond with:
+```
+I'll help you create a detailed implementation plan. Let me start by understanding what we're building.
+
+Please provide:
+1. The task/ticket description (or reference to a ticket file)
+2. Any relevant context, constraints, or specific requirements
+3. Links to related research or previous implementations
+
+I'll analyze this information and work with you to create a comprehensive plan.
+
+Tip: You can also invoke this command with a ticket file directly: `/create_plan thoughts/allison/tickets/eng_1234.md`
+For deeper analysis, try: `/create_plan think deeply about thoughts/allison/tickets/eng_1234.md`
+```
+
+Then wait for the user's input.
+
+### Step 1: Gather Context and Initial Analysis
+
+1. **Read all mentioned files immediately and FULLY**:
+    - Read all relevant files reported in the plan document or by the user
+    - **IMPORTANT**: Use the Read tool WITHOUT limit/offset parameters to read entire files
+
+2. **Analyze and verify understanding**:
+   - Cross-reference the ticket requirements with actual code
+   - Identify any discrepancies or misunderstandings
+   - Note assumptions that need verification
+   - Determine true scope based on codebase reality
+
+3. **Present informed understanding and focused questions**:
+   ```
+   Based on the available information, I understand we need to [accurate summary].
+
+   I've found that:
+   - [Current implementation detail with file:line reference]
+   - [Relevant pattern or constraint discovered]
+   - [Potential complexity or edge case identified]
+
+   Questions that my research couldn't answer:
+   - [Specific technical question that requires human judgment]
+   - [Business logic clarification]
+   - [Design preference that affects implementation]
+   ```
+
+   Only ask questions that you genuinely cannot answer through code investigation.
+
+### Step 2: Research & Discovery
+
+After getting initial clarifications:
+
+1. **If the user corrects any misunderstanding**:
+   - DO NOT just accept the correction
+   - Spawn new research tasks to verify the correct information
+   - Read the specific files/directories they mention
+   - Only proceed once you've verified the facts yourself
+
+2. **Create a research todo list** using todowrite to track exploration tasks
+
+3. **Spawn parallel sub-tasks for comprehensive research**:
+   - Create multiple Task agents to research different aspects concurrently
+   - Use the right agent for each type of research:
+
+   **For deeper investigation:**
+   - **codebase-locator** - To find more specific files (e.g., "find all files that handle [specific component]")
+   - **codebase-analyzer** - To understand implementation details (e.g., "analyze how [system] works")
+   - **codebase-pattern-finder** - To find similar features we can model after
+
+   Each agent knows how to:
+   - Find the right files and code patterns
+   - Identify conventions and patterns to follow
+   - Look for integration points and dependencies
+   - Return specific file:line references
+   - Find tests and examples
+
+3. **Wait for ALL sub-tasks to complete** before proceeding
+
+4. **Present findings and design options**:
+   ```
+   Based on my research, here's what I found:
+
+   **Current State:**
+   - [Key discovery about existing code]
+   - [Pattern or convention to follow]
+
+   **Design Options:**
+   1. [Option A] - [pros/cons]
+   2. [Option B] - [pros/cons]
+
+   **Open Questions:**
+   - [Technical uncertainty]
+   - [Design decision needed]
+
+   Which approach aligns best with your vision?
+   ```
+
+### Step 3: Plan Structure Development
+
+Once aligned on approach:
+
+1. **Create initial plan outline**:
+   ```
+   Here's my proposed plan structure:
+
+   ## Overview
+   [1-2 sentence summary]
+
+   ## Implementation Phases:
+   1. [Phase name] - [what it accomplishes]
+   2. [Phase name] - [what it accomplishes]
+   3. [Phase name] - [what it accomplishes]
+
+   Does this phasing make sense? Should I adjust the order or granularity?
+   ```
+
+2. **Get feedback on structure** before writing details
+
+### Step 4: Detailed Plan Writing
+
+After structure approval:
+
+1. Create the plan in the same directory as the research.md file and call it plan.md
+2. Document Plan - Structure a comprehensive markdown document using the following structure:
 ```markdown
-# Implementation Plan
+# Implementation Plan [Descriptive name]
 
 ## Overview
 [Brief description of what we're implementing and why]
@@ -50,10 +171,14 @@ PLAN: $ARGUMENTS
 - [Pattern to follow]
 - [Constraint to work within]
 
+## What We're NOT Doing
+
+[Explicitly list out-of-scope items to prevent scope creep]
+
 ## Implementation Approach
 [High-level strategy and reasoning]
 
-## Task 1: [Descriptive Name] [TODO]
+## Phase 1: [Descriptive Name]
 
 ### Overview
 [What this task accomplishes]
@@ -75,13 +200,15 @@ PLAN: $ARGUMENTS
 #### Automated Verification:
 - [ ] Unit tests pass: `build.py -p prj/tst/unity_host/dmtx -x`
 
-#### Hardware-in-the-loop Tests:
+#### Manual Verification:
 - [ ] Integration tests pass
 - [ ] Sanity tests pass
 
 ---
 
-List all tasks similar as before
+## Phase 2: [Descriptive Name]
+
+[Similar structure with both automated and manual success criteria...]
 
 ---
 
@@ -94,21 +221,46 @@ List all tasks similar as before
 ### Integration Tests:
 - [End-to-end scenarios]
 
+### Manual Testing Steps:
+1. [Specific step to verify feature]
+2. [Another verification step]
+3. [Edge case to test manually]
+
+## References
+
+- Original ticket:
+- Related research: `research.md`
+- Similar implementation: `[file:line]`
 ```
 
-6. Save & Report - Write the plan to `PLAN` and provide a summary of the key components
-7. Review - Ask the user to review the plan and let you know if any changes must be done
-    - Iterate based on feedback until the plan is mature
-    - Do not leave any open questions in the final plan, if you encounter any just STOP and ask for clarification
-    - The implementation plan must be complete and actionable
-    - Continue until the user is satisfied
+### Step 5: Review
+
+1. **Present the draft plan location**:
+```
+I've created the initial implementation plan at:
+`path/to/plan.md`
+
+Please review it and let me know:
+- Are the phases properly scoped?
+- Are the success criteria specific enough?
+- Any technical details that need adjustment?
+- Missing edge cases or considerations?
+```
+
+2. **Iterate based on feedback** - be ready to:
+   - Add missing phases
+   - Adjust technical approach
+   - Clarify success criteria (both automated and manual)
+   - Add/remove scope items
+
+3. **Continue refining** until the user is satisfied
 
 ## Report
 
 After creating and saving the implementation plan, provide a concise report with the following format:
 
 ```markdown
-File: `PLAN`
+File: `path/to/plan`
 Topic: [Brief description of what the plan covers]
 Key Components:
 - [main component 1]
@@ -117,4 +269,11 @@ Key Components:
 ...
 ```
 
-Next: Execute the plan: /execute `PLAN` (In a new session!)
+Use the todowrite tool to create a structured task list for the 5 steps above, marking each as pending initially.
+
+## Report
+
+* Short summary of the implementation plan
+* Display the full path to the plan document
+* Ask the user to review the plan thoroughly and to fix or improve it if required
+* Inform the user the next step is to implement the plan using the /implement [path/to/plan] command

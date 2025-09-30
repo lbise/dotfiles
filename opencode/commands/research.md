@@ -195,9 +195,7 @@ Use the todowrite tool to create a structured task list for the 6 steps above, m
 
 ## Report
 
-* Summarize what you just did
-* Display the full path to the plan document
-* Inform the user:
-    - That the document should be reviewed and improved if needed
-    - To then execute the planning phase using: `/plan <document>`
-
+* Short summary of the research conducted
+* Display the full path to the research document
+* Ask the user to review the research thoroughly and to fix or improve it if required
+* Inform the user the next step is to create the implementation plan using the /plan [path/to/research] command
