@@ -22,6 +22,8 @@ symlinks:
   "opencode.json": ".config/opencode/opencode.json"
   "opencode/agents": ".config/opencode/agent"
   "opencode/commands": ".config/opencode/command"
+  "opencode/tools": ".config/opencode/tool"
+  "opencode/plugins": ".config/opencode/plugin"
 
   # GPG configuration
   "gpg/gpg.conf": ".gnupg/gpg.conf"
