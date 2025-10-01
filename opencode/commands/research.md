@@ -10,7 +10,7 @@ The goal is to produce a self-contained document that another developer could pi
 ## Variables
 
 USER_PROMPT: $ARGUMENTS
-OUTPUT_PATH: `workdoc/`
+OUTPUT_PATH: `.workdoc/`
 
 ## Guidelines
 
