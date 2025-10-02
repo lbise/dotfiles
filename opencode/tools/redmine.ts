@@ -2,8 +2,6 @@ import { tool } from '@opencode-ai/plugin'
 import { execSync } from 'child_process'
 import path from 'path'
 
-//const REDMINE_SCRIPT_PATH = path.join(__dirname, '../../scripts/redmine.py')
-//const REDMINE_SCRIPT_PATH = path.join(__dirname, '../../scripts/redmine.py')
 const REDMINE_SCRIPT_PATH = 'redmine.py'
 
 export const view = tool({
@@ -20,6 +18,40 @@ export const view = tool({
       return result
     } catch (error: any) {
       return `Error viewing ticket: ${error.message}`
+    }
+  },
+})
+
+export const note = tool({
+  description: 'Add a note/comment to a Redmine ticket',
+  args: {
+    ticketNumber: tool.schema.number().describe('Redmine ticket number'),
+    note: tool.schema.string().describe('Note text to add to the ticket'),
+  },
+  async execute(args) {
+    try {
+      const command = `"${REDMINE_SCRIPT_PATH}" note ${args.ticketNumber} "${args.note}"`
+      const result = execSync(command, { encoding: 'utf-8' })
+      return result
+    } catch (error: any) {
+      return `Error adding note: ${error.message}`
+    }
+  },
+})
+
+export const setStatus = tool({
+  description: 'Set Redmine ticket status',
+  args: {
+    ticketNumber: tool.schema.number().describe('Redmine ticket number'),
+    status: tool.schema.string().describe('Target status (e.g., "new", "in progress", "resolved", "closed", "rejected", "feedback")'),
+  },
+  async execute(args) {
+    try {
+      const command = `"${REDMINE_SCRIPT_PATH}" set-status ${args.ticketNumber} "${args.status}"`
+      const result = execSync(command, { encoding: 'utf-8' })
+      return result
+    } catch (error: any) {
+      return `Error setting ticket status: ${error.message}`
     }
   },
 })
@@ -62,40 +94,6 @@ export const view = tool({
 //    }
 //  },
 //})
-
-export const note = tool({
-  description: 'Add a note/comment to a Redmine ticket',
-  args: {
-    ticketNumber: tool.schema.number().describe('Redmine ticket number'),
-    note: tool.schema.string().describe('Note text to add to the ticket'),
-  },
-  async execute(args) {
-    try {
-      const command = `"${REDMINE_SCRIPT_PATH}" note ${args.ticketNumber} "${args.note}"`
-      const result = execSync(command, { encoding: 'utf-8' })
-      return result
-    } catch (error: any) {
-      return `Error adding note: ${error.message}`
-    }
-  },
-})
-
-export const setStatus = tool({
-  description: 'Set Redmine ticket status',
-  args: {
-    ticketNumber: tool.schema.number().describe('Redmine ticket number'),
-    status: tool.schema.string().describe('Target status (e.g., "new", "in progress", "resolved", "closed", "rejected", "feedback")'),
-  },
-  async execute(args) {
-    try {
-      const command = `"${REDMINE_SCRIPT_PATH}" set-status ${args.ticketNumber} "${args.status}"`
-      const result = execSync(command, { encoding: 'utf-8' })
-      return result
-    } catch (error: any) {
-      return `Error setting ticket status: ${error.message}`
-    }
-  },
-})
 
 //export const report = tool({
 //  description: 'Generate weekly report in HTML format for In Progress and Resolved tickets',
