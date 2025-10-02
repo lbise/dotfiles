@@ -77,3 +77,6 @@ lazy-lock.json
 .aider.input.history
 
 .aider*
+
+**/bun.lock
+**/node_modules
