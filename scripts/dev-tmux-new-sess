@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Setup a new session
+tmux new-window -n dev
+#tmux send-keys 'vim' Enter
+tmux send-keys 'dev-tmux-layout' Enter
+# Create 2 new windows
+tmux new-window -n exec
+tmux new-window
+tmux select-window -t dev

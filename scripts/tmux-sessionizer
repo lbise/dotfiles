@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 directories="$HOME/gitrepo $HOME/"
-script="dev-tmux"
+script="dev-tmux-new-sess"
 if [ "$USER" == "13lbise" ]; then
     # Work user
     directories="$HOME/andromeda $directories"
@@ -20,11 +20,13 @@ selected_name=$(basename "$selected" | tr . _)
 tmux_running=$(pgrep tmux)
 
 if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
+    # New session but tmux is not running
     tmux new-session -s $selected_name -c $selected $script
     exit 0
 fi
 
 if ! tmux has-session -t=$selected_name 2> /dev/null; then
+    # New session from within tmux
     tmux new-session -ds $selected_name -c $selected $script
 fi
 
