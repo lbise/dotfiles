@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run vim
+tmux new-window -n vim
+tmux send-keys 'vim' Enter
+# Vertical split
+tmux split-window -h -l 80
+tmux send-keys 'opencode' Enter
+# Horizontal split
+tmux split-window -v -l 10
