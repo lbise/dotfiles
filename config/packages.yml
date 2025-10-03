@@ -47,6 +47,7 @@ packages:
 package_managers:
   ubuntu:
     update: "sudo apt update"
+    upgrade: "sudo apt upgrade"
     install: "sudo apt install -y"
   macos:
     update: "brew update -v"

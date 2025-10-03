@@ -102,13 +102,13 @@ get_package_manager_command() {
     awk "
         /^[[:space:]]*package_managers:/ { in_managers = 1; next }
         in_managers && /^[[:space:]]*${os}:/ { in_os = 1; next }
-        in_managers && in_os && /^[[:space:]]*[a-zA-Z]/ && !/^[[:space:]]*${command}/ { in_os = 0 }
+        in_managers && in_os && /^[[:space:]]*[a-zA-Z_]+:/ && !/^[[:space:]]+/ { in_os = 0 }
         in_managers && in_os && /^[[:space:]]*${command}:/ { 
             gsub(/^[[:space:]]*${command}:[[:space:]]*\"/, \"\")
             gsub(/\"$/, \"\")
             print 
         }
-        /^[[:space:]]*[a-zA-Z]/ && !/^[[:space:]]*package_managers/ { in_managers = 0 }
+        /^[^[:space:]]/ && !/^package_managers/ { in_managers = 0 }
     " "$CONFIG_DIR/$config_file"
 }
 
