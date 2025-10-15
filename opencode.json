@@ -27,7 +27,7 @@
   },
   "formatter" : {
     "clang-format" : {
-      "command": ["/home/shannon/_tools/venv/dev_bc562bc153ab202c94114ea86b475908/bin/clang-format", "--style-file={env:$ANDROMEDA_ROOT}/hooks/.clang-format", "-i $FILE"],
+      "command": ["clang-format", "--style-file={env:$ANDROMEDA_ROOT}/hooks/.clang-format", "-i $FILE"],
       "extensions" : [".c", ".cpp", ".h", ".hpp", ".ino", ".unity"]
     },
     "ruff" : {
