@@ -17,7 +17,7 @@ export const build = tool({
 
     for (const path of args.paths) {
       const result = await new Promise<string>((resolve) => {
-        const buildProcess = spawn("python3", [buildScript, "-p", path], {
+        const buildProcess = spawn([buildScript, "-p", path], {
           stdio: ["ignore", "pipe", "pipe"]
         })
 

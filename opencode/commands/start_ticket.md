@@ -10,7 +10,7 @@ Setup the environment to start working on a new ticket. Your goal is to create a
 ## Variables
 
 TICKET: $ARGUMENTS
-PLAN_OUTPUT: `ai_plans/`
+PLAN_OUTPUT: `.workdoc/`
 
 ## Workflow
 

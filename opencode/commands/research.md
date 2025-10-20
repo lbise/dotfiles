@@ -32,7 +32,7 @@ OUTPUT_PATH: `.workdoc/`
 
 When this command is invoked, respond with:
 ```
-I'm ready to research the codebase. Please provide your research question or area of interest, and I'll analyze it thoroughly by exploring relevant components and connections.
+I'm ready to assist you with research for a new topic. Provide your starting research question or area of interest and I'll analyze it deeply by exploring relevant components and connections. If you have any ticket references please also provide them.
 ```
 
 Then wait for the user's research query.
