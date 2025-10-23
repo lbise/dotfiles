@@ -18,9 +18,6 @@ vim.opt.showcmd = true
 -- Hide the default mode text
 vim.opt.showmode = false
 
--- Hide command line by default
-vim.opt.cmdheight = 0
-
 -- Set shell
 vim.opt.shell = "/bin/zsh"
 
