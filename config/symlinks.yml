@@ -14,6 +14,7 @@ symlinks:
   "tmux": ".tmux"
   ".clang-format": ".clang-format"
   ".aider.conf.yml": ".aider.conf.yml"
+  "ssh/config": ".ssh/config"
 
   # Config directory files
   "nvim": ".config/nvim"
