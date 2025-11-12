@@ -22,7 +22,9 @@
 # is ignored.  Even if the pane is running one of the above processes, if you exit that
 # process (say its running nvim and you exit to the zsh shell), the parent process
 # will have the old DISPLAY variable.  In these cases manually run this script later.
-VARS=("DISPLAY")
+VARS=("DISPLAY"
+      "SSH_AUTH_SOCK"
+)
 #VARS=("DISPLAY"
 #      "KRB5CCNAME"
 #      "SSH_AGENT_PID"
