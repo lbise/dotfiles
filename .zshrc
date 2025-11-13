@@ -173,6 +173,17 @@ DOT="$HOME/gitrepo/dotfiles"
 alias lfskill="git rm --cached -r .;git reset --hard;git rm .gitattributes;git reset .;git checkout ."
 alias vim=nvim
 alias dotupdate="dotupdate.sh"
+# Update tmux env with current env variables
+alias tmux_env="tmux refresh-client -S && eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')"
+
+# If running tmux, add hook to update tmux env in shell
+if [[ -n "$TMUX" ]]; then
+precmd() {
+    tmux refresh-client -S
+    eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
+}
+fi
+
 # Docker devenv
 devenv_img="ch03git.phonak.com/13lbise/devenv:latest"
 devenv_name="devenv"
