@@ -12,16 +12,16 @@ software:
     source_dir: "archives"
 
   neovim:
-    version: "0.11.2"
+    version: "0.11.5"
     platform_template: "nvim-linux-x86_64"
     archive_template: "nvim-{version}-linux-x86_64"
     archive_extension: ".tar.gz"
     install_path: "$HOME/.bin"
     binary_path: "bin/nvim"
+    source_dir: "archives"
     version_check:
       command: "{install_path}/{platform_template}/bin/nvim -v"
       regex: "^NVIM v([0-9]+\\.[0-9]+\\.[0-9]+)"
-    source_dir: "archives"
     pre_install:
       - "killall nvim || true"
 

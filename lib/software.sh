@@ -64,13 +64,13 @@ install_git_delta() {
 
     if ! which delta >/dev/null 2>&1; then
         echo "Installing git delta v$DELTA_VERSION..."
-        
+
         # Download if archive doesn't exist
         if [ ! -f "$DELTA_ARCHIVE" ]; then
             echo "Downloading git delta from $DELTA_URL..."
             curl -L -o "$DELTA_ARCHIVE" "$DELTA_URL"
         fi
-        
+
         sudo dpkg -i "$DELTA_ARCHIVE"
     else
         echo "git delta already installed!"
@@ -78,26 +78,62 @@ install_git_delta() {
 }
 
 install_neovim() {
-    NVIM_VERSION="0.11.2"
-    NVIM_VER_REGEX="^NVIM v([0-9]+.[0-9]+.[0-9]+)"
-    NVIM_OUT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../archives)"
-    NVIM_DIR="nvim-linux-x86_64"
+    # Source config utilities
+    source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+
+    # Load configuration from software.yml
+    NVIM_VERSION=$(get_software_config "neovim" "version")
+    NVIM_PLATFORM=$(get_software_config "neovim" "platform_template")
+    NVIM_ARCHIVE_TEMPLATE=$(get_software_config "neovim" "archive_template")
+    NVIM_ARCHIVE_EXT=$(get_software_config "neovim" "archive_extension")
+    NVIM_INSTALL_PATH=$(get_software_config "neovim" "install_path")
+    NVIM_BINARY_PATH=$(get_software_config "neovim" "binary_path")
+    NVIM_SOURCE_DIR=$(get_software_config "neovim" "source_dir")
+
+    # Extract version regex from config (nested under version_check)
+    NVIM_VER_REGEX=$(awk '
+        /^  neovim:/ { in_nvim = 1; next }
+        in_nvim && /^  [a-z]/ { in_nvim = 0 }
+        in_nvim && /^    version_check:/ { in_check = 1; next }
+        in_check && /^    [a-z]/ { in_check = 0 }
+        in_check && /^      regex:/ {
+            gsub(/^      regex: *"/, "")
+            gsub(/"$/, "")
+            gsub(/\\\\/, "\\")
+            print
+            exit
+        }
+    ' "$CONFIG_DIR/software.yml")
+
+    # Build paths using config values
+    NVIM_OUT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && realpath ../$NVIM_SOURCE_DIR)"
+    NVIM_DIR="$NVIM_PLATFORM"
     NVIM_SRC="$NVIM_OUT/$NVIM_DIR"
-    NVIM_DST="$HOME/.bin"
-    NVIM_BIN="$NVIM_DST/$NVIM_DIR/bin/nvim"
-    NVIM_ARCHIVE="$NVIM_OUT/nvim-${NVIM_VERSION}-linux-x86_64.tar.gz"
+    NVIM_DST="${NVIM_INSTALL_PATH//\$HOME/$HOME}"
+    NVIM_BIN="$NVIM_DST/$NVIM_DIR/$NVIM_BINARY_PATH"
+    NVIM_ARCHIVE="$NVIM_OUT/${NVIM_ARCHIVE_TEMPLATE//\{version\}/$NVIM_VERSION}${NVIM_ARCHIVE_EXT}"
+
+    # Verify regex was extracted
+    if [ -z "$NVIM_VER_REGEX" ]; then
+        echo "Error: Failed to extract version regex from config" >&2
+        exit 1
+    fi
 
     print_section "Installing Neovim"
     if [ -f "$NVIM_BIN" ]; then
-        NVIM_CUR_VER=$($NVIM_BIN -v)
+        NVIM_CUR_VER=$($NVIM_BIN -v | head -1)
         if [[ $NVIM_CUR_VER =~ $NVIM_VER_REGEX ]]; then
-            # Match
-            NVIM_CUR_VER=${BASH_REMATCH[1]}
-            if [[ $NVIM_CUR_VER == $NVIM_VERSION ]]; then
-                echo "nvim $NVIM_CUR_VER already installed!"
-                return
+            # Match - extract version from capture group
+            if [ -n "${BASH_REMATCH[1]:-}" ]; then
+                NVIM_CUR_VER=${BASH_REMATCH[1]}
+                if [[ $NVIM_CUR_VER == $NVIM_VERSION ]]; then
+                    echo "nvim $NVIM_CUR_VER already installed!"
+                    return
+                else
+                    echo "nvim $NVIM_VERSION must be installed"
+                fi
             else
-                echo "nvim $NVIM_VERSION must be installed"
+                echo "Cannot extract nvim version, re-installing"
             fi
         else
             # No match
@@ -128,12 +164,12 @@ copy_neovim_plugins() {
     PLUGIN_DST="$DOTFILES_DIR/vim/pack/my-plugins/start"
     $MKDIR -p "$PLUGIN_DST"
     $CP -R "$DOTFILES_DIR/vim_plugins/"* "$PLUGIN_DST"
-    
+
     # nvim
     NVIM_PLUGINS_DST="$HOME/.local/share"
     NVIM_PLUGINS_SRC="/mnt/ch03pool/murten_mirror/shannon/packages/bootstrap/nvim_plugins_$NVIM_PLUGINS_MD5.tar.gz"
     MD5_INSTALLED=""
-    
+
     if [ ! -f "$NVIM_PLUGINS_SRC" ]; then
         echo "$NVIM_PLUGINS_SRC not found!"
         exit 1
@@ -195,13 +231,13 @@ install_software() {
     fi
 
     install_zsh
-    
+
     # Only install these on non-WSL systems or when not WSL_ONLY
     if [ "$WSL_ONLY" != 1 ]; then
         install_neovim
         install_nodejs  # Required by pyright
         install_git_delta
-        
+
         # Only install GCM for non-work installations
         if [ "$WORK_INSTALL" = 0 ]; then
             install_gcm_home
