@@ -176,11 +176,19 @@ alias dotupdate="dotupdate.sh"
 # Update tmux env with current env variables
 alias tmux_env="tmux refresh-client -S && eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')"
 
+check_tty_integrity() {
+    if [[ "$(stty -a)" == *"-icrnl"* ]]; then
+        print -P "%F{red}[WARNING]%f TTY flag '%F{yellow}$flag%f' is OFF (corrupted state detected)"
+        stty icrnl
+    fi
+}
+
 # If running tmux, add hook to update tmux env in shell
 if [[ -n "$TMUX" ]]; then
 precmd() {
     tmux refresh-client -S
     eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
+    check_tty_integrity
 }
 fi
 
