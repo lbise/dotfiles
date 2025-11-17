@@ -22,6 +22,7 @@ When cleaning code follow these rules
 - Items in headers must be prefixed by the file name in PascalCase. It can be shortened if necessary (dmtx_dsp_management.c -> DmTxDspMgmt)
 - Don't use useless prefixes in type names such as _t or _e (e.g. struct MyStruct_t or enum MyEnum_e)
 - Internal functions MUST be static
+- Any usage of pointers where the function in question does NOT modify the pointer must be const
 
 ## Workflow
 
