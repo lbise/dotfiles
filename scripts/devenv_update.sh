@@ -17,6 +17,9 @@ CLANGD_INSTALL_DIR="$HOME/.local/share/clangd"
 GITEA_REGISTRY="https://ch03git.phonak.com/api/packages/13lbise/npm/"
 GITEA_TOKEN="${GITEA_TOKEN:-}"
 
+# Force flag for clean install
+FORCE_CLEAN_INSTALL=false
+
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
 }
@@ -24,6 +27,23 @@ log() {
 error() {
     log "ERROR: $*"
     exit 1
+}
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Update development environment with opencode, clangd, and pyright.
+
+OPTIONS:
+    -f, --force     Force clean install (removes cache before installation)
+    -h, --help      Show this help message
+
+EXAMPLES:
+    $(basename "$0")              # Normal update (preserves cache)
+    $(basename "$0") --force      # Clean install (removes cache)
+EOF
+    exit 0
 }
 
 check_dependencies() {
@@ -123,9 +143,9 @@ install_opencode() {
     # Extract version from archive name
     local version=$(echo "$archive_name" | sed 's/opencode-v\([0-9.]*\).*/\1/')
 
-    # Check if already installed
+    # Check if already installed (skip if force clean install is enabled)
     local installed_version=$(get_installed_opencode_version)
-    if [[ -n "$installed_version" && "$installed_version" == "$version" ]]; then
+    if [[ "$FORCE_CLEAN_INSTALL" == false && -n "$installed_version" && "$installed_version" == "$version" ]]; then
         log "✓ opencode $version is already installed"
         return 0
     fi
@@ -159,9 +179,15 @@ install_opencode() {
         mkdir -p "$OPENCODE_BIN_DIR/bin"
     fi
 
-    # Check if cache already exists - if so, preserve it
+    # Check if cache already exists - if so, preserve it (unless force clean install)
     local cache_exists=false
-    if [[ -d "$OPENCODE_CACHE_DIR" ]]; then
+    if [[ "$FORCE_CLEAN_INSTALL" == true ]]; then
+        if [[ -d "$OPENCODE_CACHE_DIR" ]]; then
+            log "Force clean install: removing existing cache at $OPENCODE_CACHE_DIR"
+            rm -rf "$OPENCODE_CACHE_DIR"
+        fi
+        mkdir -p "$OPENCODE_CACHE_DIR"
+    elif [[ -d "$OPENCODE_CACHE_DIR" ]]; then
         log "Existing opencode cache found at $OPENCODE_CACHE_DIR - preserving it"
         cache_exists=true
     else
@@ -420,6 +446,23 @@ verify_installation() {
 }
 
 main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -f|--force)
+                FORCE_CLEAN_INSTALL=true
+                log "Force clean install enabled"
+                shift
+                ;;
+            -h|--help)
+                usage
+                ;;
+            *)
+                error "Unknown option: $1. Use --help for usage information."
+                ;;
+        esac
+    done
+
     log "Starting development environment update..."
 
     # Check dependencies
