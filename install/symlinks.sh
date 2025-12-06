@@ -4,12 +4,11 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_ROOT="$(dirname "$SCRIPT_DIR")/dot"
 DOTFILES_LINKS=(
+    ".zshrc"
     ".gitconfig"
     ".config/nvim"
 )
 
-    #".zshrc"
-    #".gitconfig"
     #".tmux.conf"
     #".config/nvim"
     #".config/ghostty"
@@ -23,7 +22,6 @@ fi
 for REL in "${DOTFILES_LINKS[@]}"; do
     SRC="$DOTFILES_ROOT/$REL"
     DST="$DOTFILES_DST/$REL"
-    echo "Symlink: $SRC -> $DST"
 
     if [[ ! -e "$SRC" ]]; then
         echo "ERROR: $SRC does not exist"
@@ -36,4 +34,5 @@ for REL in "${DOTFILES_LINKS[@]}"; do
     fi
 
     ln -sf "$SRC" "$DST"
+    echo "Created symlink $SRC -> $DST"
 done

@@ -7,20 +7,23 @@ echo "**************************************************************************
 echo "Installation of Leo's dotfiles..."
 echo "********************************************************************************"
 
-# OS specific
-if [[ -f /etc/os-release ]]; then
-    . /etc/os-release
-    if [[ "$ID" == "arch" ]]; then
-        echo ">> Installing arch linux packages"
+source $SCRIPT_DIR/install/helpers.sh
+
+# OS specific installation
+if is_arch; then
+    echo ">> Installing arch linux packages"
 	source $SCRIPT_DIR/install/packages_arch.sh
-    fi
+elif is_ubuntu; then
+    echo ">> Installing ubuntu packages"
+    echo "TODO"
+    exit 1
 fi
 
-# Install symlinks using stow
 echo ">> Installing symlinks"
-./install/stow.sh
+$SCRIPT_DIR/install/symlinks.sh
 
-
+echo ">> Installing apps"
+source $SCRIPT_DIR/install/apps/zsh.sh
 
 echo "********************************************************************************"
 echo "Installation completed"
