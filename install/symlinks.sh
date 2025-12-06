@@ -13,6 +13,7 @@ DOTFILES_LINKS=(
     ".zsh_work"
     ".gitconfig"
     ".tmux.conf"
+    ".tmux/plugins"
     ".config/nvim"
     ".config/ghostty"
     ".config/hypr"

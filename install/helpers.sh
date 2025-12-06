@@ -15,6 +15,12 @@ create_symlink() {
         rm -rf "$DST"
     fi
 
+    DST_DIR="$(dirname $DST)"
+    if [[ ! -e "$DST_DIR" ]]; then
+        echo "Create directory $DST_DIR"
+        mkdir -p $DST_DIR
+    fi
+
     ln -sf "$SRC" "$DST"
     echo "Created symlink $SRC -> $DST"
 }
