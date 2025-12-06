@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PACMAN_PKGS="zsh tmux git"
-YAY_PKGS="neovim ghostty stow zen-browser-bin"
+YAY_PKGS="neovim ghostty zen-browser-bin fzf ripgrep"
 
 # Only install packages if needed
 sudo pacman -S --noconfirm --needed $PACMAN_PKGS

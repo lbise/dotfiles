@@ -1,0 +1,23 @@
+# Ugly hack to workaround this andromeda ctrl+c issue
+check_tty_integrity() {
+    if [[ "$(stty -a)" == *"-icrnl"* ]]; then
+        print -P "%F{red}[WARNING]%f TTY flag '%F{yellow}$flag%f' is OFF (corrupted state detected)"
+        stty icrnl
+    fi
+}
+
+if [[ -n "$TMUX" ]]; then
+precmd() {
+    tmux refresh-client -S
+    eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
+    check_tty_integrity
+}
+fi
+
+# Andromeda
+if [ -d "$HOME/andromeda" ]; then
+    CURRENT_DIR=$PWD
+    cd $HOME/andromeda
+    source sourceme
+    cd $CURRENT_DIR
+fi

@@ -14,7 +14,7 @@
 [user]
 	name = Léonard Bise
 	email = leonard.bise@gmail.com
-	#signingkey = ED0DFB79FF83B277
+	signingkey = ED0DFB79FF83B277
 
 [difftool]
 	prompt = false
@@ -60,8 +60,8 @@
 [credential]
 	helper = /usr/local/bin/git-credential-manager
 	credentialStore = gpg
-#[commit]
-#    gpgsign = true
+[commit]
+    gpgsign = true
 [safe]
 	directory = *
 [column]
