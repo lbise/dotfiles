@@ -24,6 +24,7 @@ $SCRIPT_DIR/install/symlinks.sh
 
 echo ">> Installing apps"
 source $SCRIPT_DIR/install/apps/zsh.sh
+source $SCRIPT_DIR/install/apps/opencode.sh
 
 echo "********************************************************************************"
 echo "Installation completed"

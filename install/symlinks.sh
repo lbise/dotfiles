@@ -17,6 +17,7 @@ DOTFILES_LINKS=(
     ".config/nvim"
     ".config/ghostty"
     ".config/hypr"
+    ".config/opencode"
 )
 
 DOTFILES_DST="$HOME"
