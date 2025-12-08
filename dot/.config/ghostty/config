@@ -41,11 +41,14 @@
 # # which is explained in the docs for that config option.
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
+
+# Prevent systemd service from quitting, improves start time of ghostty
+quit-after-last-window-closed = false
+
 theme = TokyoNight Night
 
 #font-family = "Iosevka Nerd Font Mono"
-font-family = FiraCode Nerd Font Mono Reg
-font-thicken = true
+font-family = "FiraCode Nerd Font Mono"
 font-size = 14
 
 # window-decoration = flse
