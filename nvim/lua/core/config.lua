@@ -72,9 +72,6 @@ vim.opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
 -- Set completeopt to have a better completion experience
 vim.opt.completeopt = "menuone,longest"
 
--- NOTE: You should make sure your terminal supports this
-vim.opt.termguicolors = true
-
 -- Indenting
 vim.opt.expandtab = true
 vim.opt.smartindent = true
