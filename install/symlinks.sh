@@ -18,6 +18,9 @@ DOTFILES_LINKS=(
     ".config/ghostty"
     ".config/hypr"
     ".config/opencode"
+    ".config/leo"
+    ".config/mako"
+    ".config/waybar"
 )
 
 DOTFILES_DST="$HOME"

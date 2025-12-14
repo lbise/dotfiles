@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PACMAN_PKGS="zsh tmux git unzip swaybg mako hypridle hyprlock"
+PACMAN_PKGS="zsh tmux git unzip swaybg mako hypridle hyprlock man-db man-pages waybar"
 YAY_PKGS="neovim ghostty zen-browser-bin fzf ripgrep"
 
 # Only install packages if needed
