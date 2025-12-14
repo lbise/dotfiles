@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PACMAN_PKGS="zsh tmux git unzip swaybg mako hypridle hyprlock man-db man-pages waybar"
-YAY_PKGS="neovim ghostty zen-browser-bin fzf ripgrep"
+YAY_PKGS="neovim ghostty zen-browser-bin fzf ripgrep xdg-terminal-exec"
 
 # Only install packages if needed
 sudo pacman -S --noconfirm --needed $PACMAN_PKGS
