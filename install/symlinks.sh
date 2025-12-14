@@ -21,6 +21,7 @@ DOTFILES_LINKS=(
     ".config/leo"
     ".config/mako"
     ".config/waybar"
+    ".config/uwsm"
 )
 
 DOTFILES_DST="$HOME"
@@ -37,4 +38,7 @@ for REL in "${DOTFILES_LINKS[@]}"; do
 done
 
 # Symlink scripts folder
-create_symlink "$DOTFILES_ROOT/scripts" "$DOTFILES_DST/.scripts"
+SCRIPT_DST="$HOME/.scripts"
+if [ ! -e "$SCRIPT_DST" ]; then
+    create_symlink "$DOTFILES_ROOT/scripts" "$SCRIPT_DST"
+fi

@@ -26,6 +26,9 @@ echo ">> Installing apps"
 source $SCRIPT_DIR/install/apps/zsh.sh
 source $SCRIPT_DIR/install/apps/opencode.sh
 
+echo ">> Set timezone"
+source $SCRIPT_DIR/scripts/system/system-set-timezone.sh
+
 echo "********************************************************************************"
 echo "Installation completed"
 echo "********************************************************************************"

@@ -1,0 +1,4 @@
+# Changes require a restart to take effect.
+
+# Ensure system scripts are in the path
+export PATH=$HOME/.scripts/system:$PATH
