@@ -7,4 +7,4 @@ fi
 
 APP="$1"
 
-exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.leo.$(basename $1) -e "$APP" "${@:2}"
+eval exec setsid uwsm-app -- "$APP" "${@:2}"

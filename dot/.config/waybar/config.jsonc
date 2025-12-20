@@ -43,7 +43,7 @@
   "cpu": {
     "interval": 5,
     "format": "󰍛",
-    "on-click": "system-exec.sh btop"
+    "on-click": "system-exec-term.sh btop"
   },
   "clock": {
     "format": "{:L%A %H:%M}",
@@ -92,7 +92,7 @@
   },
   "pulseaudio": {
     "format": "{icon}",
-    "on-click": "omarchy-launch-or-focus-tui wiremix",
+    "on-click": "system-exec.sh pavucontrol",
     "on-click-right": "pamixer -t",
     "tooltip-format": "Playing at {volume}%",
     "scroll-step": 5,
