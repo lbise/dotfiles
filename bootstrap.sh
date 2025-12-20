@@ -28,11 +28,33 @@ echo ">> Updating package database..."
 sudo pacman -Sy
 
 # Install essential packages needed for the full installation
-echo ">> Installing essential packages (git, base-devel)..."
+echo ">> Installing essential packages..."
 sudo pacman -S --noconfirm --needed git base-devel
 
+# Check if yay is already installed
+if ! command -v yay &> /dev/null; then
+    echo ">> Installing yay (AUR helper)..."
+
+    # Create temporary directory for building yay
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+
+    # Clone and build yay
+    git clone https://aur.archlinux.org/yay.git
+    cd yay
+    makepkg -si --noconfirm
+
+    # Clean up
+    cd ~
+    rm -rf "$TEMP_DIR"
+
+    echo ">> yay installed successfully"
+else
+    echo ">> yay is already installed"
+fi
+
 # Clone dotfiles repository
-DOTFILES_DIR="$HOME/dotfiles"
+DOTFILES_DIR="$HOME/gitrepo/dotfiles"
 if [[ -d "$DOTFILES_DIR" ]]; then
     echo ">> Dotfiles directory already exists at $DOTFILES_DIR"
     read -p "Do you want to remove it and re-clone? (y/N): " -n 1 -r
@@ -43,6 +65,8 @@ if [[ -d "$DOTFILES_DIR" ]]; then
         echo "Aborting..."
         exit 1
     fi
+else
+    mkdir -p $DOTFILES_DIR
 fi
 
 echo ">> Cloning dotfiles repository..."
