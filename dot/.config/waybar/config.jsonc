@@ -61,7 +61,7 @@
     "tooltip-format-disconnected": "Disconnected",
     "interval": 3,
     "spacing": 1,
-    "on-click": "omarchy-launch-wifi"
+    "on-click": "system-exec-term.sh impala"
   },
   "battery": {
     "format": "{capacity}% {icon}",
