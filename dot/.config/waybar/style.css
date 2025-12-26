@@ -1,5 +1,4 @@
-@define-color foreground #948979;
-@define-color background #222831;
+@import "../leo/theme/waybar.css";
 
 * {
   background-color: @background;
