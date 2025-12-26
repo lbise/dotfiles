@@ -52,3 +52,9 @@ font-family = "FiraCode Nerd Font Mono"
 font-size = 14
 
 # window-decoration = flse
+
+# Clipboard settings - use system clipboard
+clipboard-read = allow
+clipboard-write = allow
+# Copy on select (like traditional X11 behavior)
+copy-on-select = clipboard
