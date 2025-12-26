@@ -22,6 +22,7 @@ DOTFILES_LINKS=(
     ".config/mako"
     ".config/waybar"
     ".config/uwsm"
+    ".config/walker"
 )
 
 DOTFILES_DST="$HOME"
