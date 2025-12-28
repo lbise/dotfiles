@@ -1,32 +1,18 @@
-[color]
-	ui = auto
-
-[color "diff"]
-	meta = blue
-	frag = white
-	old = red bold
-	new = green bold
-
 [core]
-	editor = nvim
-	filemode = false
-    autocrlf = false
+    pager = delta
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true  # use n and N to move between diff sections
+    dark = true      # or light = true, or omit for auto-detection
+    line-numbers = true
 
 [user]
-	name = Léonard Bise
-	email = leonard.bise@gmail.com
-	signingkey = ED0DFB79FF83B277
-
-[difftool]
-	prompt = false
-
-[merge]
-    tool = nvimdiff2
-    conflictStyle = diff3
-
-[grep]
-	extendRegexp = true
-	lineNumber = true
+	name = Leonard Bise
+	email = leonard.bise@sonova.com
+	signingkey = 74C8AEB4E19420A7
 
 [alias]
 	a = add
@@ -54,46 +40,24 @@
 	# Rebase: abort
 	abort = rebase --abort
 
-[log]
-	# Show branch names with git log
-	decorate = short
-
-[pull]
-    rebase = true
-
-[rebase]
-	autoSquash = yes
-	autoStash = yes
-
-[rerere]
-	enabled = true
-
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
 [credential]
-	helper = /usr/local/bin/git-credential-manager
 	credentialStore = gpg
-
-#[commit]
-#    gpgsign = true
-
-[safe]
-	directory = *
-
-[column]
-	ui = auto
-
-[branch]
-    sort = --commiterdate
-
-[remote "origin"]
-	prune = true
-
-[fetch]
-	prune = true
-    pruneTags = true
-
-[mergetool]
-	keepBackup = false
-    prompt = false
-
-[includeIf "hasconfig:remote.*.url:*ch03git*"]
-    path = ~/.gitconfigwork
+	useHttpPath = true
+[commit]
+	gpgsign = true
+[tag]
+	gpgsign = true
+[credential "https://dev.azure.com"]
+	useHttpPath = true
+[credential "https://ch03git.phonak.com"]
+    user = 13lbise
+    provider = generic
+[url "git@ch03git.phonak.com:"]
+	insteadOf = https://ch03git.phonak.com/
+[url "git@git.sonova.com:"]
+    insteadOf = https://git.sonova.com/
