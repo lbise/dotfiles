@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PACMAN_PKGS="zsh tmux git unzip swaybg mako hypridle hyprlock man-db man-pages waybar impala fcitx5 brightnessctl"
+PACMAN_PKGS="zsh tmux git unzip swaybg mako hypridle hyprlock man-db man-pages waybar impala fcitx5 brightnessctl jq"
 YAY_PKGS="neovim ghostty zen-browser-bin fzf ripgrep xdg-terminal-exec elephant walker dropbox"
 
 # Only install packages if needed

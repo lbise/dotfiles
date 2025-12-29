@@ -51,8 +51,6 @@ theme = TokyoNight Night
 font-family = "FiraCode Nerd Font Mono"
 font-size = 14
 
-# window-decoration = flse
-
 # Clipboard settings - use system clipboard
 clipboard-read = allow
 clipboard-write = allow
