@@ -48,7 +48,8 @@ quit-after-last-window-closed = false
 theme = TokyoNight Night
 
 #font-family = "Iosevka Nerd Font Mono"
-font-family = "FiraCode Nerd Font Mono"
+#font-family = "FiraCode Nerd Font Mono"
+font-famliy = "JetBrainsMono Nerd Font Mono"
 font-size = 14
 
 # Window
