@@ -6,7 +6,9 @@ source $SCRIPT_DIR/helpers.sh
 
 DOTFILES_ROOT="$(dirname "$SCRIPT_DIR")"
 DOTFILES_DOT_ROOT="$DOTFILES_ROOT/dot"
-DOTFILES_LINKS=(
+
+# Common symlinks for all environments
+COMMON_LINKS=(
     ".zshrc"
     ".aliases"
     ".exports"
@@ -15,15 +17,27 @@ DOTFILES_LINKS=(
     ".tmux.conf"
     ".tmux/plugins"
     ".config/nvim"
+    ".config/opencode"
+)
+
+# Desktop-only symlinks (Hyprland, Waybar, etc.)
+DESKTOP_LINKS=(
     ".config/ghostty"
     ".config/hypr"
-    ".config/opencode"
-    ".config/leo"
     ".config/mako"
     ".config/waybar"
     ".config/uwsm"
     ".config/walker"
+    ".config/leo"
 )
+
+# Start with common links
+DOTFILES_LINKS=("${COMMON_LINKS[@]}")
+
+# Add desktop links if not on work machine
+if [[ "$HOSTNAME" != "13lbise" ]]; then
+    DOTFILES_LINKS+=("${DESKTOP_LINKS[@]}")
+fi
 
 DOTFILES_DST="$HOME"
 
