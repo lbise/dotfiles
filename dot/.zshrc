@@ -24,6 +24,25 @@ if [ "$USER" = "13lbise" ]; then
     zstyle :omz:plugins:ssh-agent identities $WORK_KEY
 fi
 
+# Load completions
+autoload -Uz compinit && compinit
+
+# History
+HISTSIZE=10000
+SAVEHIST=10000
+HISTDUP=erase
+HISTFILE=${HISTFILE:-$HOME/.zsh_history}
+setopt appendhistory
+setopt sharehistory
+setopt hist_ignore_space
+setopt hist_ignore_all_dups
+setopt hist_save_no_dups
+setopt hist_ignore_dups
+setopt hist_find_no_dups
+
+# Integrate fzf in shell
+eval "$(fzf --zsh)"
+
 # Source last to take into account changes
 source $ZSH/oh-my-zsh.sh
 
