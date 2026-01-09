@@ -14,6 +14,7 @@ COMMON_LINKS=(
     ".exports"
     ".zsh_work"
     ".gitconfig"
+    ".gitconfigwork"
     ".tmux.conf"
     ".tmux/plugins"
     ".config/nvim"

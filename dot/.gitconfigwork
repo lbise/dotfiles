@@ -14,50 +14,25 @@
 	email = leonard.bise@sonova.com
 	signingkey = 74C8AEB4E19420A7
 
-[alias]
-	a = add
-	ua = reset HEAD
-	c = commit
-	ca = commit --amend
-	call = commit -a
-	cm = commit -m
-	cam = commit -am
-	cne = commit --no-edit
-	co = checkout
-	s = status
-	d = diff
-	cp = cherry-pick
-	l = log --graph --pretty=format:'%C(magenta)%h%C(blue)%d%Creset %s %C(blue bold)- %an, %ad%Creset'
-	ll = log --stat --abbrev-commit
-	# List my own commits
-	my = !git log --branches=* --no-merges --pretty=format:'%C(reset)%C(bold)%cd %C(reset)%C(white)%s  %C(reset)%h' --date=short --author=\"$(git config user.name)\"
-	# List of branches ordered by last change
-	branches = for-each-ref --sort=-committerdate refs/heads/ --format='%(color:bold)%(refname:short)%(color:reset)\t%(committerdate:relative)'
-	# Rebase: add changes and continue
-	cont = !git add . && git rebase --continue
-	# Rebase: skip a rebase step
-	skip = rebase --skip
-	# Rebase: abort
-	abort = rebase --abort
-
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
+
 [credential]
-	credentialStore = gpg
 	useHttpPath = true
-[commit]
-	gpgsign = true
-[tag]
-	gpgsign = true
+
 [credential "https://dev.azure.com"]
 	useHttpPath = true
+
 [credential "https://ch03git.phonak.com"]
     user = 13lbise
     provider = generic
+
+# Hack to force using ssh
 [url "git@ch03git.phonak.com:"]
 	insteadOf = https://ch03git.phonak.com/
+
 [url "git@git.sonova.com:"]
     insteadOf = https://git.sonova.com/

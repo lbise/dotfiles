@@ -69,11 +69,13 @@
 	enabled = true
 
 [credential]
-	helper = /usr/local/bin/git-credential-manager
 	credentialStore = gpg
 
-#[commit]
-#    gpgsign = true
+[commit]
+    gpgsign = true
+
+[tag]
+	gpgsign = true
 
 [safe]
 	directory = *
@@ -95,5 +97,9 @@
 	keepBackup = false
     prompt = false
 
-[includeIf "hasconfig:remote.*.url:*ch03git*"]
+# Include specific work config
+# Note: hasconfig:remote requires Git 2.36+
+[includeIf "gitdir:~/andromeda/"]
+    path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/leo_dotfiles/"]
     path = ~/.gitconfigwork
