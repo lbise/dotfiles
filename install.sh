@@ -11,18 +11,17 @@ source $SCRIPT_DIR/install/helpers.sh
 
 # OS specific installation
 if is_arch; then
-    echo ">> Installing arch linux packages"
+    echo ">> Installing arch linux packages..."
 	source $SCRIPT_DIR/install/packages_arch.sh
 elif is_ubuntu; then
-    echo ">> Installing ubuntu packages"
-    echo "TODO"
-    exit 1
+    echo ">> Installing ubuntu packages..."
+	source $SCRIPT_DIR/install/packages_ubuntu.sh
 fi
 
-echo ">> Installing symlinks"
+echo ">> Installing symlinks..."
 $SCRIPT_DIR/install/symlinks.sh
 
-echo ">> Installing apps"
+echo ">> Installing external apps..."
 source $SCRIPT_DIR/install/apps/zsh.sh
 source $SCRIPT_DIR/install/apps/opencode.sh
 
