@@ -19,6 +19,7 @@ COMMON_LINKS=(
     ".tmux/plugins"
     ".config/nvim"
     ".config/opencode"
+    ".ssh/config"
 )
 
 # Desktop-only symlinks (Hyprland, Waybar, etc.)
