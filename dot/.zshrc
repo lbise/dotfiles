@@ -40,6 +40,9 @@ setopt hist_save_no_dups
 setopt hist_ignore_dups
 setopt hist_find_no_dups
 
+# Prompt for passphrase
+export GPG_TTY=$(tty)
+
 # Integrate fzf in shell
 eval "$(fzf --zsh)"
 
