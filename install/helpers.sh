@@ -81,26 +81,51 @@ get_github_latest_tag() {
     curl -sL "https://api.github.com/repos/${repo}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p'
 }
 
+# Extract version number from a version string (strips leading 'v' and extra info)
+# Usage: normalize_version "v1.2.3" -> "1.2.3"
+normalize_version() {
+    local version="$1"
+    # Remove leading 'v' and anything after space/dash (e.g., "1.2.3 (abc123)" -> "1.2.3")
+    echo "$version" | sed -E 's/^v//; s/[- ].*//'
+}
+
 # Install a binary from a GitHub release tarball to ~/.local/bin
-# Usage: install_github_release "tool_name" "owner/repo" "tarball_url" ["binary_name_in_archive"]
+# Usage: install_github_release "tool_name" "owner/repo" "tarball_url" "latest_tag" ["binary_name_in_archive"]
 # - tool_name: name of the tool (used for messages and default binary name)
 # - owner/repo: GitHub repository (e.g., "tmux/tmux-builds")
 # - tarball_url: full URL to the .tar.gz file
+# - latest_tag: the latest release tag (e.g., "v1.2.3")
 # - binary_name_in_archive: optional, name of binary inside archive (defaults to tool_name)
 install_github_release() {
     local tool_name="$1"
     local repo="$2"
     local tarball_url="$3"
-    local binary_name="${4:-$tool_name}"
+    local latest_tag="$4"
+    local binary_name="${5:-$tool_name}"
     local install_dir="$HOME/.local/bin"
 
-    # Check if already installed
+    local latest_version
+    latest_version=$(normalize_version "$latest_tag")
+
+    # Check if already installed and up to date
     if [[ -x "$install_dir/$tool_name" ]]; then
-        echo "$tool_name is already installed ($("$install_dir/$tool_name" --version 2>/dev/null || echo 'version unknown'))"
-        return 0
+        local current_version_raw current_version
+        current_version_raw=$("$install_dir/$tool_name" --version 2>/dev/null | head -n1 || echo "")
+        current_version=$(normalize_version "$current_version_raw")
+
+        if [[ -n "$current_version" && "$current_version" == "$latest_version" ]]; then
+            echo "$tool_name is already up to date ($current_version)"
+            return 0
+        elif [[ -n "$current_version" ]]; then
+            echo "$tool_name $current_version is installed, upgrading to $latest_version..."
+        else
+            echo "$tool_name is installed but version unknown, reinstalling..."
+        fi
+    else
+        echo "Installing $tool_name $latest_version..."
     fi
 
-    echo "Downloading $tool_name from $tarball_url..."
+    echo "Downloading from $tarball_url..."
 
     # Create temporary directory for extraction
     local tmp_dir

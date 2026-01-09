@@ -34,4 +34,4 @@ esac
 
 TARBALL_URL="https://github.com/${REPO}/releases/download/${TAG}/ripgrep-${TAG}-${TARGET}.tar.gz"
 
-install_github_release "rg" "$REPO" "$TARBALL_URL" "rg"
+install_github_release "rg" "$REPO" "$TARBALL_URL" "$TAG" "rg"

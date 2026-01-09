@@ -19,4 +19,4 @@ VERSION="${TAG#v}"  # Remove 'v' prefix for filename
 
 TARBALL_URL="https://github.com/${REPO}/releases/download/${TAG}/tmux-${VERSION}-${OS}-${ARCH}.tar.gz"
 
-install_github_release "tmux" "$REPO" "$TARBALL_URL"
+install_github_release "tmux" "$REPO" "$TARBALL_URL" "$TAG"

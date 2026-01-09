@@ -30,4 +30,4 @@ esac
 
 TARBALL_URL="https://github.com/${REPO}/releases/download/${TAG}/fzf-${VERSION}-${FZF_OS}_${FZF_ARCH}.tar.gz"
 
-install_github_release "fzf" "$REPO" "$TARBALL_URL"
+install_github_release "fzf" "$REPO" "$TARBALL_URL" "$TAG"
