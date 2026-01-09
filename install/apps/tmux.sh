@@ -6,6 +6,11 @@ source "$SCRIPT_DIR/../helpers.sh"
 
 echo ">> Installing tmux..."
 
+if is_arch; then
+    echo "Skipped on arch linux, done using yay"
+    exit 0
+fi
+
 REPO="tmux/tmux-builds"
 OS=$(get_os) || exit 1
 ARCH=$(get_arch) || exit 1

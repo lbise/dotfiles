@@ -3,6 +3,11 @@ set -Eeuo pipefail
 
 echo ">> Installing zsh..."
 
+if is_arch; then
+    echo "Skipped on arch linux, done using yay"
+    exit 0
+fi
+
 ZSH_PATH=$(which zsh)
 if [[ ! -e "$ZSH_PATH" ]]; then
     echo "ZSH is not installed: $ZSH_PATH"
