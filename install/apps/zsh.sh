@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "Configuring zsh..."
+echo ">> Installing zsh..."
 
 ZSH_PATH=$(which zsh)
 if [[ ! -e "$ZSH_PATH" ]]; then

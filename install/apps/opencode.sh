@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "Installing opencode..."
+echo ">> Installing opencode..."
 
 # Check if opencode is already installed
 if command -v opencode &> /dev/null; then
