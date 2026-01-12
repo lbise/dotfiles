@@ -83,10 +83,11 @@ get_github_latest_tag() {
 
 # Extract version number from a version string (strips leading 'v' and extra info)
 # Usage: normalize_version "v1.2.3" -> "1.2.3"
+#        normalize_version "NVIM v0.11.5" -> "0.11.5"
 normalize_version() {
     local version="$1"
-    # Remove leading 'v' and anything after space/dash (e.g., "1.2.3 (abc123)" -> "1.2.3")
-    echo "$version" | sed -E 's/^v//; s/[- ].*//'
+    # Extract version number: find pattern like v1.2.3 or 1.2.3 and strip the 'v'
+    echo "$version" | grep -oE 'v?[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 | sed 's/^v//'
 }
 
 # Install a binary from a GitHub release tarball to ~/.local/bin
@@ -112,16 +113,24 @@ install_github_release() {
     # Check if already installed and up to date
     if [[ -x "$install_dir/$tool_name" ]]; then
         local current_version_raw current_version
-        current_version_raw=$("$install_dir/$tool_name" --version 2>/dev/null | head -n1 || echo "")
+        # Try --version first, then -V, then -v
+        current_version_raw=$("$install_dir/$tool_name" --version 2>/dev/null | head -n1) ||
+            current_version_raw=$("$install_dir/$tool_name" -V 2>/dev/null | head -n1) ||
+            current_version_raw=$("$install_dir/$tool_name" -v 2>/dev/null | head -n1) ||
+            current_version_raw=""
         current_version=$(normalize_version "$current_version_raw")
 
-        if [[ -n "$current_version" && "$current_version" == "$latest_version" ]]; then
+        if [[ -z "$current_version" ]]; then
+            echo "ERROR: $tool_name is installed but could not determine version" >&2
+            echo "Tried: --version, -V, -v" >&2
+            return 1
+        fi
+
+        if [[ "$current_version" == "$latest_version" ]]; then
             echo "$tool_name is already up to date ($current_version)"
             return 0
-        elif [[ -n "$current_version" ]]; then
-            echo "$tool_name $current_version is installed, upgrading to $latest_version..."
         else
-            echo "$tool_name is installed but version unknown, reinstalling..."
+            echo "$tool_name $current_version is installed, upgrading to $latest_version..."
         fi
     else
         echo "Installing $tool_name $latest_version..."

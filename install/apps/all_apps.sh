@@ -2,9 +2,11 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "$0")"
 
-$SCRIPT_DIR/zsh.sh
-$SCRIPT_DIR/opencode.sh
-$SCRIPT_DIR/tmux.sh
-$SCRIPT_DIR/ripgrep.sh
-$SCRIPT_DIR/fzf.sh
+# Run all .sh scripts in this directory except this one
+for script in "$SCRIPT_DIR"/*.sh; do
+    [[ "$(basename "$script")" == "$SCRIPT_NAME" ]] && continue
+    echo "Running $(basename "$script")..."
+    "$script"
+done
