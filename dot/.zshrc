@@ -13,6 +13,8 @@ bindkey -s '^@' "^utmux-sessionizer\n"
 ZSH_THEME="candy"
 
 plugins=(
+    colorize
+    colored-man-pages
     fzf
     ssh-agent
     vi-mode
@@ -46,11 +48,19 @@ setopt hist_find_no_dups
 # Prompt for passphrase
 export GPG_TTY=$(tty)
 
+##### FZF #####
 # Integrate fzf in shell
 eval "$(fzf --zsh)"
+# Default options: Ignore case, full style, 40% height
+export FZF_DEFAULT_OPTS="-i --style full --height 40%"
+
+
 
 # Source last to take into account changes
 source $ZSH/oh-my-zsh.sh
+
+
+
 
 
 
