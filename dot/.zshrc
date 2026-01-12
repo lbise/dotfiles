@@ -1,15 +1,5 @@
 export ZSH="$HOME/.oh-my-zsh"
 
-# Setup aliases and env
-source $HOME/.aliases
-source $HOME/.exports
-if [ -f "$HOME/.keys" ]; then
-    source "$HOME/.keys"
-fi
-
-# Bindings
-bindkey -s '^@' "^utmux-sessionizer\n"
-
 ZSH_THEME="candy"
 
 plugins=(
@@ -19,6 +9,10 @@ plugins=(
     ssh-agent
     vi-mode
 )
+
+# Source last to take into account changes
+source $ZSH/oh-my-zsh.sh
+# --------------------------------------------------------------------------------
 
 # Work specific
 if [ "$USER" = "13lbise" ]; then
@@ -54,11 +48,15 @@ eval "$(fzf --zsh)"
 # Default options: Ignore case, full style, 40% height
 export FZF_DEFAULT_OPTS="-i --style full --height 40%"
 
+# Setup aliases and env
+source $HOME/.aliases
+source $HOME/.exports
+if [ -f "$HOME/.keys" ]; then
+    source "$HOME/.keys"
+fi
 
-
-# Source last to take into account changes
-source $ZSH/oh-my-zsh.sh
-
+# Bindings
+bindkey -s '^@' "^utmux-sessionizer\n"
 
 
 
