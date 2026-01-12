@@ -90,6 +90,7 @@ normalize_version() {
 }
 
 # Install a binary from a GitHub release tarball to ~/.local/bin
+# Also installs share/ and lib/ directories to ~/.local if present in the archive
 # Usage: install_github_release "tool_name" "owner/repo" "tarball_url" "latest_tag" ["binary_name_in_archive"]
 # - tool_name: name of the tool (used for messages and default binary name)
 # - owner/repo: GitHub repository (e.g., "tmux/tmux-builds")
@@ -103,6 +104,7 @@ install_github_release() {
     local latest_tag="$4"
     local binary_name="${5:-$tool_name}"
     local install_dir="$HOME/.local/bin"
+    local local_dir="$HOME/.local"
 
     local latest_version
     latest_version=$(normalize_version "$latest_tag")
@@ -161,4 +163,22 @@ install_github_release() {
     chmod +x "$install_dir/$tool_name"
 
     echo "$tool_name installed successfully to $install_dir/$tool_name"
+
+    # Install share/ directory if present (for runtime files, help docs, etc.)
+    local share_dir
+    share_dir=$(find "$tmp_dir" -type d -name "share" 2>/dev/null | head -n1)
+    if [[ -n "$share_dir" && -d "$share_dir" ]]; then
+        mkdir -p "$local_dir/share"
+        cp -r "$share_dir"/* "$local_dir/share/"
+        echo "Installed share files to $local_dir/share"
+    fi
+
+    # Install lib/ directory if present (for libraries, plugins, etc.)
+    local lib_dir
+    lib_dir=$(find "$tmp_dir" -type d -name "lib" 2>/dev/null | head -n1)
+    if [[ -n "$lib_dir" && -d "$lib_dir" ]]; then
+        mkdir -p "$local_dir/lib"
+        cp -r "$lib_dir"/* "$local_dir/lib/"
+        echo "Installed lib files to $local_dir/lib"
+    fi
 }
