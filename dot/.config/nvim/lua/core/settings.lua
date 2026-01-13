@@ -7,15 +7,15 @@ local settings = {
 			"clang-format",
 			"basedpyright",
 			-- Required version for work..
-			--"ruff@0.11.2",
-			"ruff",
+			"ruff@0.11.2",
+			--"ruff",
 			"bash-language-server",
 			"lua-language-server",
 			"stylua",
 		},
 		-- Servers enable status, can also be a list of settings passed to require('lspconfig')[server].setup(settings = { xxx })
 		servers = {
-            clangd = false,
+			clangd = false,
 			--clangd = {
 			--	cmd = {
 			--		"clangd",
@@ -40,7 +40,7 @@ local settings = {
 				settings = {
 					basedpyright = {
 						analysis = {
-						    typeCheckingMode = "standard",
+							typeCheckingMode = "standard",
 							extraPaths = {
 								vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
@@ -53,6 +53,24 @@ local settings = {
 					},
 				},
 			},
+			--ty = {
+			--	settings = {
+			--		ty = {
+			--			configuration = {
+			--				environment = {
+			--					["extra-paths"] = {
+			--						vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
+			--						vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
+			--						vim.fn.expand("$HOME/andromeda/pctools/scripts/python"),
+			--						vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
+			--						vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
+			--						vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
+			--					},
+			--				},
+			--			},
+			--		},
+			--	},
+			--},
 			lua_ls = {
 				settings = {
 					Lua = {
