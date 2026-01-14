@@ -44,7 +44,6 @@ local settings = {
 							extraPaths = {
 								vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
-								vim.fn.expand("$HOME/andromeda/pctools/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
@@ -61,7 +60,6 @@ local settings = {
 			--					["extra-paths"] = {
 			--						vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
 			--						vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
-			--						vim.fn.expand("$HOME/andromeda/pctools/scripts/python"),
 			--						vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
 			--						vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
 			--						vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),

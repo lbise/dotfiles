@@ -14,7 +14,6 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Iterator
 
-
 class SanityRun:
     """Represents a single sanity test run with its logs and metadata."""
 
@@ -645,7 +644,7 @@ Examples:
         '--lines',
         help='''Line specification for partial viewing:
   - Number: "50" (first 50 lines)
-  - Range: "10:50" (lines 10 to 50)  
+  - Range: "10:50" (lines 10 to 50)
   - Start range: "100:" (from line 100 to end)
   - End range: ":50" (first 50 lines)''',
     )
