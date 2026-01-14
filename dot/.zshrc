@@ -1,3 +1,10 @@
+# Setup aliases and env
+source $HOME/.aliases
+source $HOME/.exports
+if [ -f "$HOME/.keys" ]; then
+    source "$HOME/.keys"
+fi
+
 export ZSH="$HOME/.oh-my-zsh"
 
 ZSH_THEME="candy"
@@ -57,13 +64,6 @@ export GPG_TTY=$(tty)
 eval "$(fzf --zsh)"
 # Default options: Ignore case, full style, 40% height
 export FZF_DEFAULT_OPTS="-i --style full --height 40%"
-
-# Setup aliases and env
-source $HOME/.aliases
-source $HOME/.exports
-if [ -f "$HOME/.keys" ]; then
-    source "$HOME/.keys"
-fi
 
 # Bindings
 bindkey -s '^@' "^utmux-sessionizer\n"
