@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_NAME="$(basename "$0")"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 # Run all .sh scripts in this directory except this one
 for script in "$SCRIPT_DIR"/*.sh; do
