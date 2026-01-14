@@ -38,6 +38,16 @@
   "lsp": {
     "clangd": {
       "disabled": true
+    },
+    "pyright": {
+      "disabled": true
+    },
+    "basedpyright": {
+      "command": ["basedpyright-langserver", "--stdio"],
+      "extensions": [".py"],
+      "initialization": {
+        "typeCheckingMode": "all"
+      }
     }
   }
 }
