@@ -9,6 +9,7 @@ DOTFILES_DOT_ROOT="$DOTFILES_ROOT/dot"
 
 # Common symlinks for all environments
 COMMON_LINKS=(
+    ".bashrc"
     ".zshrc"
     ".aliases"
     ".exports"
