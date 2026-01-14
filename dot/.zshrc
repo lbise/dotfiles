@@ -38,8 +38,23 @@ function set_terminal_title() {
     echo -en "\e]2;$@\a"
 }
 
-# Set static window title to hostname
-set_terminal_title $HOST
+# Set window title to hostname : tmux session
+function update_title() {
+    local host session title
+
+    host="$HOST"
+
+    if [[ -n "$TMUX" ]]; then
+      session="$(tmux display-message -p '#S' 2>/dev/null)"
+      title="${host} : ${session}"
+    else
+      title="${host}"
+    fi
+
+    print -Pn "\e]0;${title}\a"
+}
+
+update_title
 
 source $ZSH/oh-my-zsh.sh
 # --------------------------------------------------------------------------------
