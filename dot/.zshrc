@@ -40,18 +40,10 @@ function set_terminal_title() {
 
 # Set window title to hostname : tmux session
 function update_title() {
-    local host session title
+    # No title update when in tmux
+    [[ -n "$TMUX" ]] && return
 
-    host="$HOST"
-
-    if [[ -n "$TMUX" ]]; then
-      session="$(tmux display-message -p '#S' 2>/dev/null)"
-      title="${host} : ${session}"
-    else
-      title="${host}"
-    fi
-
-    print -Pn "\e]0;${title}\a"
+    print -Pn "\e]0;${HOST}\a"
 }
 
 update_title
