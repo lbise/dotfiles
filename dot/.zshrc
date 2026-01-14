@@ -6,21 +6,31 @@ plugins=(
     colorize
     colored-man-pages
     fzf
-    ssh-agent
     vi-mode
 )
 
-# Source last to take into account changes
+# ssh-agent must only be running on the local machine
+# When connected through SSH public key is forwarded
+if [[ -z "$SSH_CONNECTION" ]]; then
+    plugins+=(ssh-agent)
+    # Setup ssh-agent for work
+    if [ "$USER" = "13lbise" ]; then
+        # Work key
+        KEY="id_ed25519_git_sonova"
+    else
+        # Default key
+        KEY="id_rsa"
+    fi
+
+    zstyle :omz:plugins:ssh-agent identities $KEY
+fi
+
 source $ZSH/oh-my-zsh.sh
 # --------------------------------------------------------------------------------
 
 # Work specific
 if [ "$USER" = "13lbise" ]; then
     source $HOME/.zsh_work
-
-    # Setup ssh-agent for work
-    WORK_KEY="id_ed25519_git_sonova"
-    zstyle :omz:plugins:ssh-agent identities $WORK_KEY
 fi
 
 # Load completions
