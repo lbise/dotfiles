@@ -38,6 +38,14 @@ is_ubuntu() {
     [[ -f /etc/os-release ]] && grep -qi '^ID=ubuntu' /etc/os-release
 }
 
+is_work() {
+    [[ "$USER" == "13lbise" ]]
+}
+
+is_wsl() {
+    [[ -f /proc/version ]] && grep -qi 'microsoft\|wsl' /proc/version
+}
+
 # Get the current OS name (linux or macos)
 get_os() {
     local os

@@ -18,9 +18,14 @@ if [[ ! -e "$ZSH_PATH" ]]; then
 fi
 
 if [[ ! "$SHELL" == */zsh ]]; then
-    echo "Set zsh as default shell"
-    # Change default shell
-    chsh -s $ZSH_PATH
+    # Only change shell if not at work, or if at work but running WSL
+    if ! is_work || is_wsl; then
+        echo "Set zsh as default shell"
+        # Change default shell
+        chsh -s $ZSH_PATH
+    else
+        echo "Skipping chsh at work (not WSL)"
+    fi
 fi
 
 OHZSH_PATH="$HOME/.oh-my-zsh"

@@ -37,7 +37,7 @@ DESKTOP_LINKS=(
 DOTFILES_LINKS=("${COMMON_LINKS[@]}")
 
 # Add desktop links if not on work machine
-if [[ "$HOSTNAME" != "13lbise" ]]; then
+if ! is_work; then
     DOTFILES_LINKS+=("${DESKTOP_LINKS[@]}")
 fi
 
