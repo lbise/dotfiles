@@ -523,7 +523,22 @@ fi
 
 log "Moving package to $POOL_DIR..."
 mv "$OUTPUT_PATH" "$POOL_DIR"
-OUTPUT_PATH="$POOL_DIR"
+OUTPUT_PATH="$POOL_DIR/$PACKAGE_NAME"
+
+# Remove older archive versions from the pool
+log "Cleaning up older archive versions..."
+OLDER_ARCHIVES=$(find "$POOL_DIR" -maxdepth 1 -name "opencode-v*-offline-*.tar.gz" -type f ! -name "$PACKAGE_NAME" 2>/dev/null || true)
+if [[ -n "$OLDER_ARCHIVES" ]]; then
+    echo "$OLDER_ARCHIVES" | while read -r old_archive; do
+        if [[ -f "$old_archive" ]]; then
+            log "Removing older archive: $(basename "$old_archive")"
+            rm -f "$old_archive"
+        fi
+    done
+    log "Cleanup completed"
+else
+    log "No older archives found to remove"
+fi
 
 # Get package size
 PACKAGE_SIZE=$(du -h "$OUTPUT_PATH" | cut -f1)
