@@ -55,6 +55,15 @@ local settings = {
 			--ty = {
 			--	settings = {
 			--		ty = {
+			--			diagnosticMode = "openFilesOnly",
+			--			showSyntaxErrors = true,
+			--			inlayHints = {
+			--				variableTypes = true,
+			--				callArgumentNames = true,
+			--			},
+			--			completions = {
+			--				autoImport = true,
+			--			},
 			--			configuration = {
 			--				environment = {
 			--					["extra-paths"] = {
