@@ -14,10 +14,4 @@ precmd() {
 }
 fi
 
-# Andromeda
-if [ -d "$HOME/andromeda" ]; then
-    CURRENT_DIR=$PWD
-    cd $HOME/andromeda
-    source sourceme
-    cd $CURRENT_DIR
-fi
+alias sourceme="cd $ANDROMEDA_ROOT && source sourceme"
