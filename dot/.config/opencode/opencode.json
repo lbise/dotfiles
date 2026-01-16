@@ -6,13 +6,50 @@
   "share": "disabled",
   "instructions": ["ai_notes/conventions.md"],
   "provider": {
-    "azure": {
-      "options": {
-        "resourceName": "{env:AZURE_RESOURCE_NAME}",
-        "apiKey": "{env:AZURE_API_KEY}"
-      },
-      "models": {}
-    },
+    "azure-anthropic": {
+	  "name": "Azure AI Foundry (Anthropic)",
+	  "npm": "@ai-sdk/anthropic",
+	  "api": "{env:AZURE_API_BASE}",
+	  "env": ["AZURE_API_KEY"],
+	  "models": {
+        "claude-opus-4-5": {
+          "id": "claude-opus-4-5",
+          "name": "Claude Opus 4.5",
+          "tool_call": true,
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true
+        },
+	    "claude-sonnet-4-5": {
+		  "id": "claude-sonnet-4-5",
+		  "name": "Claude Sonnet 4.5",
+		  "tool_call": true,
+		  "attachment": true,
+		  "reasoning": true,
+		  "temperature": true,
+		  "options": {
+		    "thinking": {
+			  "type": "enabled",
+			  "budgetTokens": 16000
+			}
+		  }
+		},
+		"claude-haiku-4-5": {
+		  "id": "claude-haiku-4-5",
+		  "name": "Claude Haiku 4.5",
+		  "tool_call": true,
+		  "attachment": true,
+		  "reasoning": true,
+		  "temperature": true,
+		  "options": {
+		  	"thinking": {
+		  	  "type": "enabled",
+		  	  "budgetTokens": 16000
+		    }
+		  }
+		}
+	  }
+	}
   },
   "mcp": {
     "mcp-redmine": {
