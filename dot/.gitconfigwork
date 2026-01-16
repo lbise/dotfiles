@@ -30,9 +30,12 @@
     user = 13lbise
     provider = generic
 
-# Hack to force using ssh
+# Force using ssh (handles both with and without username in URL)
 [url "git@ch03git.phonak.com:"]
 	insteadOf = https://ch03git.phonak.com/
+# Match URLs with any username (e.g., https://username@ch03git.phonak.com/)
+[url "git@ch03git.phonak.com:"]
+	insteadOf = https://13lbise@ch03git.phonak.com/
 
 [url "git@git.sonova.com:"]
     insteadOf = https://git.sonova.com/
