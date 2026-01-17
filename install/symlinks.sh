@@ -58,5 +58,6 @@ done
 # Symlink scripts folder
 SCRIPT_DST="$HOME/.scripts"
 if [ ! -e "$SCRIPT_DST" ]; then
+    rm -rf "$SCRIPT_DST"
     create_symlink "$DOTFILES_ROOT/scripts" "$SCRIPT_DST"
 fi
