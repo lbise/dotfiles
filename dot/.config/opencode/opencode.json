@@ -86,5 +86,6 @@
         "typeCheckingMode": "all"
       }
     }
-  }
+  },
+  "plugin": ["@franlol/opencode-md-table-formatter@0.0.3"],
 }
