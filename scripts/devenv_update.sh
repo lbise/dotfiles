@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Development environment update script
-# Installs opencode from archives and pyright from Gitea registry
+# Installs opencode from archives and clangd from GitHub
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
@@ -12,10 +12,6 @@ INSTALL_DIR="$HOME/.local/bin"
 OPENCODE_BIN_DIR="$HOME/.opencode"
 OPENCODE_CACHE_DIR="$HOME/.cache/opencode"
 CLANGD_INSTALL_DIR="$HOME/.local/share/clangd"
-
-# Gitea configuration
-GITEA_REGISTRY="https://ch03git.phonak.com/api/packages/13lbise/npm/"
-GITEA_TOKEN="${GITEA_TOKEN:-}"
 
 # Force flag for clean install
 FORCE_CLEAN_INSTALL=false
@@ -33,7 +29,7 @@ usage() {
     cat << EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Update development environment with opencode, clangd, and pyright.
+Update development environment with opencode and clangd.
 
 OPTIONS:
     -f, --force     Force clean install (removes cache before installation)
@@ -52,7 +48,7 @@ check_dependencies() {
     local missing_deps=()
 
     # Check for required commands
-    for cmd in curl tar npm unzip; do
+    for cmd in curl tar unzip; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             missing_deps+=("$cmd")
         fi
@@ -347,67 +343,6 @@ install_clangd() {
     log "✓ clangd $version installed successfully"
 }
 
-setup_gitea_npm() {
-    log "Setting up Gitea npm registry..."
-
-    if [[ -z "$GITEA_TOKEN" ]]; then
-        log "⚠ GITEA_TOKEN not set, skipping npm setup"
-        return 1
-    fi
-
-    # Use our gitea-npm-setup script
-    local setup_script="$SCRIPT_DIR/gitea-npm-setup.sh"
-    if [[ -f "$setup_script" ]]; then
-        log "Using gitea-npm-setup.sh script..."
-        "$setup_script" --set-default "$GITEA_REGISTRY" "$GITEA_TOKEN"
-    else
-        log "gitea-npm-setup.sh not found, setting up manually..."
-
-        # Manual setup as fallback
-        local registry_host
-        registry_host=$(echo "$GITEA_REGISTRY" | sed 's|https\?://||' | cut -d'/' -f1)
-
-        npm config set registry "$GITEA_REGISTRY"
-        npm config set "//${registry_host}/:_authToken" "$GITEA_TOKEN"
-
-        log "✓ npm configured for Gitea registry"
-    fi
-}
-
-install_pyright() {
-    log "Installing pyright from Gitea registry..."
-
-    # Check if pyright is already installed and up to date
-    if command -v pyright >/dev/null 2>&1; then
-        local current_version
-        current_version=$(pyright --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "unknown")
-        log "Current pyright version: $current_version"
-    fi
-
-    # Try to install/update pyright
-    if npm install -g pyright 2>/dev/null; then
-        log "✓ pyright installed/updated successfully"
-
-        # Verify installation
-        if command -v pyright >/dev/null 2>&1; then
-            local new_version
-            new_version=$(pyright --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "unknown")
-            log "✓ pyright version: $new_version"
-        fi
-    else
-        log "⚠ Failed to install pyright from Gitea registry"
-
-        # Fallback to public npm registry
-        log "Trying fallback to public npm registry..."
-        if npm install -g pyright --registry="https://registry.npmjs.org"; then
-            log "✓ pyright installed from public npm registry"
-        else
-            log "✗ Failed to install pyright from both registries"
-            return 1
-        fi
-    fi
-}
-
 verify_installation() {
     log "Verifying installations..."
 
@@ -418,15 +353,6 @@ verify_installation() {
         log "✓ opencode: $opencode_version"
     else
         log "⚠ opencode not found in PATH (may need to restart shell)"
-    fi
-
-    # Check pyright
-    if command -v pyright >/dev/null 2>&1; then
-        local pyright_version
-        pyright_version=$(pyright --version 2>/dev/null | head -1 || echo "version unknown")
-        log "✓ pyright: $pyright_version"
-    else
-        log "⚠ pyright not found in PATH"
     fi
 
     # Check clangd
@@ -476,14 +402,6 @@ main() {
     # Install clangd from GitHub releases
     install_clangd
 
-    # Setup npm for Gitea registry
-    if setup_gitea_npm; then
-        # Install pyright from Gitea
-        install_pyright
-    else
-        log "Skipping pyright installation (Gitea setup failed)"
-    fi
-
     # Verify everything is working
     verify_installation
 
@@ -494,7 +412,6 @@ main() {
     log "=== Post-Installation Notes ==="
     log "• Restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
     log "• Verify opencode: opencode --version"
-    log "• Verify pyright: pyright --version"
     log "• Verify clangd: clangd --version"
     log "• Installation locations:"
     log "  - Binary: $OPENCODE_BIN_DIR/bin"
