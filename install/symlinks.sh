@@ -21,6 +21,7 @@ COMMON_LINKS=(
     ".config/nvim"
     ".config/opencode"
     ".ssh/config"
+    ".gnupg"
     ".config/fcitx5"
     ".config/environment.d"
 )
