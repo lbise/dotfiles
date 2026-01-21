@@ -21,6 +21,8 @@ COMMON_LINKS=(
     ".config/nvim"
     ".config/opencode"
     ".ssh/config"
+    ".config/fcitx5"
+    ".config/environment.d"
 )
 
 # Desktop-only symlinks (Hyprland, Waybar, etc.)
