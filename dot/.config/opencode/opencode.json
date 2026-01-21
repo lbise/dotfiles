@@ -4,6 +4,7 @@
   "model": "github-copilot/claude-opus-4.5",
   "small_model": "github-copilot/gpt-4.1",
   "share": "disabled",
+  "autoupdate": false,
   "instructions": ["ai_notes/conventions.md"],
   "provider": {
     "azure-anthropic": {
@@ -88,4 +89,9 @@
     }
   },
   "plugin": ["@franlol/opencode-md-table-formatter@0.0.3"],
+  "agent": {
+    "explore": {
+      "model": "github-copilot/claude-sonnet-4.5"
+    }
+  }
 }
