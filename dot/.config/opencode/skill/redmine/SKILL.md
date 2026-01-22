@@ -18,6 +18,29 @@ Important subcommands:
 * note <ticket> <note> : Add a new note to a ticket
 * set-status <ticket> <status> : Set the ticket status from the following: "in progress", "resolved", "closed", "monitoring"
 
+** IMPORTANT ** : Redmine does not support markdown syntax. When writing notes take this into account.
+The format is the following:
+
+* Heading: h1. <Title>, h2. <Title> or h3. <Title>
+* Link to issues : #ticket and ##ticket (include number, name and subject)
+* External link : [Website name](url)
+* Text formatting :
+```
+**bold** __bold__
+*italic* _italic_
+***bold italic*** ___bold italic___
+<ins>underline</ins>
+<del>strike through</del>
+Plain <sup>superscript</sup>
+Plain <sub>subscript</sub>
+`inline monospace`
+normal **bold** _italic_ normal;E=mc<sup>2</sup>
+normal<strong>bold</strong><em>italic</em>normal;E=mc<sup>2</sup>
+Escaping: \*\*bold\*\* \_italic\_ \`inlinemono\`
+<pre>**some lines**      some [link](http://www.redmine.org)</pre>
+<pre>\*\*some lines\*\*      some \[link](http\://www\.redmine\.org)</pre>
+```
+
 ## Examples
 
 * View ticket #1234 : redmine.py view 1234
