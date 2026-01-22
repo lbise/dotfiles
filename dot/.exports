@@ -3,3 +3,4 @@ export PATH=$HOME/.local/bin:$PATH
 # Add opencode
 export PATH=$PATH:$HOME/.scripts:$HOME/.opencode/bin
 export EDITOR='vim'
+export ANDROMEDA_ROOT="$HOME/andromeda"
