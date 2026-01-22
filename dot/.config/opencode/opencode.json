@@ -88,7 +88,6 @@
       }
     }
   },
-  "plugin": ["@franlol/opencode-md-table-formatter@0.0.3"],
   "agent": {
     "explore": {
       "model": "github-copilot/claude-sonnet-4.5"
