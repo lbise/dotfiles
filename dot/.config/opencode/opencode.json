@@ -5,14 +5,18 @@
   "small_model": "github-copilot/gpt-4.1",
   "share": "disabled",
   "autoupdate": false,
-  "instructions": ["ai_notes/conventions.md"],
+  "instructions": [
+    "ai_notes/conventions.md"
+  ],
   "provider": {
     "azure-anthropic": {
-	  "name": "Azure AI Foundry (Anthropic)",
-	  "npm": "@ai-sdk/anthropic",
-	  "api": "{env:AZURE_API_BASE}",
-	  "env": ["AZURE_API_KEY"],
-	  "models": {
+      "name": "Azure AI Foundry (Anthropic)",
+      "npm": "@ai-sdk/anthropic",
+      "api": "{env:AZURE_API_BASE}",
+      "env": [
+        "AZURE_API_KEY"
+      ],
+      "models": {
         "claude-opus-4-5": {
           "id": "claude-opus-4-5",
           "name": "Claude Opus 4.5",
@@ -21,56 +25,64 @@
           "reasoning": true,
           "temperature": true
         },
-	    "claude-sonnet-4-5": {
-		  "id": "claude-sonnet-4-5",
-		  "name": "Claude Sonnet 4.5",
-		  "tool_call": true,
-		  "attachment": true,
-		  "reasoning": true,
-		  "temperature": true,
-		  "options": {
-		    "thinking": {
-			  "type": "enabled",
-			  "budgetTokens": 16000
-			}
-		  }
-		},
-		"claude-haiku-4-5": {
-		  "id": "claude-haiku-4-5",
-		  "name": "Claude Haiku 4.5",
-		  "tool_call": true,
-		  "attachment": true,
-		  "reasoning": true,
-		  "temperature": true,
-		  "options": {
-		  	"thinking": {
-		  	  "type": "enabled",
-		  	  "budgetTokens": 16000
-		    }
-		  }
-		}
-	  }
-	}
-  },
-  "mcp": {
-    "mcp-redmine": {
-      "type": "local",
-      "command": ["uvx", "--from", "mcp-redmine==2025.07.09.120802", "--refresh-package", "mcp-redmine", "mcp-redmine"],
-      "enabled": false,
-      "environment": {
-        "REDMINE_URL": "https://ch03rdteam.phonak.com/redmine/",
-        "REDMINE_API_KEY": "{env:REDMINE_API_KEY}",
+        "claude-sonnet-4-5": {
+          "id": "claude-sonnet-4-5",
+          "name": "Claude Sonnet 4.5",
+          "tool_call": true,
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "options": {
+            "thinking": {
+              "type": "enabled",
+              "budgetTokens": 16000
+            }
+          }
+        },
+        "claude-haiku-4-5": {
+          "id": "claude-haiku-4-5",
+          "name": "Claude Haiku 4.5",
+          "tool_call": true,
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "options": {
+            "thinking": {
+              "type": "enabled",
+              "budgetTokens": 16000
+            }
+          }
+        }
       }
-    },
+    }
   },
-  "formatter" : {
-    "clang-format" : {
-      "command": ["clang-format", "--style-file={env:$ANDROMEDA_ROOT}/hooks/.clang-format", "-i $FILE"],
-      "extensions" : [".c", ".cpp", ".h", ".hpp", ".ino", ".unity"]
+  "formatter": {
+    "clang-format": {
+      "command": [
+        "clang-format",
+        "--style-file={env:$ANDROMEDA_ROOT}/hooks/.clang-format",
+        "-i $FILE"
+      ],
+      "extensions": [
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".ino",
+        ".unity"
+      ]
     },
-    "ruff" : {
-      "command": ["ruff", "format", "$FILE", "--config {env:$ANDROMEDA_ROOT}/pyproject.toml"],
-      "extensions" : [".py", ".pyi"]
+    "ruff": {
+      "command": [
+        "ruff",
+        "format",
+        "$FILE",
+        "--config {env:$ANDROMEDA_ROOT}/pyproject.toml"
+      ],
+      "extensions": [
+        ".py",
+        ".pyi"
+      ]
     }
   },
   "lsp": {
@@ -81,8 +93,13 @@
       "disabled": true
     },
     "basedpyright": {
-      "command": ["basedpyright-langserver", "--stdio"],
-      "extensions": [".py"],
+      "command": [
+        "basedpyright-langserver",
+        "--stdio"
+      ],
+      "extensions": [
+        ".py"
+      ],
       "initialization": {
         "typeCheckingMode": "all"
       }
