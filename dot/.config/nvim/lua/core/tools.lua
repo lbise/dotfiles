@@ -44,7 +44,7 @@ end
 
 -- Stolen from https://github.com/timoclsn/dotfiles/blob/a200117f8a2d9f0577dbb3e8d09735842e56af5a/nvim/lua/utils/path_utils.lua#L27
 local function detect_project_root(_)
-  return vim.fn.getcwd()
+	return vim.fn.getcwd()
 end
 
 function tools.relative_to_root(full_path)
@@ -80,6 +80,21 @@ function tools.copy_relative_path(full_path, opts)
 	end
 
 	return rel
+end
+
+-- Convert glob -> Lua pattern
+function tools.glob_to_lua_pattern(glob)
+	-- Escape Lua pattern magic chars
+	local pattern = glob
+		:gsub("([%^%$%(%)%%%.%[%]%+%-%?])", "%%%1")
+		-- ** matches any number of directories (use placeholder to avoid double replacement)
+		:gsub("%*%*", "\1DOUBLESTAR\1")
+		-- * matches anything except path separator
+		:gsub("%*", "[^/]*")
+		-- Replace placeholder with .* for **
+		:gsub("\1DOUBLESTAR\1", ".*")
+
+	return pattern
 end
 
 return tools

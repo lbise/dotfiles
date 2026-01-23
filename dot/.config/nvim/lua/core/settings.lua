@@ -25,6 +25,8 @@ local settings = {
 					"--completion-style=detailed",
 					"--header-insertion=iwyu",
 					"--function-arg-placeholders=1",
+					-- Fails with ccac
+					-- "--query-driver=/home/13lbise/andromeda/_tools/ARC_2023_03/MetaWare/arc/bin/ccac"
 				},
 				filetypes = { "unity", "c", "cpp", "objc", "objcpp", "cuda", "proto" },
 				root_markers = {
