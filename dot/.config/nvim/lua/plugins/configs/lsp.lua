@@ -138,6 +138,7 @@ local config = {
 					end,
 					cpp = { "clang_format" },
 					c = { "clang_format" },
+					json = { "jq" },
 				},
 				formatters = {
 					ruff_format = {
