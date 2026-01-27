@@ -8,7 +8,11 @@ sudo systemctl enable --now cups.service
 sudo systemctl restart cups.service
 
 # Install drivers
-yay -S canon-pixma-mg5200-complete
+# 27.01.2026: Package does not work, cannot seem to download drivers from canon.
+# Had to go manually in ~/.cache/yay/canon-pixma-mg5200-complete and do:
+# * wget https://files.canon-europe.com/files/soft40260/Software/MG5200series-scanner_driver.tar
+# * wget https://files.canon-europe.com/files/soft40259/Software/MG5200series-printer_driver.tar
+yay -S --needed canon-pixma-mg5200-complete
 
 echo "Looking for network printer..."
 PRINTER=$(cnijnetprn --installer --search auto)
