@@ -138,7 +138,18 @@ local config = {
 					end,
 					cpp = { "clang_format" },
 					c = { "clang_format" },
-					json = { "jq" },
+					json = { "prettier" },
+					-- Web dev (prettier)
+					html = { "prettier" },
+					css = { "prettier" },
+					scss = { "prettier" },
+					javascript = { "prettier" },
+					typescript = { "prettier" },
+					javascriptreact = { "prettier" },
+					typescriptreact = { "prettier" },
+					vue = { "prettier" },
+					yaml = { "prettier" },
+					markdown = { "prettier" },
 				},
 				formatters = {
 					ruff_format = {
