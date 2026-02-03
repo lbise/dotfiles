@@ -5,17 +5,13 @@
   "small_model": "github-copilot/gpt-4.1",
   "share": "disabled",
   "autoupdate": false,
-  "instructions": [
-    "ai_notes/conventions.md"
-  ],
+  "instructions": ["ai_notes/conventions.md"],
   "provider": {
     "azure-anthropic": {
       "name": "Azure AI Foundry (Anthropic)",
       "npm": "@ai-sdk/anthropic",
       "api": "{env:AZURE_API_BASE}",
-      "env": [
-        "AZURE_API_KEY"
-      ],
+      "env": ["AZURE_API_KEY"],
       "models": {
         "claude-opus-4-5": {
           "id": "claude-opus-4-5",
@@ -63,14 +59,7 @@
         "--style-file={env:$ANDROMEDA_ROOT}/hooks/.clang-format",
         "-i $FILE"
       ],
-      "extensions": [
-        ".c",
-        ".cpp",
-        ".h",
-        ".hpp",
-        ".ino",
-        ".unity"
-      ]
+      "extensions": [".c", ".cpp", ".h", ".hpp", ".ino", ".unity"]
     },
     "ruff": {
       "command": [
@@ -79,10 +68,7 @@
         "$FILE",
         "--config {env:$ANDROMEDA_ROOT}/pyproject.toml"
       ],
-      "extensions": [
-        ".py",
-        ".pyi"
-      ]
+      "extensions": [".py", ".pyi"]
     }
   },
   "lsp": {
@@ -93,13 +79,8 @@
       "disabled": true
     },
     "basedpyright": {
-      "command": [
-        "basedpyright-langserver",
-        "--stdio"
-      ],
-      "extensions": [
-        ".py"
-      ],
+      "command": ["basedpyright-langserver", "--stdio"],
+      "extensions": [".py"],
       "initialization": {
         "typeCheckingMode": "all"
       }
