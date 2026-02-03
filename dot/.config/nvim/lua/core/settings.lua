@@ -89,6 +89,8 @@ local settings = {
 					},
 				},
 			},
+			ts_ls = true,
+			eslint = true,
 		},
 	},
 }

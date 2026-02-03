@@ -139,6 +139,7 @@ local config = {
 					cpp = { "clang_format" },
 					c = { "clang_format" },
 					json = { "prettier" },
+					jsonc = { "prettier" },
 					-- Web dev (prettier)
 					html = { "prettier" },
 					css = { "prettier" },
