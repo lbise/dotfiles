@@ -1,3 +1,5 @@
+local tools = require("core.tools")
+
 local settings = {
 	colorscheme = "tokyonight",
 	lsp = {
@@ -89,10 +91,15 @@ local settings = {
 					},
 				},
 			},
-			ts_ls = true,
-			eslint = true,
 		},
 	},
 }
+
+-- Web dev LSPs (only enabled when not at work)
+if not tools.is_work() then
+	settings.lsp.servers.ts_ls = true
+	settings.lsp.servers.eslint = true
+	settings.lsp.servers.tailwindcss = true
+end
 
 return settings

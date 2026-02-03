@@ -437,6 +437,20 @@ local config = {
 		dependencies = { "MunifTanjim/nui.nvim" },
 		opts = {},
 	},
+	{
+		"NvChad/nvim-colorizer.lua",
+		event = { "BufReadPost", "BufNewFile" },
+		opts = {
+			filetypes = {
+				"*", -- Highlight all files
+			},
+			user_default_options = {
+				names = false, -- Disable named colors (e.g., "red", "blue")
+				tailwind = true, -- Enable tailwind colors (e.g., bg-red-500)
+				mode = "background", -- "background" | "foreground" | "virtualtext"
+			},
+		},
+	},
 }
 
 return config
