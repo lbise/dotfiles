@@ -14,4 +14,4 @@ precmd() {
 }
 fi
 
-alias sourceme="cd $ANDROMEDA_ROOT && source sourceme"
+alias sourceme='_sourceme_dir="$PWD" && cd $ANDROMEDA_ROOT && source sourceme && cd "$_sourceme_dir"'
