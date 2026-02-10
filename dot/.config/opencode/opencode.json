@@ -189,7 +189,23 @@
       "command": ["basedpyright-langserver", "--stdio"],
       "extensions": [".py"],
       "initialization": {
-        "typeCheckingMode": "all"
+        "typeCheckingMode": "all",
+        "extraPaths": [
+		  "{env:$HOME}/andromeda",
+		  "{env:$HOME}/andromeda/apps/scripts/python",
+		  "{env:$HOME}/andromeda/bt/scripts/python",
+		  "{env:$HOME}/andromeda/buildsystem/scripts/python",
+		  "{env:$HOME}/andromeda/dsp/scripts/python",
+		  "{env:$HOME}/andromeda/executer/scripts/python",
+		  "{env:$HOME}/andromeda/hlc/scripts/python",
+		  "{env:$HOME}/andromeda/infrastructure/scripts/python",
+		  "{env:$HOME}/andromeda/pctools/scripts/python",
+		  "{env:$HOME}/andromeda/raspi4/scripts/python",
+		  "{env:$HOME}/andromeda/rom/scripts/python",
+		  "{env:$HOME}/andromeda/stf4/scripts/python",
+		  "{env:$HOME}/andromeda/tstenv/scripts/python",
+		  "{env:$HOME}/andromeda/nordic/scripts/python",
+		],
       }
     }
   },

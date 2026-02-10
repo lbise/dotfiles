@@ -40,17 +40,27 @@ local settings = {
 					"configure.ac",
 				},
 			},
+
 			basedpyright = {
 				settings = {
 					basedpyright = {
 						analysis = {
 							typeCheckingMode = "standard",
 							extraPaths = {
-								vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
-								vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
+								vim.fn.expand("$HOME/andromeda"),
+								vim.fn.expand("$HOME/andromeda/apps/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/bt/scripts/python"),
 								vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/dsp/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/hlc/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/pctools/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/raspi4/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/stf4/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/tstenv/scripts/python"),
+								vim.fn.expand("$HOME/andromeda/nordic/scripts/python"),
 							},
 						},
 					},
