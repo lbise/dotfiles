@@ -1,5 +1,8 @@
 # .local/bin with precedence
 export PATH=$HOME/.local/bin:$PATH
+# Bun runtime
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
 # Add opencode
 export PATH=$PATH:$HOME/.scripts:$HOME/.opencode/bin
 export EDITOR='vim'
