@@ -35,6 +35,7 @@ DESKTOP_LINKS=(
     ".config/uwsm"
     ".config/walker"
     ".config/leo"
+    ".local/share/applications/connect-rdp.desktop"
 )
 
 # Start with common links

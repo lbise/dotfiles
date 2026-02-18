@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Connect RDP
+Comment=Connect to Sonova RDP session
+Exec=sh -lc "$HOME/.scripts/connect_rdp.sh"
+Icon=preferences-system-network
+Terminal=false
+Categories=Network;RemoteAccess;
+StartupNotify=true
