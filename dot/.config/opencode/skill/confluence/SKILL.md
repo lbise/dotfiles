@@ -7,7 +7,7 @@ Confluence is a wiki system used for documentation and knowledge sharing.
 
 ## Confluence CLI
 
-Confluence can be accessed by using the confluence.py python script. It is accessible directly from the PATH.
+Confluence can be accessed by using the [confluence script](./confluence.py).
 
 The script works with a series of subcommands invoked like this: confluence.py <subcommand>
 
@@ -34,20 +34,20 @@ The `get` command supports the following Confluence URL formats:
 ## Examples
 
 * Fetch page by URL:
-  confluence.py get "https://wiki.example.com/pages/viewpage.action?spaceKey=SONIC&title=My+Page"
+    python3 confluence.py get "https://wiki.example.com/pages/viewpage.action?spaceKey=SONIC&title=My+Page"
 
 * Fetch page by ID:
-  confluence.py get 123456
-  confluence.py view 123456
+    python3 confluence.py get 123456
+    python3 confluence.py view 123456
 
 * Search for pages:
-  confluence.py search "signal processing"
+    python3 confluence.py search "signal processing"
 
 * List spaces:
-  confluence.py spaces
+    python3 confluence.py spaces
 
 * Get raw HTML content:
-  confluence.py get "https://wiki.example.com/display/SPACE/Page" --raw
+    python3 confluence.py get "https://wiki.example.com/display/SPACE/Page" --raw
 
 ## Environment Variables
 
