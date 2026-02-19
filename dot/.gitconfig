@@ -101,5 +101,7 @@
 # Note: hasconfig:remote requires Git 2.36+
 [includeIf "gitdir:~/andromeda/"]
     path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/rig/"]
+    path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/leo_dotfiles/"]
     path = ~/.gitconfigwork
