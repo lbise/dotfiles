@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "Installing fonts..."
 
 # Configuration
 FONTS=("FiraCode" "Iosevka" "JetBrainsMono")
 FONT_DIR="$HOME/.local/share/fonts/NerdFonts"
+CUSTOM_FONT_DIR="$SCRIPT_DIR/../fonts"
 TMP_DIR=$(mktemp -d)
 
 # Ensure font directory exists
@@ -53,6 +56,24 @@ for FONT_NAME in "${FONTS[@]}"; do
     echo "  ✓ ${FONT_NAME} installed successfully!"
 done
 
+echo ""
+echo "Installing local fonts from $CUSTOM_FONT_DIR..."
+if [[ -d "$CUSTOM_FONT_DIR" ]]; then
+    LOCAL_FONT_COUNT=0
+    while IFS= read -r -d '' FONT_FILE; do
+        cp "$FONT_FILE" "$FONT_DIR/"
+        LOCAL_FONT_COUNT=$((LOCAL_FONT_COUNT + 1))
+    done < <(find "$CUSTOM_FONT_DIR" -type f \( -iname "*.ttf" -o -iname "*.otf" \) -print0)
+
+    if ((LOCAL_FONT_COUNT > 0)); then
+        echo "  ✓ Installed ${LOCAL_FONT_COUNT} local font file(s)"
+    else
+        echo "  - No local .ttf or .otf fonts found, skipping..."
+    fi
+else
+    echo "  - Local fonts directory not found, skipping..."
+fi
+
 # Cleanup
 rm -rf "$TMP_DIR"
 
@@ -61,4 +82,3 @@ echo "Updating font cache..."
 fc-cache -f "$FONT_DIR"
 
 echo "✓ All fonts installed successfully!"
-
