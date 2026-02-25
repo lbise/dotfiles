@@ -8,6 +8,6 @@ if [ -z "$1" ]; then
 fi
 
 CURR_WALLPAPER="$SCRIPT_DIR/current.jpg"
-ln -sf "$1" "$CURR_WALLPAPER"
+cp $1 $CURR_WALLPAPER
 pkill -x swaybg
 setsid uwsm-app -- swaybg -i "$CURR_WALLPAPER" -m fill >/dev/null 2>&1 &
