@@ -142,6 +142,9 @@ class GiteaClient:
     ) -> dict:
         """Create a review comment on a specific line of a pull request.
 
+        Uses the Gitea reviews API to create a single-comment review, since
+        the pulls comments endpoint does not support creating new comments.
+
         Args:
             owner: Repository owner
             repo: Repository name
@@ -149,15 +152,21 @@ class GiteaClient:
             body: Comment text
             commit_id: The SHA of the commit to comment on
             path: The relative path of the file to comment on
-            line: The line number in the diff to comment on (new file line)
+            line: The line number in the new file to comment on
             side: Which side of the diff to comment on ('LEFT' for old, 'RIGHT' for new)
         """
-        url = f'{self.api_url}/repos/{owner}/{repo}/pulls/{pr_number}/comments'
+        url = f'{self.api_url}/repos/{owner}/{repo}/pulls/{pr_number}/reviews'
         data = {
-            'body': body,
             'commit_id': commit_id,
-            'path': path,
-            'new_position': line,
+            'body': '',
+            'event': 'comment',
+            'comments': [
+                {
+                    'path': path,
+                    'new_position': line,
+                    'body': body,
+                },
+            ],
         }
 
         response = self.session.post(url, json=data)
