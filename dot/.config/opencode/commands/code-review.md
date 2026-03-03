@@ -11,7 +11,9 @@ Before starting ensure the user provided a pull request, if that is not the case
 
 To do the code review proceed as follows:
 
-1. Fetch the pull request information and ALL the code changes. Create a summary and list ALL changes mentioning the absolute file path as well as the line numbers that were changed and the diff itself. It is important that this summary contains the full change, this will be useful later to provide to subagents. **IMPORTANT** Focus only on the changes made by the pull request do **NOT** attempt to search the local files as they might differ from those of the pull request.
+1. Fetch the pull request information. Start by checking the list of files modified before getting the diff. If you notice there is a large amount of changes that will need to be split into work chunks, **STOP** and tell the user how you will split the work and if he agrees. The idea is to group several files together and perform the usual code review to prevent having to deal with too much context at once.
+
+    **IMPORTANT** Focus only on the changes made by the pull request do **NOT** attempt to search the local files as they might differ from those of the pull request.
 
 2.  Launch 4 agents in parallel to independently review the changes. Each agent should return the list of issues, where each issue includes a description and the reason it was flagged (e.g. "code smell", "bug"). Provide the full pull request summary you made previously. **IMPORTANT** Agents should **ONLY** analyze the changes you provided and not attempt to search local files. The agents should do the following:
 
@@ -25,6 +27,7 @@ To do the code review proceed as follows:
     | **Shotgun surgery** | One change requires edits across many files |
     | **Divergent change** | One file changes for many unrelated reasons |
     | **Dead code** | Unreachable or never-called code |
+    | **Debug/Dev code** | Code that only purpose is for debugging/development and that cannot be disabled |
     | **Speculative generality** | Abstractions for hypothetical future needs |
     | **Magic numbers/strings** | Hardcoded values without named constants |
 
@@ -57,4 +60,5 @@ To do the code review proceed as follows:
 4. Report findings
 
     * For each issue found, post an in-line comment to the pull request in the appropriate file and line.
-    * Once all issues have been posted at the correct line and file add a small general comment to the pull request with the summary of the review
+    * Once all issues have been posted at the correct line and file add a small general comment to the pull request with the summary of the review. When creating the summary add checkboxes so the user can easily mark comments as handled like `- [ ] Fix this ugly bug`
+    ** IMPORTANT ** You must always sign your reviews as Jean-Claude with an inspiring quote and a funny emoticon
