@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dev tmux window layout (vim + opencode + shell)
+# Dev tmux window layout
 tmux rename-window "dev"
 tmux send-keys 'vim' Enter
 # Vertical split
