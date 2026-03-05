@@ -6,7 +6,6 @@
   "share": "disabled",
   "autoupdate": false,
   "instructions": ["ai_notes/conventions.md"],
-  "plugin": ["opencode-antigravity-auth@latest"],
   "provider": {
     "google": {
       "models": {
