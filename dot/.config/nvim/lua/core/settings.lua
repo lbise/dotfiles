@@ -9,6 +9,7 @@ local settings = {
 			"clang-format",
 			"basedpyright",
 			-- Required version for work..
+			-- Install like this :MasonInstall ruff@0.11.2
 			"ruff@0.11.2",
 			--"ruff",
 			"bash-language-server",
