@@ -585,7 +585,7 @@ class WorkflowManager:
             print(f'Error: Failed to connect to Redmine server - {e}', file=sys.stderr)
             sys.exit(1)
 
-    def generate_report(self) -> None:
+    def generate_report(self, output_format: str = 'html') -> None:
         try:
             # Always use current user from API
             current_user_data = self.redmine.get_current_user()
@@ -608,21 +608,20 @@ class WorkflowManager:
             ]
 
             if not filtered_issues:
-                print(
-                    '<p>No tickets with "In Progress" or "Resolved" status found.</p>'
-                )
+                if output_format == 'markdown':
+                    print(
+                        'No tickets with "In Progress" or "Resolved" status found.'
+                    )
+                else:
+                    print(
+                        '<p>No tickets with "In Progress" or "Resolved" status found.</p>'
+                    )
                 return
 
-            print('<h3>LeB (5d)</h3>')
-            print('<ul>')
-            for issue in filtered_issues:
-                issue_id = issue['id']
-                subject = issue['subject']
-                ticket_url = f'{self.redmine.base_url}/issues/{issue_id}'
-
-                print(f'<li>{subject} (<a href="{ticket_url}">#{issue_id}</a>)</li>')
-
-            print('</ul>')
+            if output_format == 'markdown':
+                self._generate_report_markdown(filtered_issues)
+            else:
+                self._generate_report_html(filtered_issues)
 
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
@@ -638,6 +637,29 @@ class WorkflowManager:
         except requests.exceptions.RequestException as e:
             print(f'Error: Failed to connect to Redmine server - {e}', file=sys.stderr)
             sys.exit(1)
+
+    def _generate_report_html(self, issues: list) -> None:
+        print('<h3>LeB (5d)</h3>')
+        print('<ul>')
+        for issue in issues:
+            issue_id = issue['id']
+            subject = issue['subject']
+            ticket_url = f'{self.redmine.base_url}/issues/{issue_id}'
+
+            print(f'<li>{subject} (<a href="{ticket_url}">#{issue_id}</a>)</li>')
+
+        print('</ul>')
+
+    def _generate_report_markdown(self, issues: list) -> None:
+        print('### LeB (5d)')
+        print()
+        for issue in issues:
+            issue_id = issue['id']
+            subject = issue['subject']
+            ticket_url = f'{self.redmine.base_url}/issues/{issue_id}'
+
+            print(f'- {subject} ([#{issue_id}]({ticket_url}))')
+        print()
 
     def add_note(self, ticket_number: int, note: str) -> None:
         try:
@@ -769,7 +791,13 @@ def main():
 
     report_parser = subparsers.add_parser(
         'report',
-        help='Generate weekly report in HTML format for In Progress and Resolved tickets',
+        help='Generate weekly report for In Progress and Resolved tickets',
+    )
+    report_parser.add_argument(
+        '--format',
+        choices=['html', 'markdown'],
+        default='html',
+        help='Output format for the report (default: html)',
     )
     report_parser.add_argument(
         '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
@@ -815,7 +843,7 @@ def main():
             args.user, getattr(args, 'status', None), getattr(args, 'priority', None)
         )
     elif args.command == 'report':
-        workflow.generate_report()
+        workflow.generate_report(output_format=args.format)
     elif args.command == 'note':
         workflow.add_note(args.ticket_number, args.note)
     elif args.command == 'set-status':
