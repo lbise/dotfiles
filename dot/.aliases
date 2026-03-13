@@ -1,1 +1,35 @@
 alias vim=nvim
+
+wt() {
+  local branch="$1"
+  local root repo parent target base_ref
+
+  if [[ -z "$branch" ]]; then
+    printf 'usage: wt <branch-name>\n' >&2
+    return 1
+  fi
+
+  root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    printf 'wt: not inside a git repository\n' >&2
+    return 1
+  }
+
+  repo="$(basename "$root")"
+  parent="$(dirname "$root")"
+  target="$parent/${repo}-${branch//\//-}"
+  base_ref="origin/master"
+
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    printf 'wt: branch %s already exists\n' "$branch" >&2
+    return 1
+  fi
+
+  if [[ -e "$target" ]]; then
+    printf 'wt: target already exists: %s\n' "$target" >&2
+    return 1
+  fi
+
+  git fetch origin master || return 1
+  git worktree add -b "$branch" "$target" "$base_ref" || return 1
+  cd "$target" || return 1
+}
