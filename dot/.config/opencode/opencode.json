@@ -5,7 +5,6 @@
   "share": "disabled",
   "autoupdate": false,
   "instructions": ["ai_notes/conventions.md"],
-  "plugin": ["@tarquinen/opencode-dcp@latest"],
   "provider": {
     "google": {
       "models": {
