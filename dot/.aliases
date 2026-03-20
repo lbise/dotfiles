@@ -1,11 +1,23 @@
 alias vim=nvim
 
 wt() {
-  local branch="$1"
-  local root repo parent target base_ref
+  local force=0
+  local branch="" base_ref="HEAD"
+  local root repo parent target
+
+  local OPTIND opt
+  while getopts ':fb:' opt; do
+    case "$opt" in
+      f) force=1 ;;
+      b) base_ref="$OPTARG" ;;
+      *) printf 'usage: wt [-f] [-b <base>] <branch-name>\n' >&2; return 1 ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+  branch="$1"
 
   if [[ -z "$branch" ]]; then
-    printf 'usage: wt <branch-name>\n' >&2
+    printf 'usage: wt [-f] [-b <base>] <branch-name>\n' >&2
     return 1
   fi
 
@@ -14,10 +26,16 @@ wt() {
     return 1
   }
 
+  if (( ! force )); then
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+      printf 'wt: working tree has uncommitted changes; commit or stash them first (use -f to override)\n' >&2
+      return 1
+    fi
+  fi
+
   repo="$(basename "$root")"
   parent="$(dirname "$root")"
   target="$parent/${repo}-${branch//\//-}"
-  base_ref="origin/master"
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
     printf 'wt: branch %s already exists\n' "$branch" >&2
@@ -29,7 +47,65 @@ wt() {
     return 1
   fi
 
-  git fetch origin master || return 1
   git worktree add -b "$branch" "$target" "$base_ref" || return 1
   cd "$target" || return 1
+}
+
+wtm() {
+  local target_branch="$1"
+  local current_branch current_worktree main_worktree
+
+  git rev-parse --git-dir >/dev/null 2>&1 || {
+    printf 'wtm: not inside a git repository\n' >&2
+    return 1
+  }
+
+  current_branch="$(git symbolic-ref --short HEAD 2>/dev/null)" || {
+    printf 'wtm: not on a branch (detached HEAD)\n' >&2
+    return 1
+  }
+
+  current_worktree="$(git rev-parse --show-toplevel)"
+  main_worktree="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+
+  if [[ "$current_worktree" == "$main_worktree" ]]; then
+    printf 'wtm: already in the main worktree; run this from a linked worktree\n' >&2
+    return 1
+  fi
+
+  if [[ -z "$target_branch" ]]; then
+    target_branch="$(git worktree list --porcelain | awk '
+      /^worktree / { idx++ }
+      /^branch /   { if (idx == 1) { sub(/^branch refs\/heads\//, ""); print; exit } }
+    ')"
+    if [[ -z "$target_branch" ]]; then
+      printf 'wtm: cannot determine target branch; specify one explicitly\n' >&2
+      return 1
+    fi
+  fi
+
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    printf 'wtm: working tree has uncommitted changes; commit or stash them first\n' >&2
+    return 1
+  fi
+
+  local main_current
+  main_current="$(git -C "$main_worktree" symbolic-ref --short HEAD 2>/dev/null)"
+  if [[ "$main_current" != "$target_branch" ]]; then
+    printf 'wtm: main worktree is on %s, expected %s\n' "$main_current" "$target_branch" >&2
+    return 1
+  fi
+
+  cd "$main_worktree" || return 1
+
+  if ! git merge "$current_branch"; then
+    printf 'wtm: merge conflicts detected; resolve them in %s then run:\n' "$main_worktree" >&2
+    printf '  git worktree remove %s && git branch -d %s\n' "$current_worktree" "$current_branch" >&2
+    return 1
+  fi
+
+  git worktree remove "$current_worktree" || return 1
+  git branch -d "$current_branch" || return 1
+
+  printf 'wtm: merged %s into %s and cleaned up worktree\n' "$current_branch" "$target_branch"
 }
