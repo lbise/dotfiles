@@ -105,3 +105,5 @@
     path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/leo_dotfiles/"]
     path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/smcode/"]
+    path = ~/.gitconfigwork
