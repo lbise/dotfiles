@@ -12,6 +12,16 @@ from typing import Optional
 import requests
 
 
+def _format_filesize(size_bytes: int) -> str:
+    """Format a file size in bytes to a human-readable string."""
+    if size_bytes > 1024 * 1024:
+        return f'{size_bytes / (1024 * 1024):.1f} MB'
+    elif size_bytes > 1024:
+        return f'{size_bytes / 1024:.1f} KB'
+    else:
+        return f'{size_bytes} B'
+
+
 class RedmineClient:
     def __init__(self, base_url: str, api_key: str):
         self.base_url = base_url.rstrip('/')
@@ -112,6 +122,27 @@ class RedmineClient:
         response.raise_for_status()
 
         return response.json() if response.content else {}
+
+    def download_attachment(self, content_url: str, dest_path: str) -> str:
+        """Download an attachment from Redmine to a local file path.
+
+        Args:
+            content_url: The download URL for the attachment.
+            dest_path: The local file path to save the attachment to.
+
+        Returns:
+            The local file path where the attachment was saved.
+        """
+        response = self.session.get(content_url, stream=True)
+        response.raise_for_status()
+
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+        with open(dest_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        return dest_path
 
 
 class WorkflowManager:
@@ -288,6 +319,19 @@ class WorkflowManager:
                             new_value = detail.get('new_value', '')
                             markdown_content += f'- Changed {field_name}: "{old_value}" → "{new_value}"\n'
 
+        # Add attachments
+        if issue.get('attachments'):
+            markdown_content += '\n## Attachments\n'
+            for attachment in issue['attachments']:
+                filename = attachment.get('filename', 'Unknown')
+                content_url = attachment.get('content_url', '')
+                content_type = attachment.get('content_type', '')
+                filesize = attachment.get('filesize', 0)
+                size_str = _format_filesize(filesize)
+                markdown_content += (
+                    f'- [{filename}]({content_url}) ({content_type}, {size_str})\n'
+                )
+
         markdown_content += '\n## Work Notes\n\n<!-- Add your work notes here -->\n'
 
         return markdown_content
@@ -386,6 +430,17 @@ class WorkflowManager:
                                 print(
                                     f'  Changed {field_name}: "{old_value}" → "{new_value}"'
                                 )
+
+            # Display attachments
+            if issue.get('attachments'):
+                print('\nAttachments:')
+                for attachment in issue['attachments']:
+                    filename = attachment.get('filename', 'Unknown')
+                    content_type = attachment.get('content_type', 'Unknown')
+                    filesize = attachment.get('filesize', 0)
+                    content_url = attachment.get('content_url', '')
+                    size_str = _format_filesize(filesize)
+                    print(f'  {filename} ({content_type}, {size_str}): {content_url}')
 
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
@@ -725,6 +780,95 @@ class WorkflowManager:
         # Print ticket URL for easy access
         self._print_ticket_url(ticket_number)
 
+    def download_attachments(
+        self,
+        ticket_number: int,
+        filename_filter: Optional[str] = None,
+        dest_dir: Optional[str] = None,
+    ) -> None:
+        """Download attachment(s) from a Redmine ticket.
+
+        Args:
+            ticket_number: The Redmine ticket number.
+            filename_filter: Optional substring to filter attachments by filename.
+            dest_dir: Optional destination directory. Defaults to /tmp/redmine_attachments/<ticket_number>/.
+        """
+        try:
+            issue_data = self.redmine.get_issue(ticket_number)
+            issue = issue_data['issue']
+            attachments = issue.get('attachments', [])
+
+            if not attachments:
+                print(f'No attachments found on ticket #{ticket_number}')
+                return
+
+            # Filter by filename if specified
+            if filename_filter:
+                attachments = [
+                    a
+                    for a in attachments
+                    if filename_filter.lower() in a.get('filename', '').lower()
+                ]
+                if not attachments:
+                    print(
+                        f'No attachments matching "{filename_filter}" found on ticket #{ticket_number}'
+                    )
+                    return
+
+            # Determine destination directory
+            if not dest_dir:
+                dest_dir = os.path.join(
+                    '/tmp', 'redmine_attachments', str(ticket_number)
+                )
+
+            os.makedirs(dest_dir, exist_ok=True)
+
+            print(
+                f'Downloading {len(attachments)} attachment(s) from ticket #{ticket_number}...'
+            )
+
+            for attachment in attachments:
+                filename = attachment.get('filename', 'unknown')
+                content_url = attachment.get('content_url', '')
+                filesize = attachment.get('filesize', 0)
+                size_str = _format_filesize(filesize)
+
+                if not content_url:
+                    print(f'  Skipping {filename}: no download URL available')
+                    continue
+
+                dest_path = os.path.join(dest_dir, filename)
+
+                try:
+                    self.redmine.download_attachment(content_url, dest_path)
+                    print(f'  Downloaded: {dest_path} ({size_str})')
+                except requests.exceptions.HTTPError as e:
+                    print(
+                        f'  Failed to download {filename}: HTTP {e.response.status_code}',
+                        file=sys.stderr,
+                    )
+                except requests.exceptions.RequestException as e:
+                    print(
+                        f'  Failed to download {filename}: {e}', file=sys.stderr
+                    )
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                print(f'Error: Ticket #{ticket_number} not found', file=sys.stderr)
+            elif e.response.status_code == 401:
+                print(
+                    'Error: Authentication failed. Check your API key', file=sys.stderr
+                )
+            else:
+                print(
+                    f'Error: HTTP {e.response.status_code} - {e.response.text}',
+                    file=sys.stderr,
+                )
+            sys.exit(1)
+        except requests.exceptions.RequestException as e:
+            print(f'Error: Failed to connect to Redmine server - {e}', file=sys.stderr)
+            sys.exit(1)
+
 
 def get_api_key(args_api_key: Optional[str]) -> str:
     if args_api_key:
@@ -824,6 +968,23 @@ def main():
         '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
     )
 
+    dl_parser = subparsers.add_parser(
+        'download-attachment',
+        help='Download attachment(s) from a ticket',
+    )
+    dl_parser.add_argument('ticket_number', type=int, help='Redmine ticket number')
+    dl_parser.add_argument(
+        '--filename',
+        help='Filter attachments by filename (substring match)',
+    )
+    dl_parser.add_argument(
+        '--dest',
+        help='Destination directory (default: /tmp/redmine_attachments/<ticket>/)',
+    )
+    dl_parser.add_argument(
+        '--api-key', help='Redmine API key (or use REDMINE_API_KEY env var)'
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -848,6 +1009,12 @@ def main():
         workflow.add_note(args.ticket_number, args.note)
     elif args.command == 'set-status':
         workflow.set_ticket_status(args.ticket_number, args.status)
+    elif args.command == 'download-attachment':
+        workflow.download_attachments(
+            args.ticket_number,
+            filename_filter=args.filename,
+            dest_dir=args.dest,
+        )
 
 
 if __name__ == '__main__':
