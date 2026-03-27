@@ -6,11 +6,23 @@ check_tty_integrity() {
     fi
 }
 
+check_andromeda_env() {
+    if [[ "$PWD" == "$HOME/andromeda" || "$PWD" == "$HOME/andromeda/"* ]]; then
+        if [[ -z "$ANDROMEDA_ROOT" ]] || ! alias b &>/dev/null; then
+            print -P "%F{yellow}[INFO]%f Running %F{cyan}sourceme%f to configure the environment."
+            _sourceme_dir="$PWD" && cd $ANDROMEDA_ROOT && source sourceme && cd "$_sourceme_dir"
+        fi
+    fi
+}
+
 if [[ -n "$TMUX" ]]; then
 precmd() {
+    # Refresh local env, usually needed when a new ssh session uses an existing tmux session
     tmux refresh-client -S
     eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
+    # Hack for ctrl+c andromeda issue, is it really needed anymore?
     check_tty_integrity
+    check_andromeda_env
 }
 fi
 
