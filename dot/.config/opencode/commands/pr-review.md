@@ -90,11 +90,11 @@ If you skipped checkout in Phase 1 (already on the PR branch), skip this phase.
 
 Output a summary of the review findings to the terminal:
 
-* If issues were found, list each issue with a brief description.
+* If issues were found, list each issue with a brief description. For each issues there should be a confidence level that it is a real issue.
 * If CI checks are failing, list them.
 * If no issues were found, state: "No issues found. Checked for bugs and code smells."
 
-**IMPORTANT** At this point ask the user if he wishes to post comments to the pull request directly. If not, **STOP** here. Otherwise continue to the next section.
+**IMPORTANT** After showing the list of issues to the user, ask if he wishes to post comments to the pull request directly. If not, **STOP** here. Otherwise continue to the next section.
 
 ### Post inline comments
 
