@@ -14,7 +14,6 @@ COMMON_LINKS=(
     ".aliases"
     ".exports"
     ".zsh_work"
-    ".gitconfig"
     ".gitconfigwork"
     ".tmux.conf"
     ".tmux/plugins"
@@ -41,6 +40,12 @@ DESKTOP_LINKS=(
 # Start with common links
 DOTFILES_LINKS=("${COMMON_LINKS[@]}")
 
+if [[ "$USER" == "jean-claude-bot" ]]; then
+    DOTFILES_LINKS+=(".gitconfigbot:.gitconfig")
+else
+    DOTFILES_LINKS+=(".gitconfig")
+fi
+
 # Add desktop links if not on work machine
 if ! is_work; then
     DOTFILES_LINKS+=("${DESKTOP_LINKS[@]}")
@@ -54,8 +59,14 @@ if [[ ! -d "$DOTFILES_DOT_ROOT" ]]; then
 fi
 
 for REL in "${DOTFILES_LINKS[@]}"; do
-    SRC="$DOTFILES_DOT_ROOT/$REL"
-    DST="$DOTFILES_DST/$REL"
+    SRC_REL="${REL%%:*}"
+    DST_REL="${REL#*:}"
+    if [[ "$REL" != *:* ]]; then
+        DST_REL="$REL"
+    fi
+
+    SRC="$DOTFILES_DOT_ROOT/$SRC_REL"
+    DST="$DOTFILES_DST/$DST_REL"
     create_symlink "$SRC" "$DST"
 done
 

@@ -1,0 +1,111 @@
+[color]
+	ui = auto
+
+[color "diff"]
+	meta = blue
+	frag = white
+	old = red bold
+	new = green bold
+
+[core]
+	editor = nvim
+	filemode = false
+    autocrlf = false
+
+[user]
+	name = Jean-Claude Bot
+	email = leonard.bise@gmail.com
+	signingkey = /home/jean-claude-bot/.ssh/id_ed25519_jc.pub
+
+[difftool]
+	prompt = false
+
+[merge]
+    tool = nvimdiff2
+    conflictStyle = diff3
+
+[grep]
+	extendRegexp = true
+	lineNumber = true
+
+[alias]
+	a = add
+	ua = reset HEAD
+	c = commit
+	ca = commit --amend
+	call = commit -a
+	cm = commit -m
+	cam = commit -am
+	cne = commit --no-edit
+	co = checkout
+	s = status
+	d = diff
+	cp = cherry-pick
+	l = log --graph --pretty=format:'%C(magenta)%h%C(blue)%d%Creset %s %C(blue bold)- %an, %ad%Creset'
+	ll = log --stat --abbrev-commit
+	# List my own commits
+	my = !git log --branches=* --no-merges --pretty=format:'%C(reset)%C(bold)%cd %C(reset)%C(white)%s  %C(reset)%h' --date=short --author=\"$(git config user.name)\"
+	# List of branches ordered by last change
+	branches = for-each-ref --sort=-committerdate refs/heads/ --format='%(color:bold)%(refname:short)%(color:reset)\t%(committerdate:relative)'
+	# Rebase: add changes and continue
+	cont = !git add . && git rebase --continue
+	# Rebase: skip a rebase step
+	skip = rebase --skip
+	# Rebase: abort
+	abort = rebase --abort
+
+[log]
+	# Show branch names with git log
+	decorate = short
+
+[pull]
+    rebase = true
+
+[rebase]
+	autoSquash = yes
+	autoStash = yes
+
+[rerere]
+	enabled = true
+
+[credential]
+	credentialStore = gpg
+
+[commit]
+    gpgsign = true
+
+[tag]
+	gpgsign = true
+
+[safe]
+	directory = *
+
+[column]
+	ui = auto
+
+[branch]
+    sort = -committerdate
+
+[remote "origin"]
+	prune = true
+
+[fetch]
+	prune = true
+    pruneTags = true
+
+[mergetool]
+	keepBackup = false
+    prompt = false
+
+# Include specific work config
+# Note: hasconfig:remote requires Git 2.36+
+[includeIf "gitdir:~/andromeda/"]
+    path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/rig/"]
+    path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/leo_dotfiles/"]
+    path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/smcode/"]
+    path = ~/.gitconfigwork
+[gpg]
+	format = ssh
