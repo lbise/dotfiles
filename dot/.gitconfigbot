@@ -15,7 +15,7 @@
 [user]
 	name = Jean-Claude Bot
 	email = leonard.bise@gmail.com
-	signingkey = /home/jean-claude-bot/.ssh/id_ed25519_jc.pub
+	signingkey = /home/jean-claude-bot/.ssh/id_ed25519.pub
 
 [difftool]
 	prompt = false
