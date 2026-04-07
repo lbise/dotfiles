@@ -13,9 +13,9 @@
     autocrlf = false
 
 [user]
-	name = Léonard Bise
-	email = leonard.bise@gmail.com
-	signingkey = ED0DFB79FF83B277
+    name = Léonard Bise
+    email = leonard.bise@gmail.com
+    signingkey = ED0DFB79FF83B277
 
 [difftool]
 	prompt = false
@@ -107,3 +107,5 @@
     path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/smcode/"]
     path = ~/.gitconfigwork
+[gpg]
+	format = ssh
