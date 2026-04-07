@@ -15,7 +15,7 @@
 [user]
     name = Léonard Bise
     email = leonard.bise@gmail.com
-    signingkey = ED0DFB79FF83B277
+    signingkey = /home/leo/.ssh/id_rsa.pub
 
 [difftool]
 	prompt = false
