@@ -107,5 +107,7 @@
     path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/smcode/"]
     path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/meridian/"]
+    path = ~/.gitconfigwork
 [gpg]
 	format = ssh
