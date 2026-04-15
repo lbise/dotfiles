@@ -6,3 +6,4 @@ dot/.gnupg/.*
 dot/.gnupg/private-keys*
 dot/.gnupg/pubring.kbx*
 dot/.gnupg/trustdb.gpg
+**/package-lock.json
