@@ -3,20 +3,17 @@
 OUTPUT_DIR="$HOME/screenshots"
 
 if [[ ! -d "$OUTPUT_DIR" ]]; then
-    mkdir -p $OUTPUT_DIR
+    mkdir -p "$OUTPUT_DIR"
 fi
 
-MODE="fullscreen"
+MODE="${1:-fullscreen}"
 # Change to edit
 PROCESSING="nothing"
 
 case "$MODE" in
-#  region)
-#    wayfreeze & PID=$!
-#    sleep .1
-#    SELECTION=$(slurp 2>/dev/null)
-#    kill $PID 2>/dev/null
-#    ;;
+  region)
+    SELECTION=$(slurp 2>/dev/null)
+    ;;
 #  windows)
 #    wayfreeze & PID=$!
 #    sleep .1
@@ -25,6 +22,9 @@ case "$MODE" in
 #    ;;
   fullscreen)
     SELECTION=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | "\(.x),\(.y) \((.width / .scale) | floor)x\((.height / .scale) | floor)"')
+    ;;
+  *)
+    exit 1
     ;;
 #  smart|*)
 #    RECTS=$(get_rectangles)
@@ -89,4 +89,3 @@ else
     grim -g "$SELECTION" - | wl-copy
     notify-send "Screenshot saved to clipboard"
 fi
-
