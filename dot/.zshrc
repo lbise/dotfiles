@@ -6,6 +6,7 @@ if [ -f "$HOME/.keys" ]; then
 fi
 
 export ZSH="$HOME/.oh-my-zsh"
+autoload -Uz add-zsh-hook
 
 ZSH_THEME="candy"
 
@@ -47,6 +48,16 @@ function update_title() {
 }
 
 update_title
+
+update_tmux_env() {
+    if [[ -n "$TMUX" ]]; then
+        # Refresh local env when attaching to an existing tmux session over ssh.
+        tmux refresh-client -S
+        eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
+    fi
+}
+
+add-zsh-hook precmd update_tmux_env
 
 source $ZSH/oh-my-zsh.sh
 # --------------------------------------------------------------------------------

@@ -15,16 +15,15 @@ check_andromeda_env() {
     fi
 }
 
-precmd() {
+work_precmd() {
     if [[ -n "$TMUX" ]]; then
-        # Refresh local env, usually needed when a new ssh session uses an existing tmux session
-        tmux refresh-client -S
-        eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
         # Hack for ctrl+c andromeda issue, is it really needed anymore?
         check_tty_integrity
     fi
 
     check_andromeda_env
 }
+
+add-zsh-hook precmd work_precmd
 
 alias sourceme='_sourceme_dir="$PWD" && cd $ANDROMEDA_ROOT && source sourceme && cd "$_sourceme_dir"'
