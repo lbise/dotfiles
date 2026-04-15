@@ -23,6 +23,7 @@ COMMON_LINKS=(
     ".gnupg/gpg-agent.conf"
     ".config/fcitx5"
     ".config/environment.d"
+    ".pi/agent/settings.json"
 )
 
 # Desktop-only symlinks (Hyprland, Waybar, etc.)

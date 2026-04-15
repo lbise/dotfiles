@@ -1,0 +1,14 @@
+{
+  "lastChangelogVersion": "0.67.1",
+  "defaultProvider": "github-copilot",
+  "defaultModel": "gpt-5.4",
+  "defaultThinkingLevel": "xhigh",
+  "theme": "tokyo-night",
+  "packages": [
+    "npm:@ifi/oh-pi-themes"
+  ],
+  "enabledModels": [
+    "github-copilot/claude-opus-4.6",
+    "github-copilot/gpt-5.4"
+  ]
+}
