@@ -1,0 +1,8 @@
+{
+  "nodeVersion": "20.11.1",
+  "packages": [
+    {
+      "source": "npm:@ifi/oh-pi-themes"
+    }
+  ]
+}
