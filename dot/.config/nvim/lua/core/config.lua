@@ -31,7 +31,7 @@ vim.wo.numberwidth = 2
 
 -- UI
 vim.g.have_nerd_font = true
-vim.o.colorcolumn = '120'
+vim.o.colorcolumn = "120"
 vim.o.cursorline = true
 vim.cmd("highlight ColorColumn ctermbg=0 guibg=#333333")
 
@@ -53,8 +53,8 @@ vim.opt.breakindent = true
 vim.opt.undofile = true
 
 -- Case-insensitive searching UNLESS \C or capital in search
-vim.opt.ignorecase = true
-vim.opt.smartcase = true
+-- vim.opt.ignorecase = true
+-- vim.opt.smartcase = true
 
 -- Keep signcolumn on by default
 vim.wo.signcolumn = "yes"
