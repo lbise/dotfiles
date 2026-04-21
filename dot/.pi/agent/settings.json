@@ -1,11 +1,14 @@
 {
-  "lastChangelogVersion": "0.67.2",
+  "lastChangelogVersion": "0.67.68",
   "defaultProvider": "github-copilot",
   "defaultModel": "gpt-5.4",
   "defaultThinkingLevel": "xhigh",
   "theme": "tokyo-night",
   "packages": [
     "npm:@ifi/oh-pi-themes"
+  ],
+  "extensions": [
+    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
   ],
   "enabledModels": [
     "github-copilot/claude-opus-4.6",

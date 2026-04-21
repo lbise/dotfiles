@@ -24,6 +24,7 @@ COMMON_LINKS=(
     ".config/fcitx5"
     ".config/environment.d"
     ".pi/agent/settings.json"
+    ".pi/agent/prompts"
 )
 
 # Desktop-only symlinks (Hyprland, Waybar, etc.)
