@@ -1,44 +1,82 @@
+---@generic T
+---@param super T[]
+---@param sub T[]
+---@return T[]
+function table.except(super, sub)
+	local result = {}
+	local seenInResult = {}
+	local lookupSub = {}
+
+	for _, value in ipairs(sub) do
+		lookupSub[value] = true
+	end
+
+	for _, value in ipairs(super) do
+		if not lookupSub[value] and not seenInResult[value] then
+			table.insert(result, value)
+			seenInResult[value] = true
+		end
+	end
+
+	return result
+end
+
 local config = {
-    {
-        'nvim-treesitter/nvim-treesitter',
-        -- Always load treesitter
-        lazy = false,
-        cmd = { 'TSInstall', 'TSBufEnable', 'TSBufDisable', 'TSModuleInfo' },
-        dependencies = {
-            'nvim-treesitter/nvim-treesitter-textobjects',
-        },
-        build = ':TSUpdate',
-        config = function()
-            require('nvim-treesitter.configs').setup {
-                -- A list of parser names, or 'all' (the five listed parsers should always be installed)
-                -- Add more from https://github.com/nvim-treesitter/nvim-treesitter#supported-languages
-                ensure_installed = { 'c', 'lua', 'vim', 'vimdoc', 'query', 'cpp', 'python', 'bash', 'csv', 'diff', 'json', 'make', 'cmake', 'xml', 'yaml' },
-
-                -- Install parsers synchronously (only applied to `ensure_installed`)
-                sync_install = false,
-
-                -- Automatically install missing parsers when entering buffer
-                -- Recommendation: set to false if you don't have `tree-sitter` CLI installed locally
-                auto_install = true,
-
-                -- List of parsers to ignore installing (or 'all')
-                ignore_install = {},
-
-                ---- If you need to change the installation directory of the parsers (see -> Advanced Setup)
-                -- parser_install_dir = '/some/path/to/store/parsers', -- Remember to run vim.opt.runtimepath:append('/some/path/to/store/parsers')!
-
-                highlight = {
-                    enable = true,
-
-                    -- Setting this to true will run `:h syntax` and tree-sitter at the same time.
-                    -- Set this to `true` if you depend on 'syntax' being enabled (like for indentation).
-                    -- Using this option may slow down your editor, and you may see some duplicate highlights.
-                    -- Instead of true it can also be a list of languages
-                    additional_vim_regex_highlighting = false,
-                },
-            }
-        end,
-    },
+	{
+		"nvim-treesitter/nvim-treesitter",
+		branch = "main",
+		-- Always load treesitter
+		lazy = false,
+		cmd = { "TSInstall", "TSBufEnable", "TSBufDisable", "TSModuleInfo" },
+		build = ":TSUpdate",
+		config = function()
+			local treesitter = require("nvim-treesitter")
+			treesitter.setup({})
+			local ensure_installed = require("core.settings").lsp.treesitter_installed
+			treesitter.install(table.except(ensure_installed, treesitter.get_installed()))
+			-- Automatically enable highlighting
+			vim.api.nvim_create_autocmd("FileType", {
+				callback = function(args)
+					if vim.list_contains(treesitter.get_installed(), vim.treesitter.language.get_lang(args.match)) then
+						vim.treesitter.start(args.buf)
+					end
+				end,
+			})
+		end,
+	},
+	{
+		"nvim-treesitter/nvim-treesitter-textobjects",
+		branch = "main",
+		dependencies = {
+			"nvim-treesitter/nvim-treesitter",
+		},
+		config = function()
+			require("nvim-treesitter-textobjects").setup({
+				select = {
+					lookahead = true,
+					selection_modes = {
+						["@parameter.outer"] = "v",
+						["@function.outer"] = "V",
+						["@class.outer"] = "V",
+					},
+					include_surrounding_whitespace = true,
+				},
+				move = {
+					set_jumps = false,
+				},
+			})
+			do -- move
+				vim.keymap.set({ "n", "x", "o" }, "]]", function()
+					require("nvim-treesitter-textobjects.move").goto_next_start("@function.outer", "textobjects")
+					vim.cmd("normal! zz")
+				end)
+				vim.keymap.set({ "n", "x", "o" }, "[[", function()
+					require("nvim-treesitter-textobjects.move").goto_previous_start("@function.outer", "textobjects")
+					vim.cmd("normal! zz")
+				end)
+			end
+		end,
+	},
 }
 
 return config

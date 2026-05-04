@@ -15,6 +15,25 @@ local settings = {
 			"bash-language-server",
 			"lua-language-server",
 			"stylua",
+			"ty",
+		},
+		-- Language highlighting through tree sitter
+		treesitter_installed = {
+			"c",
+			"lua",
+			"vim",
+			"vimdoc",
+			"query",
+			"cpp",
+			"python",
+			"bash",
+			"csv",
+			"diff",
+			"json",
+			"make",
+			"cmake",
+			"xml",
+			"yaml",
 		},
 		-- Servers enable status, can also be a list of settings passed to require('lspconfig')[server].setup(settings = { xxx })
 		servers = {
