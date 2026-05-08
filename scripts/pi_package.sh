@@ -144,7 +144,7 @@ resolve_pi_package_dir() {
         local npm_root
         npm_root="$(npm root -g 2>/dev/null || true)"
         if [[ -n "$npm_root" ]]; then
-            local candidate="$npm_root/@mariozechner/pi-coding-agent"
+            local candidate="$npm_root/@earendil-works/pi-coding-agent"
             if [[ -d "$candidate" ]]; then
                 printf '%s\n' "$candidate"
                 return 0
@@ -158,7 +158,7 @@ resolve_pi_package_dir() {
         return 0
     fi
 
-    error "Could not locate @mariozechner/pi-coding-agent. Install pi first on the packaging machine."
+    error "Could not locate @earendil-works/pi-coding-agent. Install pi first on the packaging machine."
 }
 
 read_json_field() {
@@ -329,12 +329,12 @@ copy_pi_runtime() {
 
 expose_pi_peer_packages() {
     local global_root="$STAGE_DIR/node/lib/node_modules"
-    mkdir -p "$global_root/@mariozechner" "$global_root/@sinclair"
+    mkdir -p "$global_root/@earendil-works" "$global_root/@sinclair"
 
-    ln -sfn "../../../../pi" "$global_root/@mariozechner/pi-coding-agent"
-    ln -sfn "../../../../pi/node_modules/@mariozechner/pi-ai" "$global_root/@mariozechner/pi-ai"
-    ln -sfn "../../../../pi/node_modules/@mariozechner/pi-agent-core" "$global_root/@mariozechner/pi-agent-core"
-    ln -sfn "../../../../pi/node_modules/@mariozechner/pi-tui" "$global_root/@mariozechner/pi-tui"
+    ln -sfn "../../../../pi" "$global_root/@earendil-works/pi-coding-agent"
+    ln -sfn "../../../../pi/node_modules/@earendil-works/pi-ai" "$global_root/@earendil-works/pi-ai"
+    ln -sfn "../../../../pi/node_modules/@earendil-works/pi-agent-core" "$global_root/@earendil-works/pi-agent-core"
+    ln -sfn "../../../../pi/node_modules/@earendil-works/pi-tui" "$global_root/@earendil-works/pi-tui"
     ln -sfn "../../../../pi/node_modules/@sinclair/typebox" "$global_root/@sinclair/typebox"
 }
 
