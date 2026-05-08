@@ -36,6 +36,48 @@ install_nvim() {
     install_github_release "nvim" "$repo" "$tarball_url" "$tag" "nvim"
 }
 
+install_tree_sitter_with_cargo() {
+    local tag="$1"
+    local local_bin="$2"
+    local cargo_bin=""
+    local version=""
+    local version_output=""
+
+    cargo_bin=$(command -v cargo 2>/dev/null || true)
+    if [[ -z "$cargo_bin" && -x "$HOME/.cargo/bin/cargo" ]]; then
+        cargo_bin="$HOME/.cargo/bin/cargo"
+    fi
+
+    if [[ -z "$cargo_bin" ]]; then
+        echo "tree-sitter source build requires cargo." >&2
+        echo "Install Rust with rustup and rerun:" >&2
+        echo "  curl https://sh.rustup.rs -sSf | sh -s -- -y" >&2
+        return 1
+    fi
+
+    version=$(normalize_version "$tag")
+    echo "Building tree-sitter ${version} from source with cargo..."
+    echo "Using cargo --no-default-features to avoid the libclang/QuickJS build dependency."
+
+    mkdir -p "$(dirname "$local_bin")"
+
+    if ! "$cargo_bin" install --locked --force --root "$HOME/.local" tree-sitter-cli --version "$version" --no-default-features; then
+        echo "Failed to build tree-sitter ${version} with cargo." >&2
+        echo "This install path avoids libclang; ensure Rust is up to date: rustup update" >&2
+        echo "tree-sitter generate will use node as the JavaScript runtime." >&2
+        return 1
+    fi
+
+    if version_output=$("$local_bin" --version 2>&1); then
+        echo "tree-sitter installed successfully to $local_bin (${version_output})"
+        return 0
+    fi
+
+    echo "tree-sitter was built, but the installed binary failed to run." >&2
+    echo "$version_output" >&2
+    return 1
+}
+
 install_tree_sitter() {
     echo ">> Installing tree-sitter..."
 
@@ -121,9 +163,10 @@ install_tree_sitter() {
         return 0
     fi
 
-    echo "ERROR: Downloaded tree-sitter binary from GitHub is not compatible with this system." >&2
+    echo "Downloaded tree-sitter binary from GitHub is not compatible with this system." >&2
     echo "$version_output" >&2
-    return 1
+    echo "Falling back to building tree-sitter from source..." >&2
+    install_tree_sitter_with_cargo "$tag" "$local_bin"
 }
 
 install_nvim

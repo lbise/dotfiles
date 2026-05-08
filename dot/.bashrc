@@ -2,3 +2,4 @@
 if [[ $- == *i* ]] && [ -x /usr/bin/zsh ] && [ -z "$ZSH_VERSION" ]; then
     exec zsh
 fi
+. "$HOME/.cargo/env"

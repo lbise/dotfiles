@@ -88,7 +88,10 @@ function tools.glob_to_lua_pattern(glob)
 	local pattern = glob
 		:gsub("([%^%$%(%)%%%.%[%]%+%-%?])", "%%%1")
 		-- ** matches any number of directories (use placeholder to avoid double replacement)
-		:gsub("%*%*", "\1DOUBLESTAR\1")
+		:gsub(
+			"%*%*",
+			"\1DOUBLESTAR\1"
+		)
 		-- * matches anything except path separator
 		:gsub("%*", "[^/]*")
 		-- Replace placeholder with .* for **

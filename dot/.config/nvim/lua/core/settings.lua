@@ -1,18 +1,18 @@
 local tools = require("core.tools")
 
+local allow_npm_tools = not tools.is_work() or tools.is_wsl()
+local enable_web_lsp = not tools.is_work()
+
 local settings = {
 	colorscheme = "tokyonight",
 	lsp = {
-		-- Not used currently ...
-		ensure_installed = {
+		-- LSP and tools installed by mason
+		-- Supports pinned version like ruff@0.11.2
+		mason_installed = {
 			"clangd",
-			"clang-format",
-			"basedpyright",
-			-- Required version for work..
-			-- Install like this :MasonInstall ruff@0.11.2
+			-- Specific version required for work
 			"ruff@0.11.2",
-			--"ruff",
-			"bash-language-server",
+			"basedpyright",
 			"lua-language-server",
 			"stylua",
 			"ty",
@@ -61,57 +61,65 @@ local settings = {
 				},
 			},
 
-			basedpyright = {
+			-- basedpyright = {
+			-- 	settings = {
+			-- 		basedpyright = {
+			-- 			analysis = {
+			-- 				typeCheckingMode = "standard",
+			-- 				extraPaths = {
+			-- 					vim.fn.expand("$HOME/andromeda"),
+			-- 					vim.fn.expand("$HOME/andromeda/apps/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/bt/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/dsp/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/hlc/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/pctools/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/raspi4/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/stf4/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/tstenv/scripts/python"),
+			-- 					vim.fn.expand("$HOME/andromeda/nordic/scripts/python"),
+			-- 				},
+			-- 			},
+			-- 		},
+			-- 	},
+			-- },
+			ty = {
+				init_options = { logLevel = "debug" },
 				settings = {
-					basedpyright = {
-						analysis = {
-							typeCheckingMode = "standard",
-							extraPaths = {
-								vim.fn.expand("$HOME/andromeda"),
-								vim.fn.expand("$HOME/andromeda/apps/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/bt/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/dsp/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/hlc/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/pctools/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/raspi4/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/stf4/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/tstenv/scripts/python"),
-								vim.fn.expand("$HOME/andromeda/nordic/scripts/python"),
-							},
+					ty = {
+						diagnosticMode = "openFilesOnly",
+						showSyntaxErrors = true,
+						inlayHints = {
+							variableTypes = true,
+							callArgumentNames = true,
 						},
+						completions = {
+							autoImport = true,
+						},
+						--configuration = {
+						--	-- Override rules from config file
+						--	rules = {
+						--		["all"] = "error",
+						--		-- ["unresolved-reference"] = "warn",
+						--	},
+
+						--	-- environment = {
+						--	-- 	-- These paths are automatically detected by Ty using PYTHONPATH
+						--	-- 	["extra-paths"] = {
+						--	-- 		vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
+						--	-- 		vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
+						--	-- 		vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
+						--	-- 		vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
+						--	-- 		vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
+						--	-- 	},
+						--	-- },
+						--},
 					},
 				},
 			},
-			--ty = {
-			--	settings = {
-			--		ty = {
-			--			diagnosticMode = "openFilesOnly",
-			--			showSyntaxErrors = true,
-			--			inlayHints = {
-			--				variableTypes = true,
-			--				callArgumentNames = true,
-			--			},
-			--			completions = {
-			--				autoImport = true,
-			--			},
-			--			configuration = {
-			--				environment = {
-			--					["extra-paths"] = {
-			--						vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
-			--						vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
-			--						vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
-			--						vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
-			--						vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
-			--					},
-			--				},
-			--			},
-			--		},
-			--	},
-			--},
 			lua_ls = {
 				settings = {
 					Lua = {
@@ -125,8 +133,21 @@ local settings = {
 	},
 }
 
--- Web dev LSPs (only enabled when not at work)
-if not tools.is_work() then
+-- Npm-based Mason tools that are allowed on work machines only when using WSL.
+if allow_npm_tools then
+	table.insert(settings.lsp.mason_installed, "prettier")
+end
+
+-- Web development tools are never enabled on work machines, even in WSL.
+if enable_web_lsp then
+	for _, package in ipairs({
+		"typescript-language-server",
+		"eslint-lsp",
+		"tailwindcss-language-server",
+	}) do
+		table.insert(settings.lsp.mason_installed, package)
+	end
+
 	settings.lsp.servers.ts_ls = true
 	settings.lsp.servers.eslint = true
 	settings.lsp.servers.tailwindcss = true

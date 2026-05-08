@@ -23,6 +23,118 @@ local function get_clang_format_config()
 	return user_path
 end
 
+local function parse_package_identifier(package_identifier)
+	local parts = vim.split(package_identifier, "@", { plain = true })
+	return parts[1], parts[2]
+end
+
+local function ensure_mason_packages_installed()
+	local registry = require("mason-registry")
+	local mason_installed = require("core.settings").lsp.mason_installed or {}
+
+	if vim.tbl_isempty(mason_installed) then
+		return
+	end
+
+	registry.refresh(function(success)
+		if not success then
+			vim.schedule(function()
+				vim.notify("Failed to refresh Mason registry", vim.log.levels.ERROR)
+			end)
+			return
+		end
+
+		local install_queue = {}
+
+		for _, package_identifier in ipairs(mason_installed) do
+			local package_name, version = parse_package_identifier(package_identifier)
+			local ok, pkg = pcall(registry.get_package, package_name)
+
+			if not ok then
+				local missing_package = package_identifier
+				vim.schedule(function()
+					vim.notify(
+						("Mason package %q was not found in the registry"):format(missing_package),
+						vim.log.levels.ERROR
+					)
+				end)
+			else
+				local is_installed = pkg:is_installed()
+				local installed_version = pkg:get_installed_version()
+				local install_opts = {}
+				local should_install = not is_installed
+
+				if version then
+					install_opts.version = version
+					if installed_version ~= version then
+						should_install = true
+						install_opts.force = is_installed
+					end
+				end
+
+				if should_install and not pkg:is_installing() then
+					table.insert(install_queue, {
+						identifier = package_identifier,
+						pkg = pkg,
+						install_opts = install_opts,
+					})
+				end
+			end
+		end
+
+		local installed_packages = {}
+		local pending_installs = #install_queue
+
+		local function notify_restart_if_needed()
+			if pending_installs ~= 0 or vim.tbl_isempty(installed_packages) then
+				return
+			end
+
+			local packages = vim.deepcopy(installed_packages)
+			table.sort(packages)
+
+			vim.schedule(function()
+				if #packages == 1 then
+					vim.notify(
+						("Installed Mason tool %s. Restart Neovim to use it."):format(packages[1]),
+						vim.log.levels.WARN
+					)
+				else
+					vim.notify(
+						("Installed Mason tools:\n- %s\nRestart Neovim to use them."):format(
+							table.concat(packages, "\n- ")
+						),
+						vim.log.levels.WARN
+					)
+				end
+			end)
+		end
+
+		for _, install in ipairs(install_queue) do
+			local package_identifier = install.identifier
+			local pkg = install.pkg
+			local install_opts = install.install_opts
+
+			pkg:install(install_opts, function(install_success, err)
+				pending_installs = pending_installs - 1
+
+				if install_success then
+					table.insert(installed_packages, package_identifier)
+				else
+					vim.schedule(function()
+						vim.notify(
+							("Failed to install Mason package %s: %s"):format(package_identifier, tostring(err)),
+							vim.log.levels.ERROR
+						)
+					end)
+				end
+
+				notify_restart_if_needed()
+			end)
+		end
+	end)
+end
+
 local config = {
 	{
 		"neovim/nvim-lspconfig",
@@ -51,6 +163,7 @@ local config = {
 		config = function()
 			-- Setup mason so LSPs are added to the PATH
 			require("mason").setup()
+			ensure_mason_packages_installed()
 
 			vim.diagnostic.config({
 				virtual_text = false,
@@ -74,15 +187,6 @@ local config = {
 					source = "if_many",
 				},
 			})
-
-			--local registry = require("mason-registry")
-			--for i, package in pairs(require("core.settings").lsp.ensure_installed) do
-			--    local pkg = registry.get_package(package)
-			--	--vim.notify("Package " .. package, vim.log.levels.ERROR)
-			--    if not pkg:is_installed() then
-			--	    vim.notify("Not installed " .. package, vim.log.levels.ERROR)
-			--    end
-			--end
 
 			for config_server, config_opt in pairs(require("core.settings").lsp.servers) do
 				if not config_opt == false then
