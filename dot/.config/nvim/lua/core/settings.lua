@@ -99,24 +99,13 @@ local settings = {
 						completions = {
 							autoImport = true,
 						},
-						--configuration = {
-						--	-- Override rules from config file
-						--	rules = {
-						--		["all"] = "error",
-						--		-- ["unresolved-reference"] = "warn",
-						--	},
-
-						--	-- environment = {
-						--	-- 	-- These paths are automatically detected by Ty using PYTHONPATH
-						--	-- 	["extra-paths"] = {
-						--	-- 		vim.fn.expand("$HOME/andromeda/rom/scripts/python"),
-						--	-- 		vim.fn.expand("$HOME/andromeda/rom/_export/python3"),
-						--	-- 		vim.fn.expand("$HOME/andromeda/executer/scripts/python"),
-						--	-- 		vim.fn.expand("$HOME/andromeda/infrastructure/scripts/python"),
-						--	-- 		vim.fn.expand("$HOME/andromeda/buildsystem/scripts/python"),
-						--	-- 	},
-						--	-- },
-						--},
+						configuration = {
+							-- Override rules from config file
+							rules = {
+								["all"] = "error",
+								-- ["unresolved-reference"] = "warn",
+							},
+						},
 					},
 				},
 			},
