@@ -11,7 +11,7 @@ local settings = {
 		mason_installed = {
 			"clangd",
 			-- Specific version required for work
-			"ruff@0.11.2",
+			"ruff@0.15.9",
 			"basedpyright",
 			"lua-language-server",
 			"stylua",
