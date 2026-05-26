@@ -13,7 +13,7 @@ PUBLISH=true
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 PACKAGE_NAME="pi-offline-${TIMESTAMP}.tar.gz"
 PACKAGE_OUTPUT_PATH=""
-DEFAULT_NODE_VERSION="20.11.1"
+DEFAULT_NODE_VERSION="22.19.0"
 NODE_VERSION="${PI_NODE_VERSION:-}"
 TEMP_DIR=""
 STAGE_DIR=""
@@ -22,6 +22,8 @@ NPM_BIN=""
 NODE_BIN=""
 PI_PACKAGE_DIR=""
 PI_VERSION=""
+PI_NODE_ENGINE=""
+PI_MIN_NODE_VERSION=""
 MANIFEST_HASH=""
 CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -39,14 +41,14 @@ usage() {
 Usage: $(basename "$0") [OPTIONS] [output_directory]
 
 Create an offline pi bundle containing:
-- a bundled Node 20 runtime
+- a bundled Node runtime compatible with the installed pi CLI
 - the pi CLI package and its dependencies
 - manifest packages pre-installed into bundled global npm from $MANIFEST_PATH
 - an install.sh helper for target machines without npm access
 
 Options:
   --manifest PATH       Manifest describing third-party pi packages
-  --node-version VER    Override bundled Node version (default from manifest or $DEFAULT_NODE_VERSION)
+  --node-version VER    Override bundled Node version (default from manifest or pi's minimum supported version)
   --pool-dir DIR        Publish archive to DIR (default: $DEFAULT_POOL_DIR)
   --no-publish          Keep the archive in output_directory instead of moving it to the pool
   --help, -h            Show this help message
@@ -56,7 +58,7 @@ Arguments:
 
 Manifest format ($MANIFEST_PATH):
 {
-  "nodeVersion": "20.11.1",
+  "nodeVersion": "$DEFAULT_NODE_VERSION",
   "packages": [
     { "source": "npm:@ifi/oh-pi-themes" },
     { "source": "git:github.com/user/repo@v1", "name": "my-package" }
@@ -71,7 +73,7 @@ Supported package sources:
 Examples:
   $(basename "$0")
   $(basename "$0") --no-publish /tmp
-  $(basename "$0") --node-version 20.11.1 --pool-dir /srv/mirror/pi
+  $(basename "$0") --node-version $DEFAULT_NODE_VERSION --pool-dir /srv/mirror/pi
 EOF
 }
 
@@ -130,8 +132,8 @@ NODE
         fi
     done <<< "$manifest_info"
 
-    if [[ -z "$NODE_VERSION" ]]; then
-        NODE_VERSION="${manifest_node_version:-$DEFAULT_NODE_VERSION}"
+    if [[ -z "$NODE_VERSION" && -n "$manifest_node_version" ]]; then
+        NODE_VERSION="$manifest_node_version"
     fi
 
     if [[ ${#PACKAGE_SPECS[@]} -eq 0 ]]; then
@@ -174,6 +176,100 @@ if (value === undefined || value === null) {
 }
 process.stdout.write(String(value));
 NODE
+}
+
+load_pi_package_metadata() {
+    PI_PACKAGE_DIR="$(resolve_pi_package_dir)"
+    [[ -f "$PI_PACKAGE_DIR/package.json" ]] || error "pi package.json not found in $PI_PACKAGE_DIR"
+
+    local pi_info
+    pi_info=$(node - "$PI_PACKAGE_DIR/package.json" <<'NODE'
+const fs = require("fs");
+const packageJsonPath = process.argv[2];
+const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+const engine = pkg.engines && pkg.engines.node ? String(pkg.engines.node) : "";
+const minMatch =
+  engine.match(/>=\s*v?(\d+(?:\.\d+){0,2})/) ||
+  engine.match(/^\s*v?(\d+(?:\.\d+){0,2})\s*$/) ||
+  engine.match(/\^\s*v?(\d+(?:\.\d+){0,2})/) ||
+  engine.match(/~\s*v?(\d+(?:\.\d+){0,2})/);
+
+console.log(`PI_VERSION=${pkg.version || ""}`);
+console.log(`PI_NODE_ENGINE=${engine}`);
+console.log(`PI_MIN_NODE_VERSION=${minMatch ? minMatch[1] : ""}`);
+NODE
+)
+
+    PI_VERSION=""
+    PI_NODE_ENGINE=""
+    PI_MIN_NODE_VERSION=""
+
+    while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        if [[ "$line" == PI_VERSION=* ]]; then
+            PI_VERSION="${line#PI_VERSION=}"
+        elif [[ "$line" == PI_NODE_ENGINE=* ]]; then
+            PI_NODE_ENGINE="${line#PI_NODE_ENGINE=}"
+        elif [[ "$line" == PI_MIN_NODE_VERSION=* ]]; then
+            PI_MIN_NODE_VERSION="${line#PI_MIN_NODE_VERSION=}"
+        fi
+    done <<< "$pi_info"
+
+    [[ -n "$PI_VERSION" ]] || error "Could not determine pi version from $PI_PACKAGE_DIR/package.json"
+}
+
+normalize_semver() {
+    local version="${1#v}"
+    local major=0
+    local minor=0
+    local patch=0
+
+    IFS='.' read -r major minor patch <<< "$version"
+    printf '%d.%d.%d\n' "${major:-0}" "${minor:-0}" "${patch:-0}"
+}
+
+semver_lt() {
+    local left right
+    left="$(normalize_semver "$1")"
+    right="$(normalize_semver "$2")"
+
+    local left_major left_minor left_patch right_major right_minor right_patch
+    IFS='.' read -r left_major left_minor left_patch <<< "$left"
+    IFS='.' read -r right_major right_minor right_patch <<< "$right"
+
+    if (( left_major != right_major )); then
+        (( left_major < right_major ))
+        return
+    fi
+
+    if (( left_minor != right_minor )); then
+        (( left_minor < right_minor ))
+        return
+    fi
+
+    (( left_patch < right_patch ))
+}
+
+resolve_bundled_node_version() {
+    if [[ -n "$NODE_VERSION" ]]; then
+        return 0
+    fi
+
+    if [[ -n "$PI_MIN_NODE_VERSION" ]]; then
+        NODE_VERSION="$PI_MIN_NODE_VERSION"
+    else
+        NODE_VERSION="$DEFAULT_NODE_VERSION"
+    fi
+}
+
+validate_requested_node_version() {
+    if [[ -z "$PI_MIN_NODE_VERSION" ]]; then
+        return 0
+    fi
+
+    if semver_lt "$NODE_VERSION" "$PI_MIN_NODE_VERSION"; then
+        error "Bundled Node $NODE_VERSION is too old for pi $PI_VERSION (requires ${PI_NODE_ENGINE:-">=$PI_MIN_NODE_VERSION"}). Update $MANIFEST_PATH or rerun with --node-version $PI_MIN_NODE_VERSION or newer."
+    fi
 }
 
 sanitize_dir_name() {
@@ -315,10 +411,8 @@ fetch_package_source() {
 }
 
 copy_pi_runtime() {
-    PI_PACKAGE_DIR="$(resolve_pi_package_dir)"
-    [[ -f "$PI_PACKAGE_DIR/package.json" ]] || error "pi package.json not found in $PI_PACKAGE_DIR"
+    [[ -n "$PI_PACKAGE_DIR" ]] || load_pi_package_metadata
 
-    PI_VERSION="$(read_json_field "$PI_PACKAGE_DIR/package.json" version)"
     PACKAGE_NAME="pi-v${PI_VERSION}-node${NODE_VERSION}-offline-${TIMESTAMP}.tar.gz"
     PACKAGE_OUTPUT_PATH="$OUTPUT_DIR/$PACKAGE_NAME"
 
@@ -336,6 +430,24 @@ expose_pi_peer_packages() {
     ln -sfn "../../../../pi/node_modules/@earendil-works/pi-agent-core" "$global_root/@earendil-works/pi-agent-core"
     ln -sfn "../../../../pi/node_modules/@earendil-works/pi-tui" "$global_root/@earendil-works/pi-tui"
     ln -sfn "../../../../pi/node_modules/@sinclair/typebox" "$global_root/@sinclair/typebox"
+}
+
+verify_bundled_pi_runtime() {
+    local verify_log="$TEMP_DIR/pi-startup-check.log"
+    mkdir -p "$TEMP_DIR/home"
+
+    log "Verifying bundled Node ${NODE_VERSION} can start pi ${PI_VERSION}"
+    if HOME="$TEMP_DIR/home" \
+        PATH="$STAGE_DIR/node/bin:${PATH}" \
+        NPM_CONFIG_PREFIX="$STAGE_DIR/node" \
+        npm_config_prefix="$STAGE_DIR/node" \
+        "$NODE_BIN" "$STAGE_DIR/pi/dist/cli.js" --help >"$verify_log" 2>&1; then
+        log "✓ Bundled pi runtime startup check passed"
+        return 0
+    fi
+
+    cat "$verify_log" >&2
+    error "Bundled Node ${NODE_VERSION} failed to start pi ${PI_VERSION}. pi requires ${PI_NODE_ENGINE:-a newer Node version}; update $MANIFEST_PATH or rerun with --node-version ${PI_MIN_NODE_VERSION:-$DEFAULT_NODE_VERSION} or newer."
 }
 
 ensure_installable_package_json() {
@@ -454,6 +566,8 @@ create_manifest_files() {
     cat > "$TEMP_DIR/manifest.env" <<EOF
 PI_VERSION='$PI_VERSION'
 NODE_VERSION='$NODE_VERSION'
+PI_NODE_ENGINE='$PI_NODE_ENGINE'
+PI_MIN_NODE_VERSION='$PI_MIN_NODE_VERSION'
 CREATED_AT='$CREATED_AT'
 MANIFEST_HASH='$MANIFEST_HASH'
 EOF
@@ -549,6 +663,7 @@ That means you can keep normal pi package settings such as \`npm:@ifi/oh-pi-them
 
 - pi version: ${PI_VERSION}
 - Node version: ${NODE_VERSION}
+- pi Node requirement: ${PI_NODE_ENGINE:-unknown}
 - created at: ${CREATED_AT}
 - manifest: ${MANIFEST_PATH}
 - manifest hash: ${MANIFEST_HASH}
@@ -624,6 +739,9 @@ main() {
     parse_args "$@"
     check_dependencies
     load_manifest
+    load_pi_package_metadata
+    resolve_bundled_node_version
+    validate_requested_node_version
 
     [[ -d "$OUTPUT_DIR" ]] || error "Output directory does not exist: $OUTPUT_DIR"
     OUTPUT_DIR="$(realpath "$OUTPUT_DIR")"
@@ -634,10 +752,15 @@ main() {
 
     log "Preparing offline pi bundle"
     log "Manifest: $MANIFEST_PATH"
+    log "pi version: $PI_VERSION"
+    if [[ -n "$PI_NODE_ENGINE" ]]; then
+        log "pi Node requirement: $PI_NODE_ENGINE"
+    fi
     log "Bundled Node version: $NODE_VERSION"
 
     setup_bundled_node
     copy_pi_runtime
+    verify_bundled_pi_runtime
     expose_pi_peer_packages
     install_manifest_packages
     create_manifest_files

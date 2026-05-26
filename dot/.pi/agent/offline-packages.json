@@ -1,5 +1,5 @@
 {
-  "nodeVersion": "20.11.1",
+  "nodeVersion": "22.19.0",
   "packages": [
     {
       "source": "npm:@ifi/oh-pi-themes"

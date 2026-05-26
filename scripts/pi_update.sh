@@ -38,7 +38,7 @@ Options:
 Examples:
   $(basename "$0")
   $(basename "$0") --force
-  $(basename "$0") --archive /mnt/share/pi/pi-v0.67.1-node20.11.1-offline-20260415_120000.tar.gz
+  $(basename "$0") --archive /mnt/share/pi/pi-v0.67.1-node22.19.0-offline-20260415_120000.tar.gz
 EOF
 }
 
@@ -124,12 +124,28 @@ verify_installation() {
         source "$TARGET_RUNTIME_DIR/manifest.env"
         log "Installed pi version: ${PI_VERSION:-unknown}"
         log "Bundled Node version: ${NODE_VERSION:-unknown}"
+        if [[ -n "${PI_NODE_ENGINE:-}" ]]; then
+            log "pi Node requirement: ${PI_NODE_ENGINE}"
+        fi
     fi
 
     if [[ -x "$TARGET_BIN_DIR/pi" ]]; then
         log "✓ pi wrapper installed at $TARGET_BIN_DIR/pi"
     else
         log "⚠ pi wrapper not found at $TARGET_BIN_DIR/pi"
+    fi
+
+    local startup_log="$TEMP_DIR/pi-startup-check.log"
+    mkdir -p "$TEMP_DIR/home"
+    if HOME="$TEMP_DIR/home" \
+        PATH="$TARGET_RUNTIME_DIR/node/bin:${PATH}" \
+        NPM_CONFIG_PREFIX="$TARGET_RUNTIME_DIR/node" \
+        npm_config_prefix="$TARGET_RUNTIME_DIR/node" \
+        "$TARGET_RUNTIME_DIR/node/bin/node" "$TARGET_RUNTIME_DIR/pi/dist/cli.js" --help >"$startup_log" 2>&1; then
+        log "✓ pi CLI startup check passed"
+    else
+        cat "$startup_log" >&2
+        error "pi failed to start after installation. Rebuild the offline archive with scripts/pi_package.sh using Node ${PI_MIN_NODE_VERSION:-compatible with this pi version} or newer."
     fi
 
     if [[ ":$PATH:" != *":$TARGET_BIN_DIR:"* ]]; then
