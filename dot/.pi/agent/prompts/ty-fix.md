@@ -1,5 +1,5 @@
 ---
-description: Run Ty for a component, fix reported errors properly, avoid checker-gaming workarounds, prefer correct type hints over Any, and treat Any as an extreme last resort
+description: Run Ty for a component, fix reported errors properly, avoid checker-gaming workarounds, prefer fixing real type hints and class contracts over Any or convenience Protocols, and treat Any as an extreme last resort
 argument-hint: "<component> [extra instructions]"
 ---
 Run Ty for component `$1` using:
@@ -13,8 +13,9 @@ ty.py --component $1
 Fix the reported Ty errors **correctly**.
 Do not merely silence diagnostics.
 Do not optimize for “Ty passes” at the expense of truthful types or sound code.
-Using `Any` is **strongly discouraged**: fix inaccurate type hints, add the right protocol/overload/helper, or narrow values locally instead.
+Using `Any` is **strongly discouraged**: fix inaccurate type hints, improve the real classes or base interfaces, add the right overload/helper, or narrow values locally instead.
 **Never, ever use `Any` or `cast(Any, ...)` as a convenience fix.** Treat them as an extreme last resort only in the rare cases where the behavior is genuinely dynamic and there is no truthful, maintainable alternative.
+Do not default to `Protocol` either. Prefer improving existing type hints, base classes, and shared class contracts when you control them; use a `Protocol` only for genuine structural typing boundaries, keep it minimal, and limit it to the real surface you need.
 If you are unsure what the correct fix is, stop and ask the user instead of guessing.
 
 ## Hard rules: do NOT game the checker
@@ -22,13 +23,14 @@ If you are unsure what the correct fix is, stop and ask the user instead of gues
 When fixing Ty errors, follow these rules strictly:
 
 - **Never use `Any` or `cast(Any, ...)` as a convenience fix. Fix the type hints, model the boundary correctly, or narrow the value instead.**
-- **Treat `Any` as an extreme last resort only when the behavior is genuinely dynamic/untyped and every more precise option (`Protocol`, `TypedDict`, overloads, wrappers, concrete unions, `object` + narrowing, etc.) has been ruled out.**
+- **Treat `Any` as an extreme last resort only when the behavior is genuinely dynamic/untyped and every more precise option (better class/base annotations, `Protocol`, `TypedDict`, overloads, wrappers, concrete unions, `object` + narrowing, etc.) has been ruled out.**
+- **Do not introduce a `Protocol` just to paper over incomplete parent/base class annotations or to avoid fixing the real class contract. Prefer improving the existing type hints, base classes, or shared APIs when you control them. If a `Protocol` is truly needed, keep it minimal and limited to the real structural surface.**
 - **Do not add unjustified `cast(...)`. A cast must reflect a real runtime invariant that already exists; it must not invent one.**
 - **Do not add fake narrowing checks (`assert`, `isinstance`, `hasattr`, `callable`, custom type guards/helpers, etc.) just to make Ty accept code. Narrowing must match a real runtime guarantee.**
 - **Do not change a type hint to something less accurate just to make Ty stop complaining.**
 - **Do not add broad unions or other weaker annotations unless they are actually true at runtime.**
 - **Do not erase type information by removing annotations, replacing explicit parameters with `*args` / `**kwargs`, or broadening to `object`, `dict[str, object]`, `list[object]`, and similar catch-all shapes unless that is the real contract.**
-- **Do not use `getattr` / `setattr` or other string-based attribute indirection as a checker workaround. If the attribute contract is real, model it explicitly with a base class, `Protocol`, wrapper, or local narrowing step.**
+- **Do not use `getattr` / `setattr` or other string-based attribute indirection as a checker workaround. If the attribute contract is real, model it explicitly with a base class or shared class contract first; use a `Protocol` only when the boundary is genuinely structural, or use a wrapper/local narrowing step.**
 - **Do not add `__getattr__`, `__getattribute__`, `__setattr__`, direct `__dict__` manipulation, or other dynamic attribute magic as a checker workaround.**
 - **Do not add over-permissive overloads, protocols, wrappers, or shims whose main purpose is to hide a mismatch instead of modeling the real contract.**
 - **Do not hide issues behind `if TYPE_CHECKING:`, dead branches, platform/version guards, or other checker-only control flow that makes Ty see a different program than runtime.**
@@ -40,10 +42,11 @@ When fixing Ty errors, follow these rules strictly:
 
 Prefer a real fix even if it requires:
 - a better type model,
+- more accurate class or base-interface annotations,
 - a more accurate function signature,
 - a small refactor,
 - a local narrowing step,
-- a small protocol or typed wrapper,
+- a small protocol or typed wrapper at a genuine structural boundary,
 - or a small API cleanup.
 
 A small rework that makes the code and types honest is **better** than a minimal checker workaround.
@@ -52,23 +55,26 @@ A small rework that makes the code and types honest is **better** than a minimal
 
 When enabling or fixing a Ty rule, use this order of preference:
 
-1. **Fix the model**: make the type or API contract accurate.
+1. **Fix the real model**: improve existing type hints, classes, or API contracts so they match runtime truth.
 2. **Narrow locally**: use truthful `assert`, `isinstance`, pattern matching, or a local variable before use.
 3. **Adapt the boundary**: normalize the value before calling another API.
-4. **Use a precise typing tool**: `Protocol`, `TypedDict`, overloads, type aliases, generics, wrapper/helper objects, or `object` plus narrowing.
-5. **Use `Any` or `cast(Any, ...)` only as an extreme last resort** for genuinely dynamic / generated / third-party behavior that cannot be modeled truthfully at reasonable cost.
-6. **Avoid broad ignores** unless there is no reasonable modeling option.
+4. **Improve shared abstractions you own**: base classes, common helpers, attribute annotations, overload boundaries, and return types.
+5. **Use a precise typing tool only when it is the truthful model**: `Protocol`, `TypedDict`, overloads, type aliases, generics, wrapper/helper objects, or `object` plus narrowing.
+6. **Use `Any` or `cast(Any, ...)` only as an extreme last resort** for genuinely dynamic / generated / third-party behavior that cannot be modeled truthfully at reasonable cost.
+7. **Avoid broad ignores** unless there is no reasonable modeling option.
 
 A good rule of thumb:
 - if the code is dynamic by design, isolate that dynamism in one place behind the smallest honest boundary;
 - if the code is merely ambiguous, narrow it before use;
 - if the existing type hints are inaccurate, fix them truthfully instead of weakening them;
-- if the type is unknown, prefer `object` plus narrowing or a small `Protocol` over `Any`;
+- if you own the class hierarchy, improve the real class or base annotations before inventing a `Protocol`;
+- if the type is unknown, prefer `object` plus narrowing, better class hints, or a small `Protocol` only at a genuine structural boundary over `Any`;
 - if a correct fix needs a small refactor, do the refactor rather than gaming the checker.
 
 When tempted to use `Any`, a broad annotation, or a cast, try one of these first:
+- fixing the existing class, base-class, or shared function annotation at the source,
 - the correct concrete type or optional type,
-- a small `Protocol` for the behavior you actually use,
+- a small `Protocol` for the behavior you actually use, but only if structural typing is truly the right model,
 - a `TypedDict` for dict-like payloads,
 - overloads or generics for polymorphic APIs,
 - `object` plus a local narrowing step,
@@ -81,8 +87,9 @@ When tempted to use `Any`, a broad annotation, or a cast, try one of these first
 2. Run `ty.py --component $1`.
 3. Group diagnostics by repeated rule/pattern.
 4. Fix shared abstractions first:
-   - base classes,
-   - protocol types,
+   - base classes and shared class contracts,
+   - existing type hints that should be corrected at the source,
+   - protocol types only when structural typing is truly the right abstraction,
    - helper wrappers,
    - overload boundaries,
    - inaccurate function signatures,
@@ -398,10 +405,10 @@ print(value)
 A variable or attribute is assigned a value that does not match its annotation.
 
 #### Preferred fix
-Adjust the annotation to match the real lifecycle, or change the stored value to match the existing annotation. If implementations vary but the used interface is stable, model that interface with a small `Protocol` instead of falling back to `Any`.
+Adjust the annotation to match the real lifecycle, or change the stored value to match the existing annotation. If implementations vary but the used interface is stable and there is no truthful shared base class or existing annotation you can improve, model that interface with a small `Protocol` instead of falling back to `Any`.
 
 #### Why
-A lot of legacy code initializes with `None` and later stores richer objects; the type should reflect that honestly. When only a small surface is relied on, a protocol is usually more truthful and maintainable than `Any`.
+A lot of legacy code initializes with `None` and later stores richer objects; the type should reflect that honestly. When only a small surface is relied on and the boundary is truly structural, a protocol is usually more truthful and maintainable than `Any`.
 
 #### Example
 ```python
@@ -453,9 +460,9 @@ Code accesses an attribute that Ty cannot prove exists.
 
 #### Preferred fix
 Use one of these, in order:
-1. add the missing attribute or method to the base class / protocol,
+1. add the missing attribute or method to the real base class or shared class hierarchy when you control it,
 2. assert the object is not `None` before access,
-3. isolate truly dynamic behavior behind a small `Protocol`, wrapper, or helper so the rest of the code stays typed,
+3. isolate truly dynamic behavior behind a small `Protocol`, wrapper, or helper only when the boundary is genuinely structural or external,
 4. use `Any` only as a last resort when the attribute surface is genuinely unknowable and external.
 
 #### Why
@@ -492,7 +499,7 @@ self.client.send(data)
 
 ### Dynamic / generated code
 For generated protocols, XML wrappers, RPC clients, instrument drivers, and similar code:
-- prefer a small `Protocol`, `TypedDict`, wrapper, adapter, or `object` + local narrowing around the dynamic handle,
+- prefer improving existing boundary annotations or adding a small typed wrapper/adapter; use a small `Protocol`, `TypedDict`, or `object` + local narrowing only when that is the truthful model for the dynamic handle,
 - keep any unavoidable escape hatch at the narrowest possible boundary,
 - do **not** turn the whole module into `Any`,
 - and if `Any` is truly unavoidable, document briefly why the boundary cannot be modeled more precisely.
@@ -534,6 +541,7 @@ These are usually **bad fixes** unless the runtime behavior truly justifies them
 
 - changing `Foo | None` to `Any` only because dereferences fail,
 - replacing a missing protocol, typed wrapper, or local narrowing step with `Any`,
+- introducing a `Protocol` for a class hierarchy you own just to avoid fixing incomplete base-class or parent type hints,
 - adding `cast(Foo, x)` when no real invariant proves `x` is a `Foo`,
 - using `cast(Any, ...)` where `assert`, `isinstance`, or `cast(ConcreteType, ...)` would be truthful,
 - adding fake `assert` / `isinstance` / `hasattr` / `callable` / custom TypeGuard-style logic purely to convince Ty,
