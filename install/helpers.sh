@@ -92,10 +92,11 @@ get_github_latest_tag() {
 # Extract version number from a version string (strips leading 'v' and extra info)
 # Usage: normalize_version "v1.2.3" -> "1.2.3"
 #        normalize_version "NVIM v0.11.5" -> "0.11.5"
+#        normalize_version "tmux 3.6b" -> "3.6b"
 normalize_version() {
     local version="$1"
-    # Extract version number: find pattern like v1.2.3 or 1.2.3 and strip the 'v'
-    echo "$version" | grep -oE 'v?[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 | sed 's/^v//'
+    # Preserve letter-suffixed releases like tmux 3.6a/3.6b.
+    echo "$version" | grep -oE 'v?[0-9]+\.[0-9]+(\.[0-9]+)?([a-z]+)?' | head -n1 | sed 's/^v//'
 }
 
 # Install a binary from a GitHub release tarball to ~/.local/bin
