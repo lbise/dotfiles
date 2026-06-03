@@ -84,6 +84,7 @@ install_tree_sitter() {
     local local_bin="$HOME/.local/bin/tree-sitter"
     local existing_bin=""
     local version=""
+    local tmp_dir=""
 
     for candidate in "$local_bin" "$(command -v tree-sitter 2>/dev/null || true)"; do
         [[ -z "$candidate" ]] && continue
@@ -110,7 +111,7 @@ install_tree_sitter() {
     fi
 
     local repo="tree-sitter/tree-sitter"
-    local os arch tag target binary_url tmp_dir version_output
+    local os arch tag target binary_url version_output
 
     os=$(get_os) || return 1
     arch=$(get_arch) || return 1
@@ -145,7 +146,7 @@ install_tree_sitter() {
 
     binary_url="https://github.com/${repo}/releases/download/${tag}/tree-sitter-${target}.gz"
     tmp_dir=$(mktemp -d)
-    trap 'rm -rf "$tmp_dir"' RETURN
+    trap 'rm -rf "${tmp_dir:-}"; trap - RETURN' RETURN
 
     echo "Downloading from $binary_url..."
     mkdir -p "$(dirname "$local_bin")"
