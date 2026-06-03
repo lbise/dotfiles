@@ -12,7 +12,6 @@ local settings = {
 			"clangd",
 			-- Specific version required for work
 			"ruff@0.15.9",
-			"basedpyright",
 			"lua-language-server",
 			"stylua",
 			"ty",
