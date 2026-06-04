@@ -148,9 +148,9 @@ install_github_release() {
     echo "Downloading from $tarball_url..."
 
     # Create temporary directory for extraction
-    local tmp_dir
+    local tmp_dir=""
     tmp_dir=$(mktemp -d)
-    trap 'rm -rf "$tmp_dir"' RETURN
+    trap 'rm -rf "${tmp_dir:-}"; trap - RETURN' RETURN
 
     # Download and extract
     if ! curl -fsSL "$tarball_url" | tar -xz -C "$tmp_dir"; then
