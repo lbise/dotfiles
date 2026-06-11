@@ -103,9 +103,39 @@ type SessionModel = {
   providerID?: string
 }
 
+type SessionPart = {
+  id: string
+  sessionID: string
+  messageID: string
+  type: string
+  text?: string
+  cost?: number
+  [key: string]: unknown
+}
+
+type SessionTextPart = SessionPart & {
+  type: "text"
+  text: string
+}
+
+type SessionMessage = {
+  info: {
+    role: string
+  }
+  parts: SessionPart[]
+}
+
+type OpencodeClient = {
+  session: {
+    get: (options: { path: { id: string } }) => Promise<{ data?: { modelID?: string; model?: unknown } }>
+    message: (options: { path: { id: string; messageID: string } }) => Promise<{ data?: SessionMessage }>
+  }
+}
+
 const CACHE_TTL_MS = 5 * 60 * 1000
 const GITHUB_API_BASE = "https://api.github.com"
 const CAPI_BASE = "https://api.githubcopilot.com"
+const processedMessages = new Set<string>()
 
 function authPaths() {
   const home = homedir()
@@ -160,6 +190,49 @@ function isGitHubCopilotModel(model: SessionModel | undefined): model is Session
 function formatCost(value: number | undefined): string | null {
   if (typeof value !== "number") return null
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)))
+}
+
+function formatEstimatedTurnAic(value: number | undefined): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null
+  const aic = value * 100
+  const digits = aic > 0 && aic < 0.01 ? 4 : aic < 1 ? 2 : 1
+  return `~${aic.toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })} AIC`
+}
+
+function withTurnCost(line: string, cost: number): string {
+  const formatted = formatEstimatedTurnAic(cost)
+  if (!formatted) return line
+
+  const turn = `turn ${formatted} est`
+  const cleaned = line.replace(/ \| turn (?:~?\$[\d,.]+|~?[\d,.]+ AIC) est/g, "")
+  const modelSeparator = " | model "
+  if (cleaned.includes(modelSeparator)) {
+    return cleaned.replace(modelSeparator, ` | ${turn}${modelSeparator}`)
+  }
+  return `${cleaned} | ${turn}`
+}
+
+function upsertTurnCost(text: string, cost: number, usageLine: string): string {
+  const footerIndex = text.lastIndexOf("\n\nCopilot: ")
+  const nextLineIndex = footerIndex >= 0 ? text.indexOf("\n\n", footerIndex + 2) : -1
+  const replacement = withTurnCost(footerIndex >= 0 ? text.slice(footerIndex + 2, nextLineIndex >= 0 ? nextLineIndex : undefined) : usageLine, cost)
+
+  if (footerIndex < 0) return `${text}\n\n${replacement}`
+  if (nextLineIndex < 0) return `${text.slice(0, footerIndex + 2)}${replacement}`
+  return `${text.slice(0, footerIndex + 2)}${replacement}${text.slice(nextLineIndex)}`
+}
+
+function totalStepCost(parts: SessionPart[], fallback: number | undefined): number | undefined {
+  const total = parts.reduce((sum, part) => sum + (part.type === "step-finish" && typeof part.cost === "number" ? part.cost : 0), 0)
+  return total > 0 ? total : fallback
+}
+
+function footerTextPart(parts: SessionPart[]): SessionTextPart | undefined {
+  const textParts = parts.filter((part): part is SessionTextPart => part.type === "text" && typeof part.text === "string")
+  return [...textParts].reverse().find((part) => part.text.includes("\n\nCopilot: ")) || textParts[textParts.length - 1]
 }
 
 function tokenPrices(model: CopilotModel): CopilotTokenPrices | undefined {
@@ -372,7 +445,7 @@ function parseSessionModel(value: unknown): SessionModel | undefined {
   return id ? { id, providerID } : undefined
 }
 
-async function readCurrentSessionModel(client: { session: { get: (options: { path: { id: string } }) => Promise<{ data?: { modelID?: string; model?: unknown } }> } }, sessionID: string): Promise<SessionModel | undefined> {
+async function readCurrentSessionModel(client: OpencodeClient, sessionID: string): Promise<SessionModel | undefined> {
   try {
     const result = await client.session.get({ path: { id: sessionID } })
     const session = result.data
@@ -479,9 +552,33 @@ async function fetchUsageLine(currentModelID: string): Promise<string> {
   }
 }
 
-export const CopilotUsagePlugin: Plugin = async ({ client }) => {
+async function updateTextPart(serverUrl: URL, part: SessionTextPart, text: string): Promise<void> {
+  const url = new URL(`/session/${encodeURIComponent(part.sessionID)}/message/${encodeURIComponent(part.messageID)}/part/${encodeURIComponent(part.id)}`, serverUrl)
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ...part, text }),
+  })
+  if (!response.ok) throw new Error(`update part failed: ${response.status}`)
+}
+
+const CopilotUsagePlugin: Plugin = async ({ client, serverUrl }) => {
   let cached: UsageSnapshot | undefined
-  const processedParts = new Set<string>()
+
+  async function cachedUsageLine(sessionID: string, currentModel: SessionModel): Promise<string> {
+    const now = Date.now()
+    const cacheKey = `${sessionID}:${currentModel.providerID || ""}/${currentModel.id}`
+    if (!cached || cached.key !== cacheKey || now - cached.fetchedAt > CACHE_TTL_MS) {
+      cached = {
+        key: cacheKey,
+        line: await fetchUsageLine(currentModel.id),
+        fetchedAt: now,
+      }
+    }
+    return cached.line
+  }
 
   return {
     tool: {
@@ -491,9 +588,42 @@ export const CopilotUsagePlugin: Plugin = async ({ client }) => {
         execute: buildModelCostsOutput,
       }),
     },
+    event: async ({ event }) => {
+      if (event.type !== "message.part.updated") return
+
+      const part = event.properties.part as SessionPart
+      if (part.type !== "step-finish") return
+
+      try {
+        const currentModel = await readCurrentSessionModel(client, part.sessionID)
+        if (!isGitHubCopilotModel(currentModel)) return
+
+        const { data: message } = await client.session.message({
+          path: {
+            id: part.sessionID,
+            messageID: part.messageID,
+          },
+        })
+        if (!message || message.info.role !== "assistant") return
+
+        const cost = totalStepCost(message.parts, part.cost)
+        if (typeof cost !== "number") return
+
+        const textPart = footerTextPart(message.parts)
+        if (!textPart) return
+
+        const usage = await cachedUsageLine(part.sessionID, currentModel)
+        const text = upsertTurnCost(textPart.text, cost, usage)
+        if (text === textPart.text) return
+
+        await updateTextPart(serverUrl, textPart, text)
+      } catch {
+        return
+      }
+    },
     "experimental.text.complete": async (input, output) => {
-      const processedKey = `${input.messageID}:${input.partID}`
-      if (processedParts.has(processedKey)) return
+      const processedKey = `${input.sessionID}:${input.messageID}`
+      if (processedMessages.has(processedKey)) return
 
       const { data: message } = await client.session.message({
         path: {
@@ -511,34 +641,13 @@ export const CopilotUsagePlugin: Plugin = async ({ client }) => {
 
       const currentModel = await readCurrentSessionModel(client, input.sessionID)
       if (!isGitHubCopilotModel(currentModel)) {
-        processedParts.add(processedKey)
         return
       }
+      if (processedMessages.has(processedKey)) return
+      processedMessages.add(processedKey)
 
-      const now = Date.now()
-      const cacheKey = `${input.sessionID}:${currentModel.providerID || ""}/${currentModel.id}`
-      if (!cached || cached.key !== cacheKey || now - cached.fetchedAt > CACHE_TTL_MS) {
-        cached = {
-          key: cacheKey,
-          line: await fetchUsageLine(currentModel.id),
-          fetchedAt: now,
-        }
-      }
-
-      output.text += `\n\n${cached.line}`
-      processedParts.add(processedKey)
-    },
-  }
-}
-
-export const CopilotModelCostsPlugin: Plugin = async () => {
-  return {
-    tool: {
-      copilot_model_costs: tool({
-        description: "Lists GitHub Copilot model billing metadata available locally",
-        args: {},
-        execute: buildModelCostsOutput,
-      }),
+      if (output.text.includes("\n\nCopilot: ")) return
+      output.text += `\n\n${await cachedUsageLine(input.sessionID, currentModel)}`
     },
   }
 }
