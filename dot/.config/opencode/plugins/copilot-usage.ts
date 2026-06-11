@@ -172,15 +172,10 @@ function formatResetDate(value: string | undefined): string | null {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
   return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
   }).format(parsed)
-}
-
-function normalizeModelID(modelID: string): string {
-  const parts = modelID.split("/")
-  return parts[parts.length - 1] || modelID
 }
 
 function isGitHubCopilotModel(model: SessionModel | undefined): model is SessionModel {
@@ -207,11 +202,7 @@ function withTurnCost(line: string, cost: number): string {
   if (!formatted) return line
 
   const turn = `turn ${formatted} est`
-  const cleaned = line.replace(/ \| turn (?:~?\$[\d,.]+|~?[\d,.]+ AIC) est/g, "")
-  const modelSeparator = " | model "
-  if (cleaned.includes(modelSeparator)) {
-    return cleaned.replace(modelSeparator, ` | ${turn}${modelSeparator}`)
-  }
+  const cleaned = line.replace(/ \| turn (?:~?\$[\d,.]+|~?[\d,.]+ AIC) est/g, "").replace(/ \| model .*/, "")
   return `${cleaned} | ${turn}`
 }
 
@@ -272,30 +263,6 @@ function describeTokenPrices(model: CopilotModel): string | null {
 
 function hasTokenPrices(model: CopilotModel): boolean {
   return describeTokenPrices(model) !== null
-}
-
-function describeCurrentModel(modelID: string | undefined, models: CopilotModel[]): string | null {
-  if (!modelID) return null
-  const normalizedModelID = normalizeModelID(modelID)
-  const model = models.find((item) => item.id === modelID || item.id === normalizedModelID)
-  if (!model) return null
-
-  const details: string[] = []
-  if (model.billing?.is_premium === true) details.push("premium")
-  if (model.billing?.is_premium === false) details.push("standard")
-  if (typeof model.billing?.multiplier === "number") details.push(`x${model.billing.multiplier}`)
-  const pricing = describeTokenPrices(model)
-  if (pricing) details.push(pricing)
-
-  const context = formatNumber(model.capabilities?.limits?.max_context_window_tokens)
-  const prompt = formatNumber(model.capabilities?.limits?.max_prompt_tokens)
-  const output = formatNumber(model.capabilities?.limits?.max_output_tokens)
-  if (context) details.push(`ctx ${context}`)
-  if (prompt) details.push(`in ${prompt}`)
-  if (output) details.push(`out ${output}`)
-
-  if (details.length === 0) return model.name || model.id || modelID
-  return `${model.name || model.id || modelID}: ${details.join(" | ")}`
 }
 
 function describeModelLine(model: CopilotModel): string {
@@ -536,17 +503,14 @@ async function fetchCopilotModels(token: string, apiBase?: string): Promise<Mode
   return { models: [], source: "none", pricingAvailable: false }
 }
 
-async function fetchUsageLine(currentModelID: string): Promise<string> {
+async function fetchUsageLine(): Promise<string> {
   const auth = await readAuth()
   const token = auth?.["github-copilot"]?.access || auth?.github?.access
   if (!token) return "Copilot usage unavailable (missing GitHub auth)"
 
   try {
     const data = (await fetchJSON("https://api.github.com/copilot_internal/user", token)) as CopilotUserInfo
-    const metadata = await fetchCopilotModels(token, data.endpoints?.api)
-    const currentModel = describeCurrentModel(currentModelID, metadata.models)
-    const usage = buildUsageLine(data)
-    return currentModel ? `${usage} | model ${currentModel}` : usage
+    return buildUsageLine(data)
   } catch {
     return "Copilot usage unavailable (request failed)"
   }
@@ -567,13 +531,13 @@ async function updateTextPart(serverUrl: URL, part: SessionTextPart, text: strin
 const CopilotUsagePlugin: Plugin = async ({ client, serverUrl }) => {
   let cached: UsageSnapshot | undefined
 
-  async function cachedUsageLine(sessionID: string, currentModel: SessionModel): Promise<string> {
+  async function cachedUsageLine(sessionID: string): Promise<string> {
     const now = Date.now()
-    const cacheKey = `${sessionID}:${currentModel.providerID || ""}/${currentModel.id}`
+    const cacheKey = sessionID
     if (!cached || cached.key !== cacheKey || now - cached.fetchedAt > CACHE_TTL_MS) {
       cached = {
         key: cacheKey,
-        line: await fetchUsageLine(currentModel.id),
+        line: await fetchUsageLine(),
         fetchedAt: now,
       }
     }
@@ -612,7 +576,7 @@ const CopilotUsagePlugin: Plugin = async ({ client, serverUrl }) => {
         const textPart = footerTextPart(message.parts)
         if (!textPart) return
 
-        const usage = await cachedUsageLine(part.sessionID, currentModel)
+        const usage = await cachedUsageLine(part.sessionID)
         const text = upsertTurnCost(textPart.text, cost, usage)
         if (text === textPart.text) return
 
@@ -647,7 +611,7 @@ const CopilotUsagePlugin: Plugin = async ({ client, serverUrl }) => {
       processedMessages.add(processedKey)
 
       if (output.text.includes("\n\nCopilot: ")) return
-      output.text += `\n\n${await cachedUsageLine(input.sessionID, currentModel)}`
+      output.text += `\n\n${await cachedUsageLine(input.sessionID)}`
     },
   }
 }
