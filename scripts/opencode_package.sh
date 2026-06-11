@@ -203,17 +203,11 @@ STAGING_OPENCODE_DIR="${TARGET_OPENCODE_DIR}.tmp.$$"
 STAGING_CACHE_DIR="${TARGET_CACHE_DIR}.tmp.$$"
 BACKUP_OPENCODE_DIR="${TARGET_OPENCODE_DIR}.old.$$"
 BACKUP_CACHE_DIR="${TARGET_CACHE_DIR}.old.$$"
+TARGET_WRAPPER="$TARGET_OPENCODE_DIR/bin/opencode"
+TARGET_REAL_BIN="$TARGET_OPENCODE_DIR/bin/opencode.real"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
-}
-
-run_opencode_version() {
-    if command -v timeout >/dev/null 2>&1; then
-        timeout 20s "$TARGET_BIN_DIR/opencode" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
-    else
-        "$TARGET_BIN_DIR/opencode" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
-    fi
 }
 
 package_version() {
@@ -272,12 +266,16 @@ if [[ -d "$SOURCE_CONFIG_DIR/node_modules" ]]; then
 fi
 
 log "Installing opencode launcher wrapper"
-cat > "$TARGET_BIN_DIR/opencode" <<'LAUNCHER_EOF'
+if [[ ! -x "$TARGET_REAL_BIN" ]]; then
+    mv "$TARGET_WRAPPER" "$TARGET_REAL_BIN"
+fi
+cat > "$TARGET_WRAPPER" <<'LAUNCHER_EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
 TARGET_OPENCODE_DIR="$HOME/.opencode"
 TARGET_CACHE_DIR="$HOME/.cache/opencode"
+TARGET_REAL_BIN="$TARGET_OPENCODE_DIR/bin/opencode.real"
 
 if [[ -f "$TARGET_CACHE_DIR/models.json" ]]; then
     if [[ -z "${OPENCODE_MODELS_PATH+x}" ]]; then
@@ -292,27 +290,25 @@ if [[ -z "${OPENCODE_DISABLE_AUTOUPDATE+x}" ]]; then
     export OPENCODE_DISABLE_AUTOUPDATE=1
 fi
 
-exec "$TARGET_OPENCODE_DIR/bin/opencode" "$@"
+exec "$TARGET_REAL_BIN" "$@"
 LAUNCHER_EOF
-chmod +x "$TARGET_BIN_DIR/opencode"
+chmod +x "$TARGET_WRAPPER"
+ln -sfn "$TARGET_WRAPPER" "$TARGET_BIN_DIR/opencode"
 
-if [[ ! -x "$TARGET_OPENCODE_DIR/bin/opencode" ]]; then
-    echo "ERROR: Installed opencode binary is missing or not executable" >&2
+if [[ ! -x "$TARGET_WRAPPER" || ! -x "$TARGET_REAL_BIN" ]]; then
+    echo "ERROR: Installed opencode launcher or real binary is missing or not executable" >&2
     exit 1
 fi
 
-installed_version="$(run_opencode_version)"
-if [[ -z "$installed_version" ]]; then
-    installed_version="$(package_version)"
-    echo "WARNING: opencode startup check did not return a version within 20s; using package manifest version." >&2
-fi
+installed_version="$(package_version)"
 echo "Installed opencode ${installed_version:-unknown}"
 echo "Runtime installed to: $TARGET_OPENCODE_DIR"
 echo "Cache installed to: $TARGET_CACHE_DIR"
 if [[ -d "$SOURCE_CONFIG_DIR/node_modules" ]]; then
     echo "Config dependencies installed to: $TARGET_CONFIG_DIR/node_modules"
 fi
-echo "Launcher installed to: $TARGET_BIN_DIR/opencode"
+echo "Launcher installed to: $TARGET_WRAPPER"
+echo "PATH launcher installed to: $TARGET_BIN_DIR/opencode"
 if [[ -f "$TARGET_CACHE_DIR/models.json" ]]; then
     echo "Packaged models catalog enabled: $TARGET_CACHE_DIR/models.json"
 fi

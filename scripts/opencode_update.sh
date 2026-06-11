@@ -10,6 +10,7 @@ TEMP_DIR=""
 TARGET_OPENCODE_DIR="$HOME/.opencode"
 TARGET_CACHE_DIR="$HOME/.cache/opencode"
 TARGET_BIN_DIR="$HOME/.local/bin"
+TARGET_REAL_BIN="$TARGET_OPENCODE_DIR/bin/opencode.real"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
@@ -59,20 +60,6 @@ check_dependencies() {
         ensure_command "$cmd"
     done
     log "✓ Dependencies available"
-}
-
-run_opencode_version() {
-    local launcher="$TARGET_BIN_DIR/opencode"
-    local command_path="$TARGET_OPENCODE_DIR/bin/opencode"
-    if [[ -x "$launcher" ]]; then
-        command_path="$launcher"
-    fi
-
-    if command -v timeout >/dev/null 2>&1; then
-        timeout 20s "$command_path" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
-    else
-        "$command_path" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
-    fi
 }
 
 package_version() {
@@ -144,6 +131,7 @@ install_archive() {
 
 verify_installation() {
     [[ -x "$TARGET_OPENCODE_DIR/bin/opencode" ]] || error "opencode binary not found at $TARGET_OPENCODE_DIR/bin/opencode"
+    [[ -x "$TARGET_REAL_BIN" ]] || error "opencode real binary not found at $TARGET_REAL_BIN"
 
     if [[ -x "$TARGET_BIN_DIR/opencode" ]]; then
         log "✓ opencode launcher installed at $TARGET_BIN_DIR/opencode"
@@ -152,12 +140,8 @@ verify_installation() {
     fi
 
     local installed_version
-    installed_version="$(run_opencode_version)"
-    if [[ -z "$installed_version" ]]; then
-        installed_version="$(package_version)"
-        log "⚠ opencode startup check did not return a version within 20s; using package manifest version"
-    fi
-    [[ -n "$installed_version" ]] || error "opencode installed, but version is unavailable from both startup check and manifest"
+    installed_version="$(package_version)"
+    [[ -n "$installed_version" ]] || error "opencode installed, but version is unavailable from manifest"
 
     log "Installed opencode version: $installed_version"
 
