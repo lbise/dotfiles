@@ -75,6 +75,15 @@ run_opencode_version() {
     fi
 }
 
+package_version() {
+    local manifest_file="$TARGET_OPENCODE_DIR/manifest.env"
+    if [[ -f "$manifest_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$manifest_file"
+        printf '%s\n' "${OPENCODE_VERSION:-}"
+    fi
+}
+
 find_latest_archive() {
     if [[ ! -d "$ARCHIVES_DIR" ]]; then
         log "Archive directory not accessible, attempting to mount: $ARCHIVES_DIR"
@@ -144,7 +153,11 @@ verify_installation() {
 
     local installed_version
     installed_version="$(run_opencode_version)"
-    [[ -n "$installed_version" ]] || error "opencode failed to start after installation"
+    if [[ -z "$installed_version" ]]; then
+        installed_version="$(package_version)"
+        log "⚠ opencode startup check did not return a version within 20s; using package manifest version"
+    fi
+    [[ -n "$installed_version" ]] || error "opencode installed, but version is unavailable from both startup check and manifest"
 
     log "Installed opencode version: $installed_version"
 

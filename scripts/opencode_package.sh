@@ -216,6 +216,15 @@ run_opencode_version() {
     fi
 }
 
+package_version() {
+    local manifest="$TARGET_OPENCODE_DIR/manifest.env"
+    if [[ -f "$manifest" ]]; then
+        # shellcheck disable=SC1090
+        source "$manifest"
+        printf '%s\n' "${OPENCODE_VERSION:-}"
+    fi
+}
+
 if [[ ! -d "$SOURCE_OPENCODE_DIR" ]]; then
     echo "ERROR: Could not find .opencode directory next to install.sh" >&2
     exit 1
@@ -279,6 +288,10 @@ if [[ -f "$TARGET_CACHE_DIR/models.json" ]]; then
     fi
 fi
 
+if [[ -z "${OPENCODE_DISABLE_AUTOUPDATE+x}" ]]; then
+    export OPENCODE_DISABLE_AUTOUPDATE=1
+fi
+
 exec "$TARGET_OPENCODE_DIR/bin/opencode" "$@"
 LAUNCHER_EOF
 chmod +x "$TARGET_BIN_DIR/opencode"
@@ -289,6 +302,10 @@ if [[ ! -x "$TARGET_OPENCODE_DIR/bin/opencode" ]]; then
 fi
 
 installed_version="$(run_opencode_version)"
+if [[ -z "$installed_version" ]]; then
+    installed_version="$(package_version)"
+    echo "WARNING: opencode startup check did not return a version within 20s; using package manifest version." >&2
+fi
 echo "Installed opencode ${installed_version:-unknown}"
 echo "Runtime installed to: $TARGET_OPENCODE_DIR"
 echo "Cache installed to: $TARGET_CACHE_DIR"
