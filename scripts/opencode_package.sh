@@ -15,6 +15,7 @@ TEMP_DIR=""
 CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 PACKAGE_HASH=""
 OPENCODE_VERSION=""
+CONFIG_DEPS_INCLUDED=false
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
@@ -32,6 +33,7 @@ Usage: $(basename "$0") [OPTIONS] [output_directory]
 Create an offline opencode bundle containing:
 - ~/.opencode/ (binary and local opencode-managed packages)
 - ~/.cache/opencode/ (cached dependencies and downloaded tools)
+- ~/.config/opencode/node_modules and lockfiles when present
 - an install.sh helper for target machines without npm access
 
 Options:
@@ -82,6 +84,16 @@ resolve_opencode_cache() {
     printf '%s\n' "$cache_dir"
 }
 
+resolve_opencode_config_dir() {
+    local config_dir="$HOME/.config/opencode"
+    if [[ -f "$config_dir/package.json" && -d "$config_dir/node_modules" ]]; then
+        printf '%s\n' "$config_dir"
+        return 0
+    fi
+
+    printf '\n'
+}
+
 load_opencode_metadata() {
     local opencode_home="$1"
 
@@ -97,13 +109,35 @@ compute_package_hash() {
     local stage_root="$1"
     (
         cd "$stage_root"
-        tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -cf - .opencode .cache/opencode
+        local hash_paths=(.opencode .cache/opencode)
+        if [[ -d .config/opencode/node_modules ]]; then
+            hash_paths+=(.config/opencode)
+        fi
+        tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -cf - "${hash_paths[@]}"
     ) | sha256sum | awk '{print $1}'
+}
+
+stage_config_deps() {
+    local config_dir="$1"
+    [[ -n "$config_dir" ]] || return 0
+
+    mkdir -p "$TEMP_DIR/.config/opencode"
+    cp -a "$config_dir/node_modules" "$TEMP_DIR/.config/opencode/node_modules"
+
+    local extra_file
+    for extra_file in package.json package-lock.json bun.lock; do
+        if [[ -f "$config_dir/$extra_file" ]]; then
+            cp -a "$config_dir/$extra_file" "$TEMP_DIR/.config/opencode/$extra_file"
+        fi
+    done
+
+    CONFIG_DEPS_INCLUDED=true
 }
 
 stage_runtime() {
     local opencode_home="$1"
     local cache_dir="$2"
+    local config_dir="$3"
 
     TEMP_DIR="$(mktemp -d)"
     trap cleanup EXIT
@@ -111,6 +145,7 @@ stage_runtime() {
     mkdir -p "$TEMP_DIR/.cache"
     cp -a "$opencode_home" "$TEMP_DIR/.opencode"
     cp -a "$cache_dir" "$TEMP_DIR/.cache/opencode"
+    stage_config_deps "$config_dir"
 
     PACKAGE_HASH="$(compute_package_hash "$TEMP_DIR")"
 
@@ -132,8 +167,10 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_OPENCODE_DIR="$SCRIPT_DIR/.opencode"
 SOURCE_CACHE_DIR="$SCRIPT_DIR/.cache/opencode"
+SOURCE_CONFIG_DIR="$SCRIPT_DIR/.config/opencode"
 TARGET_OPENCODE_DIR="$HOME/.opencode"
 TARGET_CACHE_DIR="$HOME/.cache/opencode"
+TARGET_CONFIG_DIR="$HOME/.config/opencode"
 TARGET_BIN_DIR="$HOME/.local/bin"
 STAGING_OPENCODE_DIR="${TARGET_OPENCODE_DIR}.tmp.$$"
 STAGING_CACHE_DIR="${TARGET_CACHE_DIR}.tmp.$$"
@@ -158,6 +195,19 @@ rm -rf "$TARGET_OPENCODE_DIR" "$TARGET_CACHE_DIR"
 mv "$STAGING_OPENCODE_DIR" "$TARGET_OPENCODE_DIR"
 mv "$STAGING_CACHE_DIR" "$TARGET_CACHE_DIR"
 
+if [[ -d "$SOURCE_CONFIG_DIR/node_modules" ]]; then
+    mkdir -p "$TARGET_CONFIG_DIR"
+    rm -rf "$TARGET_CONFIG_DIR/node_modules"
+    cp -a "$SOURCE_CONFIG_DIR/node_modules" "$TARGET_CONFIG_DIR/node_modules"
+
+    config_file=""
+    for config_file in package.json package-lock.json bun.lock; do
+        if [[ -f "$SOURCE_CONFIG_DIR/$config_file" ]]; then
+            cp -a "$SOURCE_CONFIG_DIR/$config_file" "$TARGET_CONFIG_DIR/$config_file"
+        fi
+    done
+fi
+
 ln -sfn "$TARGET_OPENCODE_DIR/bin/opencode" "$TARGET_BIN_DIR/opencode"
 
 if [[ ! -x "$TARGET_OPENCODE_DIR/bin/opencode" ]]; then
@@ -169,6 +219,9 @@ installed_version="$($TARGET_OPENCODE_DIR/bin/opencode --version 2>/dev/null | h
 echo "Installed opencode ${installed_version:-unknown}"
 echo "Runtime installed to: $TARGET_OPENCODE_DIR"
 echo "Cache installed to: $TARGET_CACHE_DIR"
+if [[ -d "$SOURCE_CONFIG_DIR/node_modules" ]]; then
+    echo "Config dependencies installed to: $TARGET_CONFIG_DIR/node_modules"
+fi
 echo "Launcher installed to: $TARGET_BIN_DIR/opencode"
 
 if [[ ":$PATH:" != *":$TARGET_BIN_DIR:"* ]]; then
@@ -190,6 +243,7 @@ This archive contains an offline opencode runtime bundle.
 
 - \.opencode/ with the opencode binary and local opencode-managed packages
 - \.cache/opencode/ with cached dependencies and downloaded tools
+- \.config/opencode/node_modules plus package manager files when config plugin deps are present
 - install.sh to install the bundle on a machine without npm access
 
 ## Installation
@@ -212,7 +266,8 @@ This package intentionally does not include user data such as:
 
 - ~/.local/share/opencode
 - ~/.local/state/opencode
-- ~/.config/opencode
+
+It also does not overwrite config content such as \`opencode.json\`, plugins, commands, or skills. When config-side npm dependencies are present on the packaging machine, the installer only refreshes \`~/.config/opencode/node_modules\` and related lockfiles.
 
 ## Package Metadata
 
@@ -286,11 +341,12 @@ main() {
     [[ -d "$OUTPUT_DIR" ]] || error "Output directory does not exist: $OUTPUT_DIR"
     OUTPUT_DIR="$(realpath "$OUTPUT_DIR")"
 
-    local opencode_home cache_dir
+    local opencode_home cache_dir config_dir
     opencode_home="$(resolve_opencode_home)"
     cache_dir="$(resolve_opencode_cache)"
+    config_dir="$(resolve_opencode_config_dir)"
     load_opencode_metadata "$opencode_home"
-    stage_runtime "$opencode_home" "$cache_dir"
+    stage_runtime "$opencode_home" "$cache_dir" "$config_dir"
     create_install_script
     create_readme
 
@@ -299,7 +355,11 @@ main() {
     log "Creating tarball: $PACKAGE_NAME"
     (
         cd "$TEMP_DIR"
-        tar -czf "$PACKAGE_OUTPUT_PATH" .opencode .cache install.sh README.md manifest.env
+        local tar_paths=(.opencode .cache install.sh README.md manifest.env)
+        if [[ -d .config/opencode/node_modules ]]; then
+            tar_paths+=(.config)
+        fi
+        tar -czf "$PACKAGE_OUTPUT_PATH" "${tar_paths[@]}"
     )
 
     publish_archive
