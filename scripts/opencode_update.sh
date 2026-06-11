@@ -61,6 +61,20 @@ check_dependencies() {
     log "✓ Dependencies available"
 }
 
+run_opencode_version() {
+    local launcher="$TARGET_BIN_DIR/opencode"
+    local command_path="$TARGET_OPENCODE_DIR/bin/opencode"
+    if [[ -x "$launcher" ]]; then
+        command_path="$launcher"
+    fi
+
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 20s "$command_path" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
+    else
+        "$command_path" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
+    fi
+}
+
 find_latest_archive() {
     if [[ ! -d "$ARCHIVES_DIR" ]]; then
         log "Archive directory not accessible, attempting to mount: $ARCHIVES_DIR"
@@ -116,19 +130,20 @@ install_archive() {
         cd "$TEMP_DIR"
         ./install.sh
     )
+    log "Archive installer finished"
 }
 
 verify_installation() {
     [[ -x "$TARGET_OPENCODE_DIR/bin/opencode" ]] || error "opencode binary not found at $TARGET_OPENCODE_DIR/bin/opencode"
 
-    if [[ -L "$TARGET_BIN_DIR/opencode" ]]; then
+    if [[ -x "$TARGET_BIN_DIR/opencode" ]]; then
         log "✓ opencode launcher installed at $TARGET_BIN_DIR/opencode"
     else
-        log "⚠ opencode launcher is not a symlink at $TARGET_BIN_DIR/opencode"
+        log "⚠ opencode launcher is missing or not executable at $TARGET_BIN_DIR/opencode"
     fi
 
     local installed_version
-    installed_version="$("$TARGET_OPENCODE_DIR/bin/opencode" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
+    installed_version="$(run_opencode_version)"
     [[ -n "$installed_version" ]] || error "opencode failed to start after installation"
 
     log "Installed opencode version: $installed_version"

@@ -16,6 +16,7 @@ CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 PACKAGE_HASH=""
 OPENCODE_VERSION=""
 CONFIG_DEPS_INCLUDED=false
+MODELS_CACHE_INCLUDED=false
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
@@ -33,6 +34,7 @@ Usage: $(basename "$0") [OPTIONS] [output_directory]
 Create an offline opencode bundle containing:
 - ~/.opencode/ (binary and local opencode-managed packages)
 - ~/.cache/opencode/ (cached dependencies and downloaded tools)
+- ~/.cache/opencode/models.json (cached models.dev catalog for proxied/offline machines)
 - ~/.config/opencode/node_modules and lockfiles when present
 - an install.sh helper for target machines without npm access
 
@@ -105,6 +107,27 @@ load_opencode_metadata() {
     fi
 }
 
+ensure_models_cache() {
+    local opencode_home="$1"
+    local cache_dir="$2"
+    local models_file="$cache_dir/models.json"
+
+    if [[ ! -s "$models_file" ]]; then
+        log "models.dev cache missing; refreshing $models_file"
+        if ! "$opencode_home/bin/opencode" models --refresh >/dev/null; then
+            error "Could not refresh models.dev cache. Run 'opencode models --refresh' on a machine with access to https://models.dev and retry."
+        fi
+    fi
+
+    [[ -s "$models_file" ]] || error "Cached models.dev catalog is missing or empty: $models_file"
+
+    if ! OPENCODE_DISABLE_MODELS_FETCH=1 OPENCODE_MODELS_PATH="$models_file" "$opencode_home/bin/opencode" models >/dev/null; then
+        error "Cached models.dev catalog is not readable by opencode: $models_file"
+    fi
+
+    MODELS_CACHE_INCLUDED=true
+}
+
 compute_package_hash() {
     local stage_root="$1"
     (
@@ -145,6 +168,9 @@ stage_runtime() {
     mkdir -p "$TEMP_DIR/.cache"
     cp -a "$opencode_home" "$TEMP_DIR/.opencode"
     cp -a "$cache_dir" "$TEMP_DIR/.cache/opencode"
+    if [[ -f "$TEMP_DIR/.cache/opencode/models.json" ]]; then
+        touch "$TEMP_DIR/.cache/opencode/models.json"
+    fi
     stage_config_deps "$config_dir"
 
     PACKAGE_HASH="$(compute_package_hash "$TEMP_DIR")"
@@ -153,6 +179,7 @@ stage_runtime() {
 OPENCODE_VERSION='$OPENCODE_VERSION'
 CREATED_AT='$CREATED_AT'
 PACKAGE_HASH='$PACKAGE_HASH'
+MODELS_CACHE_INCLUDED='$MODELS_CACHE_INCLUDED'
 EOF
 
     cp "$TEMP_DIR/manifest.env" "$TEMP_DIR/.opencode/manifest.env"
@@ -174,6 +201,20 @@ TARGET_CONFIG_DIR="$HOME/.config/opencode"
 TARGET_BIN_DIR="$HOME/.local/bin"
 STAGING_OPENCODE_DIR="${TARGET_OPENCODE_DIR}.tmp.$$"
 STAGING_CACHE_DIR="${TARGET_CACHE_DIR}.tmp.$$"
+BACKUP_OPENCODE_DIR="${TARGET_OPENCODE_DIR}.old.$$"
+BACKUP_CACHE_DIR="${TARGET_CACHE_DIR}.old.$$"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
+}
+
+run_opencode_version() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 20s "$TARGET_BIN_DIR/opencode" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
+    else
+        "$TARGET_BIN_DIR/opencode" --version 2>/dev/null | head -1 | tr -d '[:space:]' || true
+    fi
+}
 
 if [[ ! -d "$SOURCE_OPENCODE_DIR" ]]; then
     echo "ERROR: Could not find .opencode directory next to install.sh" >&2
@@ -185,17 +226,30 @@ if [[ ! -d "$SOURCE_CACHE_DIR" ]]; then
     exit 1
 fi
 
-rm -rf "$STAGING_OPENCODE_DIR" "$STAGING_CACHE_DIR"
+log "Preparing install directories"
+rm -rf "$STAGING_OPENCODE_DIR" "$STAGING_CACHE_DIR" "$BACKUP_OPENCODE_DIR" "$BACKUP_CACHE_DIR"
 mkdir -p "$(dirname "$TARGET_OPENCODE_DIR")" "$(dirname "$TARGET_CACHE_DIR")" "$TARGET_BIN_DIR"
 
+log "Copying opencode runtime"
 cp -a "$SOURCE_OPENCODE_DIR" "$STAGING_OPENCODE_DIR"
+
+log "Copying opencode cache"
 cp -a "$SOURCE_CACHE_DIR" "$STAGING_CACHE_DIR"
 
-rm -rf "$TARGET_OPENCODE_DIR" "$TARGET_CACHE_DIR"
+log "Swapping packaged runtime into place"
+if [[ -e "$TARGET_OPENCODE_DIR" ]]; then
+    mv "$TARGET_OPENCODE_DIR" "$BACKUP_OPENCODE_DIR"
+fi
 mv "$STAGING_OPENCODE_DIR" "$TARGET_OPENCODE_DIR"
+
+log "Swapping packaged cache into place"
+if [[ -e "$TARGET_CACHE_DIR" ]]; then
+    mv "$TARGET_CACHE_DIR" "$BACKUP_CACHE_DIR"
+fi
 mv "$STAGING_CACHE_DIR" "$TARGET_CACHE_DIR"
 
 if [[ -d "$SOURCE_CONFIG_DIR/node_modules" ]]; then
+    log "Installing opencode config dependencies"
     mkdir -p "$TARGET_CONFIG_DIR"
     rm -rf "$TARGET_CONFIG_DIR/node_modules"
     cp -a "$SOURCE_CONFIG_DIR/node_modules" "$TARGET_CONFIG_DIR/node_modules"
@@ -208,14 +262,33 @@ if [[ -d "$SOURCE_CONFIG_DIR/node_modules" ]]; then
     done
 fi
 
-ln -sfn "$TARGET_OPENCODE_DIR/bin/opencode" "$TARGET_BIN_DIR/opencode"
+log "Installing opencode launcher wrapper"
+cat > "$TARGET_BIN_DIR/opencode" <<'LAUNCHER_EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+TARGET_OPENCODE_DIR="$HOME/.opencode"
+TARGET_CACHE_DIR="$HOME/.cache/opencode"
+
+if [[ -f "$TARGET_CACHE_DIR/models.json" ]]; then
+    if [[ -z "${OPENCODE_MODELS_PATH+x}" ]]; then
+        export OPENCODE_MODELS_PATH="$TARGET_CACHE_DIR/models.json"
+    fi
+    if [[ -z "${OPENCODE_DISABLE_MODELS_FETCH+x}" ]]; then
+        export OPENCODE_DISABLE_MODELS_FETCH=1
+    fi
+fi
+
+exec "$TARGET_OPENCODE_DIR/bin/opencode" "$@"
+LAUNCHER_EOF
+chmod +x "$TARGET_BIN_DIR/opencode"
 
 if [[ ! -x "$TARGET_OPENCODE_DIR/bin/opencode" ]]; then
     echo "ERROR: Installed opencode binary is missing or not executable" >&2
     exit 1
 fi
 
-installed_version="$($TARGET_OPENCODE_DIR/bin/opencode --version 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
+installed_version="$(run_opencode_version)"
 echo "Installed opencode ${installed_version:-unknown}"
 echo "Runtime installed to: $TARGET_OPENCODE_DIR"
 echo "Cache installed to: $TARGET_CACHE_DIR"
@@ -223,11 +296,21 @@ if [[ -d "$SOURCE_CONFIG_DIR/node_modules" ]]; then
     echo "Config dependencies installed to: $TARGET_CONFIG_DIR/node_modules"
 fi
 echo "Launcher installed to: $TARGET_BIN_DIR/opencode"
+if [[ -f "$TARGET_CACHE_DIR/models.json" ]]; then
+    echo "Packaged models catalog enabled: $TARGET_CACHE_DIR/models.json"
+fi
 
 if [[ ":$PATH:" != *":$TARGET_BIN_DIR:"* ]]; then
     echo "WARNING: $TARGET_BIN_DIR is not in PATH. Add this to your shell profile:" >&2
     echo "  export PATH=\"$TARGET_BIN_DIR:\$PATH\"" >&2
 fi
+
+for old_dir in "$BACKUP_OPENCODE_DIR" "$BACKUP_CACHE_DIR"; do
+    if [[ -e "$old_dir" ]]; then
+        log "Cleaning old install in background: $old_dir"
+        rm -rf "$old_dir" >/dev/null 2>&1 &
+    fi
+done
 EOF
 
     chmod +x "$TEMP_DIR/install.sh"
@@ -243,6 +326,7 @@ This archive contains an offline opencode runtime bundle.
 
 - \.opencode/ with the opencode binary and local opencode-managed packages
 - \.cache/opencode/ with cached dependencies and downloaded tools
+- \.cache/opencode/models.json with the cached models.dev catalog
 - \.config/opencode/node_modules plus package manager files when config plugin deps are present
 - install.sh to install the bundle on a machine without npm access
 
@@ -260,7 +344,9 @@ After installation, the package-managed files live in:
 
 - ~/.opencode
 - ~/.cache/opencode
-- launcher: ~/.local/bin/opencode
+- launcher wrapper: ~/.local/bin/opencode
+
+The launcher uses the packaged \`~/.cache/opencode/models.json\` catalog and sets \`OPENCODE_DISABLE_MODELS_FETCH=1\` by default when that file exists. This prevents startup refresh attempts to \`https://models.dev/api.json\` on proxied/offline machines. Set \`OPENCODE_DISABLE_MODELS_FETCH=false\` before running \`opencode\` if you explicitly want to allow online model refreshes.
 
 This package intentionally does not include user data such as:
 
@@ -274,6 +360,7 @@ It also does not overwrite config content such as \`opencode.json\`, plugins, co
 - opencode version: ${OPENCODE_VERSION}
 - created at: ${CREATED_AT}
 - package hash: ${PACKAGE_HASH}
+- models cache included: ${MODELS_CACHE_INCLUDED}
 EOF
 }
 
@@ -346,6 +433,7 @@ main() {
     cache_dir="$(resolve_opencode_cache)"
     config_dir="$(resolve_opencode_config_dir)"
     load_opencode_metadata "$opencode_home"
+    ensure_models_cache "$opencode_home" "$cache_dir"
     stage_runtime "$opencode_home" "$cache_dir" "$config_dir"
     create_install_script
     create_readme
