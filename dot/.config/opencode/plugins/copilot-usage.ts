@@ -98,6 +98,11 @@ type ModelMetadataResult = {
   pricingAvailable: boolean
 }
 
+type SessionModel = {
+  id: string
+  providerID?: string
+}
+
 const CACHE_TTL_MS = 5 * 60 * 1000
 const GITHUB_API_BASE = "https://api.github.com"
 const CAPI_BASE = "https://api.githubcopilot.com"
@@ -148,8 +153,8 @@ function normalizeModelID(modelID: string): string {
   return parts[parts.length - 1] || modelID
 }
 
-function isGitHubCopilotModel(modelID: string | undefined): modelID is string {
-  return typeof modelID === "string" && modelID.startsWith("github-copilot/")
+function isGitHubCopilotModel(model: SessionModel | undefined): model is SessionModel {
+  return model?.providerID === "github-copilot" || model?.id.startsWith("github-copilot/") === true
 }
 
 function formatCost(value: number | undefined): string | null {
@@ -278,18 +283,18 @@ function buildUsageLine(info: CopilotUserInfo): string {
   const plan = info.copilot_plan || "copilot"
 
   if (premium?.unlimited) {
-    return `**Copilot:** **premium unlimited**${reset ? ` | reset **${reset}**` : ""}`
+    return `Copilot: premium unlimited${reset ? ` | reset ${reset}` : ""}`
   }
 
   if (remaining && entitlement) {
-    return `**Copilot:** **${used || "usage unavailable"}** \\[${remaining}/${entitlement} left\\]${reset ? ` | reset **${reset}**` : ""}`
+    return `Copilot: ${used ? `**${used}**` : "usage unavailable"} (${remaining}/${entitlement} left)${reset ? ` | reset ${reset}` : ""}`
   }
 
   if (used) {
-    return `**Copilot:** **${used}**${reset ? ` | reset **${reset}**` : ""}`
+    return `Copilot: **${used}**${reset ? ` | reset ${reset}` : ""}`
   }
 
-  return `**Copilot:** **${plan}**${reset ? ` | reset **${reset}**` : ""}`
+  return `Copilot: ${plan}${reset ? ` | reset ${reset}` : ""}`
 }
 
 async function fetchJSON(url: string, token: string): Promise<unknown> {
@@ -349,12 +354,29 @@ async function fetchCAPIJSON(url: string, token: string, integrationID: string, 
   return response.json()
 }
 
-async function readCurrentSessionModelID(client: { session: { get: (options: { path: { id: string } }) => Promise<{ data?: { modelID?: string } }> } }, sessionID: string): Promise<string | undefined> {
+function parseSessionModel(value: unknown): SessionModel | undefined {
+  if (typeof value === "string") {
+    try {
+      return parseSessionModel(JSON.parse(value))
+    } catch {
+      if (!value) return undefined
+      const [providerID, ...idParts] = value.split("/")
+      return idParts.length > 0 ? { id: idParts.join("/"), providerID } : { id: value }
+    }
+  }
+
+  if (!value || typeof value !== "object") return undefined
+  const item = value as { id?: unknown; modelID?: unknown; providerID?: unknown }
+  const id = typeof item.id === "string" ? item.id : typeof item.modelID === "string" ? item.modelID : undefined
+  const providerID = typeof item.providerID === "string" ? item.providerID : undefined
+  return id ? { id, providerID } : undefined
+}
+
+async function readCurrentSessionModel(client: { session: { get: (options: { path: { id: string } }) => Promise<{ data?: { modelID?: string; model?: unknown } }> } }, sessionID: string): Promise<SessionModel | undefined> {
   try {
     const result = await client.session.get({ path: { id: sessionID } })
     const session = result.data
-    const modelID = session?.modelID
-    return typeof modelID === "string" ? modelID : undefined
+    return parseSessionModel(session?.model) || parseSessionModel(session?.modelID)
   } catch {
     return undefined
   }
@@ -441,7 +463,7 @@ async function fetchCopilotModels(token: string, apiBase?: string): Promise<Mode
   return { models: [], source: "none", pricingAvailable: false }
 }
 
-async function fetchUsageLine(currentModelID: string, sessionID: string): Promise<string> {
+async function fetchUsageLine(currentModelID: string): Promise<string> {
   const auth = await readAuth()
   const token = auth?.["github-copilot"]?.access || auth?.github?.access
   if (!token) return "Copilot usage unavailable (missing GitHub auth)"
@@ -451,7 +473,7 @@ async function fetchUsageLine(currentModelID: string, sessionID: string): Promis
     const metadata = await fetchCopilotModels(token, data.endpoints?.api)
     const currentModel = describeCurrentModel(currentModelID, metadata.models)
     const usage = buildUsageLine(data)
-    return currentModel ? `${usage} | **Model:** ${currentModel}` : usage
+    return currentModel ? `${usage} | model ${currentModel}` : usage
   } catch {
     return "Copilot usage unavailable (request failed)"
   }
@@ -487,18 +509,18 @@ export const CopilotUsagePlugin: Plugin = async ({ client }) => {
       if (partIndex !== message.parts.length - 1) return
       if (message.parts[partIndex]?.type !== "text") return
 
-      const currentModelID = await readCurrentSessionModelID(client, input.sessionID)
-      if (!isGitHubCopilotModel(currentModelID)) {
+      const currentModel = await readCurrentSessionModel(client, input.sessionID)
+      if (!isGitHubCopilotModel(currentModel)) {
         processedParts.add(processedKey)
         return
       }
 
       const now = Date.now()
-      const cacheKey = `${input.sessionID}:${currentModelID}`
+      const cacheKey = `${input.sessionID}:${currentModel.providerID || ""}/${currentModel.id}`
       if (!cached || cached.key !== cacheKey || now - cached.fetchedAt > CACHE_TTL_MS) {
         cached = {
           key: cacheKey,
-          line: await fetchUsageLine(currentModelID, input.sessionID),
+          line: await fetchUsageLine(currentModel.id),
           fetchedAt: now,
         }
       }
