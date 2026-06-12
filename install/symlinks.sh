@@ -25,6 +25,8 @@ COMMON_LINKS=(
     ".config/environment.d"
     ".pi/agent/settings.json"
     ".pi/agent/prompts"
+    ".pi/agent/extensions"
+    ".pi/agent/themes"
 )
 
 # Desktop-only symlinks (Hyprland, Waybar, etc.)

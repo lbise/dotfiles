@@ -60,7 +60,7 @@ Manifest format ($MANIFEST_PATH):
 {
   "nodeVersion": "$DEFAULT_NODE_VERSION",
   "packages": [
-    { "source": "npm:@ifi/oh-pi-themes" },
+    { "source": "npm:@scope/pi-package@1.2.3" },
     { "source": "git:github.com/user/repo@v1", "name": "my-package" }
   ]
 }
@@ -657,7 +657,7 @@ After installation, the runtime lives in:
 - wrapper: \`~/.local/bin/pi\`
 
 The wrapper prepends the bundled Node/npm to \`PATH\` and points npm's global prefix at the bundled runtime.
-That means you can keep normal pi package settings such as \`npm:@ifi/oh-pi-themes\`; the offline bundle pre-installs the manifest packages into that bundled npm prefix.
+That means you can keep normal pi package settings; the offline bundle pre-installs any manifest packages into that bundled npm prefix.
 
 ## Package Metadata
 
