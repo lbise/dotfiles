@@ -5,7 +5,12 @@ set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
-MANIFEST_PATH="${PI_OFFLINE_MANIFEST:-$DOTFILES_DIR/dot/.pi/agent/offline-packages.json}"
+SETTINGS_PATH="${PI_SETTINGS_PATH:-$DOTFILES_DIR/dot/.pi/agent/settings.json}"
+MANIFEST_PATH="${PI_OFFLINE_MANIFEST:-}"
+PACKAGE_SOURCE_MODE="${PI_OFFLINE_MANIFEST:+manifest}"
+if [[ -z "$PACKAGE_SOURCE_MODE" ]]; then
+    PACKAGE_SOURCE_MODE="settings"
+fi
 DEFAULT_POOL_DIR="/mnt/ch03pool/murten_mirror/shannon/linux/tools/pi"
 POOL_DIR="${PI_ARCHIVES_DIR:-$DEFAULT_POOL_DIR}"
 OUTPUT_DIR="$PWD"
@@ -14,7 +19,13 @@ TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 PACKAGE_NAME="pi-offline-${TIMESTAMP}.tar.gz"
 PACKAGE_OUTPUT_PATH=""
 DEFAULT_NODE_VERSION="22.19.0"
+DEFAULT_RTK_VERSION="0.42.4"
+DEFAULT_RTK_TARGET="x86_64-unknown-linux-musl"
 NODE_VERSION="${PI_NODE_VERSION:-}"
+RTK_VERSION="${PI_RTK_VERSION:-$DEFAULT_RTK_VERSION}"
+RTK_TARGET="${PI_RTK_TARGET:-$DEFAULT_RTK_TARGET}"
+RTK_ARCHIVE_NAME="${PI_RTK_ARCHIVE_NAME:-rtk-${RTK_TARGET}.tar.gz}"
+RTK_DOWNLOAD_URL="${PI_RTK_DOWNLOAD_URL:-https://github.com/rtk-ai/rtk/releases/download/v${RTK_VERSION}/${RTK_ARCHIVE_NAME}}"
 TEMP_DIR=""
 STAGE_DIR=""
 PACKAGE_SPECS=()
@@ -25,6 +36,9 @@ PI_VERSION=""
 PI_NODE_ENGINE=""
 PI_MIN_NODE_VERSION=""
 MANIFEST_HASH=""
+PACKAGE_SOURCE_KIND=""
+PACKAGE_SOURCE_PATH=""
+BUNDLE_RTK=false
 CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 log() {
@@ -43,12 +57,14 @@ Usage: $(basename "$0") [OPTIONS] [output_directory]
 Create an offline pi bundle containing:
 - a bundled Node runtime compatible with the installed pi CLI
 - the pi CLI package and its dependencies
-- manifest packages pre-installed into bundled global npm from $MANIFEST_PATH
+- packages from Pi settings.json pre-installed into bundled global npm
+- a bundled RTK tool when required by packaged extensions (for example pi-rtk-optimizer)
 - an install.sh helper for target machines without npm access
 
 Options:
-  --manifest PATH       Manifest describing third-party pi packages
-  --node-version VER    Override bundled Node version (default from manifest or pi's minimum supported version)
+  --settings PATH       Pi settings file to read packages from (default: $SETTINGS_PATH)
+  --manifest PATH       Deprecated override: read packages from an offline manifest instead of settings.json
+  --node-version VER    Override bundled Node version (default from pi's minimum supported version)
   --pool-dir DIR        Publish archive to DIR (default: $DEFAULT_POOL_DIR)
   --no-publish          Keep the archive in output_directory instead of moving it to the pool
   --help, -h            Show this help message
@@ -56,7 +72,15 @@ Options:
 Arguments:
   output_directory      Directory to save the package before publish (default: current directory)
 
-Manifest format ($MANIFEST_PATH):
+Default package source ($SETTINGS_PATH):
+{
+  "packages": [
+    "npm:@scope/pi-package@1.2.3",
+    "git:github.com/user/repo@v1"
+  ]
+}
+
+Deprecated manifest override format:
 {
   "nodeVersion": "$DEFAULT_NODE_VERSION",
   "packages": [
@@ -72,7 +96,7 @@ Supported package sources:
 
 Examples:
   $(basename "$0")
-  $(basename "$0") --no-publish /tmp
+  $(basename "$0") --settings ~/.pi/agent/settings.json --no-publish /tmp
   $(basename "$0") --node-version $DEFAULT_NODE_VERSION --pool-dir /srv/mirror/pi
 EOF
 }
@@ -97,25 +121,50 @@ check_dependencies() {
     log "✓ Dependencies available"
 }
 
-load_manifest() {
-    [[ -f "$MANIFEST_PATH" ]] || error "Manifest not found: $MANIFEST_PATH"
+load_package_specs() {
+    local source_path
+    local source_kind
 
-    local manifest_info
-    manifest_info=$(node - "$MANIFEST_PATH" <<'NODE'
+    if [[ "$PACKAGE_SOURCE_MODE" == "manifest" ]]; then
+        [[ -n "$MANIFEST_PATH" ]] || error "Manifest path not set"
+        source_path="$MANIFEST_PATH"
+        source_kind="manifest"
+    else
+        source_path="$SETTINGS_PATH"
+        source_kind="settings"
+    fi
+
+    [[ -f "$source_path" ]] || error "Package source not found: $source_path"
+
+    PACKAGE_SOURCE_KIND="$source_kind"
+    PACKAGE_SOURCE_PATH="$source_path"
+    PACKAGE_SPECS=()
+
+    local package_info
+    package_info=$(node - "$source_kind" "$source_path" <<'NODE'
 const fs = require("fs");
 const crypto = require("crypto");
-const manifestPath = process.argv[2];
-const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-console.log(`NODE_VERSION=${manifest.nodeVersion || ""}`);
-console.log(`MANIFEST_HASH=${crypto.createHash("sha256").update(JSON.stringify(manifest)).digest("hex")}`);
-for (const item of manifest.packages || []) {
-  if (typeof item === "string") {
-    console.log(`PACKAGE=${item}\t`);
-    continue;
-  }
+const [kind, sourcePath] = process.argv.slice(2);
+const data = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+const rawPackages = Array.isArray(data.packages) ? data.packages : [];
+const packages = rawPackages.map((item, index) => {
+  if (typeof item === "string") return { source: item, name: "" };
   if (item && typeof item === "object" && item.source) {
-    console.log(`PACKAGE=${item.source}\t${item.name || ""}`);
+    return { source: String(item.source), name: item.name ? String(item.name) : "" };
   }
+  throw new Error(`Invalid package entry at packages[${index}] in ${sourcePath}`);
+});
+const normalizedPackages = packages.map((pkg) =>
+  pkg.name ? { source: pkg.source, name: pkg.name } : pkg.source
+);
+const packageHash = crypto
+  .createHash("sha256")
+  .update(JSON.stringify({ packages: normalizedPackages }))
+  .digest("hex");
+console.log(`NODE_VERSION=${kind === "manifest" ? data.nodeVersion || "" : ""}`);
+console.log(`MANIFEST_HASH=${packageHash}`);
+for (const pkg of packages) {
+  console.log(`PACKAGE=${pkg.source}\t${pkg.name}`);
 }
 NODE
 )
@@ -130,15 +179,29 @@ NODE
         elif [[ "$line" == PACKAGE=* ]]; then
             PACKAGE_SPECS+=("${line#PACKAGE=}")
         fi
-    done <<< "$manifest_info"
+    done <<< "$package_info"
 
-    if [[ -z "$NODE_VERSION" && -n "$manifest_node_version" ]]; then
+    if [[ "$source_kind" == "manifest" && -z "$NODE_VERSION" && -n "$manifest_node_version" ]]; then
         NODE_VERSION="$manifest_node_version"
     fi
 
     if [[ ${#PACKAGE_SPECS[@]} -eq 0 ]]; then
-        log "Manifest contains no third-party packages; bundle will only include pi itself"
+        log "Package source contains no third-party packages; bundle will only include pi itself"
     fi
+}
+
+bundle_requires_rtk() {
+    local spec
+    for spec in "${PACKAGE_SPECS[@]}"; do
+        local source="${spec%%$'\t'*}"
+        case "$source" in
+            *pi-rtk-optimizer*)
+                return 0
+                ;;
+        esac
+    done
+
+    return 1
 }
 
 resolve_pi_package_dir() {
@@ -268,7 +331,7 @@ validate_requested_node_version() {
     fi
 
     if semver_lt "$NODE_VERSION" "$PI_MIN_NODE_VERSION"; then
-        error "Bundled Node $NODE_VERSION is too old for pi $PI_VERSION (requires ${PI_NODE_ENGINE:-">=$PI_MIN_NODE_VERSION"}). Update $MANIFEST_PATH or rerun with --node-version $PI_MIN_NODE_VERSION or newer."
+        error "Bundled Node $NODE_VERSION is too old for pi $PI_VERSION (requires ${PI_NODE_ENGINE:-">=$PI_MIN_NODE_VERSION"}). Rerun with --node-version $PI_MIN_NODE_VERSION or newer."
     fi
 }
 
@@ -284,15 +347,15 @@ sanitize_dir_name() {
 
 expand_local_source_path() {
     local source="$1"
-    local manifest_dir
-    manifest_dir="$(dirname "$MANIFEST_PATH")"
+    local source_dir
+    source_dir="$(dirname "$PACKAGE_SOURCE_PATH")"
 
     if [[ "$source" == ~/* ]]; then
         printf '%s\n' "$HOME/${source#~/}"
     elif [[ "$source" == /* ]]; then
         printf '%s\n' "$source"
     else
-        printf '%s\n' "$(realpath -m "$manifest_dir/$source")"
+        printf '%s\n' "$(realpath -m "$source_dir/$source")"
     fi
 }
 
@@ -320,6 +383,33 @@ setup_bundled_node() {
 
     [[ -x "$NODE_BIN" ]] || error "Bundled node executable not found after extraction"
     [[ -x "$NPM_BIN" ]] || error "Bundled npm executable not found after extraction"
+}
+
+install_rtk_into_bundled_runtime() {
+    [[ "$BUNDLE_RTK" == true ]] || return 0
+
+    local download_dir="${XDG_CACHE_HOME:-$HOME/.cache}/pi-offline"
+    local rtk_archive="$download_dir/${RTK_ARCHIVE_NAME}"
+    local extract_dir="$TEMP_DIR/rtk-extract"
+
+    mkdir -p "$download_dir"
+
+    if [[ ! -f "$rtk_archive" ]]; then
+        log "Downloading RTK ${RTK_VERSION} from $RTK_DOWNLOAD_URL"
+        curl -fsSL "$RTK_DOWNLOAD_URL" -o "$rtk_archive"
+    else
+        log "Using cached RTK archive: $rtk_archive"
+    fi
+
+    rm -rf "$extract_dir"
+    mkdir -p "$extract_dir" "$STAGE_DIR/node/bin"
+    tar -xzf "$rtk_archive" -C "$extract_dir"
+
+    local rtk_bin="$extract_dir/rtk"
+    [[ -x "$rtk_bin" ]] || error "Bundled RTK executable not found after extraction"
+
+    cp "$rtk_bin" "$STAGE_DIR/node/bin/rtk"
+    chmod +x "$STAGE_DIR/node/bin/rtk"
 }
 
 fetch_npm_source() {
@@ -447,7 +537,7 @@ verify_bundled_pi_runtime() {
     fi
 
     cat "$verify_log" >&2
-    error "Bundled Node ${NODE_VERSION} failed to start pi ${PI_VERSION}. pi requires ${PI_NODE_ENGINE:-a newer Node version}; update $MANIFEST_PATH or rerun with --node-version ${PI_MIN_NODE_VERSION:-$DEFAULT_NODE_VERSION} or newer."
+    error "Bundled Node ${NODE_VERSION} failed to start pi ${PI_VERSION}. pi requires ${PI_NODE_ENGINE:-a newer Node version}; rerun with --node-version ${PI_MIN_NODE_VERSION:-$DEFAULT_NODE_VERSION} or newer."
 }
 
 ensure_installable_package_json() {
@@ -563,6 +653,16 @@ install_manifest_packages() {
 }
 
 create_manifest_files() {
+    local manifest_rtk_version=""
+    local manifest_rtk_target=""
+    local manifest_rtk_archive_name=""
+
+    if [[ "$BUNDLE_RTK" == true ]]; then
+        manifest_rtk_version="$RTK_VERSION"
+        manifest_rtk_target="$RTK_TARGET"
+        manifest_rtk_archive_name="$RTK_ARCHIVE_NAME"
+    fi
+
     cat > "$TEMP_DIR/manifest.env" <<EOF
 PI_VERSION='$PI_VERSION'
 NODE_VERSION='$NODE_VERSION'
@@ -570,10 +670,32 @@ PI_NODE_ENGINE='$PI_NODE_ENGINE'
 PI_MIN_NODE_VERSION='$PI_MIN_NODE_VERSION'
 CREATED_AT='$CREATED_AT'
 MANIFEST_HASH='$MANIFEST_HASH'
+PACKAGE_SOURCE_KIND='$PACKAGE_SOURCE_KIND'
+PACKAGE_SOURCE_PATH='$PACKAGE_SOURCE_PATH'
+RTK_VERSION='$manifest_rtk_version'
+RTK_TARGET='$manifest_rtk_target'
+RTK_ARCHIVE_NAME='$manifest_rtk_archive_name'
 EOF
 
     cp "$TEMP_DIR/manifest.env" "$STAGE_DIR/manifest.env"
-    cp "$MANIFEST_PATH" "$STAGE_DIR/offline-packages.json"
+    node - "$STAGE_DIR/offline-packages.json" "$PACKAGE_SOURCE_KIND" "$PACKAGE_SOURCE_PATH" "$NODE_VERSION" "${PACKAGE_SPECS[@]}" <<'NODE'
+const fs = require("fs");
+const [outPath, sourceKind, sourcePath, nodeVersion, ...specs] = process.argv.slice(2);
+const packages = specs.map((spec) => {
+  const [source, name = ""] = spec.split("\t");
+  return name ? { source, name } : source;
+});
+const manifest = {
+  generated: true,
+  source: {
+    kind: sourceKind,
+    path: sourcePath,
+  },
+  nodeVersion,
+  packages,
+};
+fs.writeFileSync(outPath, `${JSON.stringify(manifest, null, 2)}\n`);
+NODE
 }
 
 create_install_script() {
@@ -611,14 +733,30 @@ exec "${RUNTIME_DIR}/node/bin/node" "${RUNTIME_DIR}/pi/dist/cli.js" "$@"
 WRAPPER
 chmod +x "$TARGET_BIN_DIR/pi"
 
+if [[ -x "$TARGET_RUNTIME_DIR/node/bin/rtk" ]]; then
+    cat > "$TARGET_BIN_DIR/rtk" <<'RTK_WRAPPER'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+RUNTIME_DIR="${HOME}/.local/share/pi-runtime"
+exec "${RUNTIME_DIR}/node/bin/rtk" "$@"
+RTK_WRAPPER
+    chmod +x "$TARGET_BIN_DIR/rtk"
+fi
+
 if [[ -f "$TARGET_RUNTIME_DIR/manifest.env" ]]; then
     # shellcheck disable=SC1090
     source "$TARGET_RUNTIME_DIR/manifest.env"
     echo "Installed pi ${PI_VERSION:-unknown} with bundled Node ${NODE_VERSION:-unknown}"
+    if [[ -n "${RTK_VERSION:-}" && -x "$TARGET_RUNTIME_DIR/node/bin/rtk" ]]; then
+        echo "Installed bundled RTK ${RTK_VERSION}"
+    fi
 fi
 
 echo "pi runtime installed to: $TARGET_RUNTIME_DIR"
 echo "pi wrapper installed to: $TARGET_BIN_DIR/pi"
+if [[ -x "$TARGET_BIN_DIR/rtk" ]]; then
+    echo "rtk wrapper installed to: $TARGET_BIN_DIR/rtk"
+fi
 if [[ ":$PATH:" != *":$TARGET_BIN_DIR:"* ]]; then
     echo "WARNING: $TARGET_BIN_DIR is not in PATH. Add this to your shell profile:" >&2
     echo "  export PATH=\"$TARGET_BIN_DIR:\$PATH\"" >&2
@@ -629,6 +767,11 @@ EOF
 
 create_readme() {
     local package_basename="$PACKAGE_NAME"
+    local bundled_rtk_metadata="not included"
+    if [[ "$BUNDLE_RTK" == true ]]; then
+        bundled_rtk_metadata="${RTK_VERSION} (${RTK_TARGET})"
+    fi
+
     cat > "$TEMP_DIR/README.md" <<EOF
 # pi Offline Package
 
@@ -638,7 +781,8 @@ This archive contains an offline pi runtime bundle.
 
 - the pi CLI package and its dependencies under \`pi-runtime/pi/\`
 - a bundled Node ${NODE_VERSION} runtime under \`pi-runtime/node/\`
-- manifest packages pre-installed into bundled global npm under \`pi-runtime/node/lib/node_modules/\`
+- configured Pi packages pre-installed into bundled global npm under \`pi-runtime/node/lib/node_modules/\`
+- a bundled RTK binary under \`pi-runtime/node/bin/rtk\` when required by packaged extensions
 - \`install.sh\` to install the bundle on a machine without npm access
 
 ## Installation
@@ -655,18 +799,20 @@ After installation, the runtime lives in:
 
 - \`~/.local/share/pi-runtime\`
 - wrapper: \`~/.local/bin/pi\`
+- wrapper: \`~/.local/bin/rtk\` when RTK is bundled
 
 The wrapper prepends the bundled Node/npm to \`PATH\` and points npm's global prefix at the bundled runtime.
-That means you can keep normal pi package settings; the offline bundle pre-installs any manifest packages into that bundled npm prefix.
+That means you can keep normal pi package settings; the offline bundle pre-installs configured packages into that bundled npm prefix.
 
 ## Package Metadata
 
 - pi version: ${PI_VERSION}
 - Node version: ${NODE_VERSION}
 - pi Node requirement: ${PI_NODE_ENGINE:-unknown}
+- bundled RTK: ${bundled_rtk_metadata}
 - created at: ${CREATED_AT}
-- manifest: ${MANIFEST_PATH}
-- manifest hash: ${MANIFEST_HASH}
+- package source: ${PACKAGE_SOURCE_KIND} (${PACKAGE_SOURCE_PATH})
+- package hash: ${MANIFEST_HASH}
 EOF
 }
 
@@ -704,8 +850,14 @@ publish_archive() {
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --settings)
+                SETTINGS_PATH="$2"
+                PACKAGE_SOURCE_MODE="settings"
+                shift 2
+                ;;
             --manifest)
                 MANIFEST_PATH="$2"
+                PACKAGE_SOURCE_MODE="manifest"
                 shift 2
                 ;;
             --node-version)
@@ -738,7 +890,10 @@ parse_args() {
 main() {
     parse_args "$@"
     check_dependencies
-    load_manifest
+    load_package_specs
+    if bundle_requires_rtk; then
+        BUNDLE_RTK=true
+    fi
     load_pi_package_metadata
     resolve_bundled_node_version
     validate_requested_node_version
@@ -751,18 +906,22 @@ main() {
     STAGE_DIR="$TEMP_DIR/pi-runtime"
 
     log "Preparing offline pi bundle"
-    log "Manifest: $MANIFEST_PATH"
+    log "Package source: $PACKAGE_SOURCE_KIND ($PACKAGE_SOURCE_PATH)"
     log "pi version: $PI_VERSION"
     if [[ -n "$PI_NODE_ENGINE" ]]; then
         log "pi Node requirement: $PI_NODE_ENGINE"
     fi
     log "Bundled Node version: $NODE_VERSION"
+    if [[ "$BUNDLE_RTK" == true ]]; then
+        log "Bundled RTK version: $RTK_VERSION ($RTK_TARGET)"
+    fi
 
     setup_bundled_node
     copy_pi_runtime
     verify_bundled_pi_runtime
     expose_pi_peer_packages
     install_manifest_packages
+    install_rtk_into_bundled_runtime
     create_manifest_files
     create_install_script
     create_readme
@@ -785,6 +944,9 @@ main() {
     log "Size: $package_size"
     log "pi version: $PI_VERSION"
     log "Bundled Node version: $NODE_VERSION"
+    if [[ "$BUNDLE_RTK" == true ]]; then
+        log "Bundled RTK version: $RTK_VERSION"
+    fi
 }
 
 main "$@"

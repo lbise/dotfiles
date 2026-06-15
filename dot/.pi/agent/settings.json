@@ -1,15 +1,20 @@
 {
-  "lastChangelogVersion": "0.79.1",
   "defaultProvider": "github-copilot",
   "defaultModel": "gpt-5.4",
+  "lastChangelogVersion": "0.79.4",
   "defaultThinkingLevel": "xhigh",
   "theme": "tokyo-night-custom",
-  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
+  "extensions": [
+    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
+  ],
   "enabledModels": [
     "github-copilot/gpt-5.4",
     "openai-codex/gpt-5.5",
     "github-copilot/gpt-5.5"
   ],
-  "packages": ["git:github.com/elpapi42/pi-fork"]
+  "packages": [
+    "npm:pi-rtk-optimizer",
+    "npm:@tintinweb/pi-subagents"
+  ],
+  "hideThinkingBlock": false
 }
-

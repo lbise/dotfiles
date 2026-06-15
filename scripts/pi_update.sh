@@ -10,6 +10,8 @@ FORCE_INSTALL=false
 ARCHIVE_PATH=""
 TARGET_RUNTIME_DIR="$HOME/.local/share/pi-runtime"
 TARGET_BIN_DIR="$HOME/.local/bin"
+TARGET_RTK_BIN="$TARGET_RUNTIME_DIR/node/bin/rtk"
+TARGET_RTK_WRAPPER="$TARGET_BIN_DIR/rtk"
 TEMP_DIR=""
 
 log() {
@@ -26,6 +28,7 @@ usage() {
 Usage: $(basename "$0") [OPTIONS]
 
 Install or update the offline pi bundle on a machine without npm access.
+The script also ensures RTK is installed when required by packaged extensions.
 By default the script looks for the newest archive in:
   $DEFAULT_ARCHIVES_DIR
 
@@ -91,11 +94,99 @@ get_installed_versions() {
     if [[ -f "$TARGET_RUNTIME_DIR/manifest.env" ]]; then
         # shellcheck disable=SC1090
         source "$TARGET_RUNTIME_DIR/manifest.env"
-        printf '%s\t%s\t%s\n' "${PI_VERSION:-}" "${NODE_VERSION:-}" "${MANIFEST_HASH:-}"
+        printf '%s\t%s\t%s\t%s\n' "${PI_VERSION:-}" "${NODE_VERSION:-}" "${MANIFEST_HASH:-}" "${RTK_VERSION:-}"
         return 0
     fi
 
-    printf '\t\t\n'
+    printf '\t\t\t\n'
+}
+
+archive_bundles_rtk() {
+    [[ -x "$TEMP_DIR/pi-runtime/node/bin/rtk" ]]
+}
+
+archive_requires_rtk() {
+    [[ -f "$TEMP_DIR/pi-runtime/offline-packages.json" ]] || return 1
+    grep -q 'pi-rtk-optimizer' "$TEMP_DIR/pi-runtime/offline-packages.json"
+}
+
+write_rtk_wrapper() {
+    mkdir -p "$TARGET_BIN_DIR"
+    cat > "$TARGET_RTK_WRAPPER" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+RUNTIME_DIR="${HOME}/.local/share/pi-runtime"
+exec "${RUNTIME_DIR}/node/bin/rtk" "$@"
+EOF
+    chmod +x "$TARGET_RTK_WRAPPER"
+}
+
+runtime_rtk_version() {
+    "$TARGET_RTK_BIN" --version 2>/dev/null
+}
+
+external_rtk_version() {
+    rtk --version 2>/dev/null
+}
+
+ensure_rtk_installed() {
+    local rtk_required=false
+    if [[ -n "${RTK_VERSION:-}" ]] || archive_requires_rtk; then
+        rtk_required=true
+    fi
+
+    if [[ "$rtk_required" != true ]]; then
+        return 0
+    fi
+
+    if [[ -x "$TARGET_RTK_BIN" ]]; then
+        local runtime_version
+        runtime_version="$(runtime_rtk_version || true)"
+        if [[ -n "$runtime_version" ]]; then
+            write_rtk_wrapper
+            log "✓ RTK available: $runtime_version"
+            return 0
+        fi
+
+        if ! archive_bundles_rtk; then
+            error "Bundled RTK exists at $TARGET_RTK_BIN but failed to start. Rebuild the offline archive with a compatible RTK binary."
+        fi
+
+        log "Bundled RTK exists but failed to start; reinstalling archive"
+        install_archive
+        runtime_version="$(runtime_rtk_version || true)"
+        [[ -n "$runtime_version" ]] || error "Bundled RTK was installed but still failed to start after reinstall"
+        write_rtk_wrapper
+        log "✓ RTK available: $runtime_version"
+        return 0
+    fi
+
+    if archive_bundles_rtk; then
+        log "RTK missing from installed runtime; reinstalling archive to install bundled RTK"
+        install_archive
+        local runtime_version
+        runtime_version="$(runtime_rtk_version || true)"
+        [[ -n "$runtime_version" ]] || error "RTK was bundled in the archive but is still missing after installation"
+        write_rtk_wrapper
+        log "✓ RTK available: $runtime_version"
+        return 0
+    fi
+
+    if command -v rtk >/dev/null 2>&1; then
+        local external_path external_version
+        external_path="$(command -v rtk)"
+        external_version="$(external_rtk_version || true)"
+        if [[ -n "$external_version" ]]; then
+            log "✓ Using external RTK: $external_version ($external_path)"
+            return 0
+        fi
+    fi
+
+    if [[ -n "${RTK_VERSION:-}" ]]; then
+        error "RTK ${RTK_VERSION} is required for pi-rtk-optimizer but is not installed. Rebuild the offline archive with scripts/pi_package.sh so it bundles RTK, or install RTK manually."
+    fi
+
+    error "RTK is required for pi-rtk-optimizer but is not installed. Rebuild the offline archive with scripts/pi_package.sh so it bundles RTK, or install RTK manually."
 }
 
 extract_archive() {
@@ -127,12 +218,20 @@ verify_installation() {
         if [[ -n "${PI_NODE_ENGINE:-}" ]]; then
             log "pi Node requirement: ${PI_NODE_ENGINE}"
         fi
+        if [[ -n "${RTK_VERSION:-}" ]]; then
+            log "Bundled RTK version: ${RTK_VERSION}"
+        fi
     fi
 
     if [[ -x "$TARGET_BIN_DIR/pi" ]]; then
         log "✓ pi wrapper installed at $TARGET_BIN_DIR/pi"
     else
         log "⚠ pi wrapper not found at $TARGET_BIN_DIR/pi"
+    fi
+
+    ensure_rtk_installed
+    if [[ -x "$TARGET_RTK_WRAPPER" ]]; then
+        log "✓ rtk wrapper installed at $TARGET_RTK_WRAPPER"
     fi
 
     local startup_log="$TEMP_DIR/pi-startup-check.log"
@@ -200,16 +299,25 @@ main() {
     local archive_pi_version="${PI_VERSION:-}"
     local archive_node_version="${NODE_VERSION:-}"
     local archive_manifest_hash="${MANIFEST_HASH:-}"
+    local archive_rtk_version="${RTK_VERSION:-}"
+    local archive_rtk_required=false
+    if [[ -n "$archive_rtk_version" ]] || archive_requires_rtk; then
+        archive_rtk_required=true
+    fi
 
     local installed_info
     installed_info="$(get_installed_versions)"
-    local installed_pi_version="${installed_info%%$'\t'*}"
-    local installed_rest="${installed_info#*$'\t'}"
-    local installed_node_version="${installed_rest%%$'\t'*}"
-    local installed_manifest_hash="${installed_rest#*$'\t'}"
+    local installed_pi_version=""
+    local installed_node_version=""
+    local installed_manifest_hash=""
+    local installed_rtk_version=""
+    IFS=$'\t' read -r installed_pi_version installed_node_version installed_manifest_hash installed_rtk_version <<< "$installed_info"
 
-    if [[ "$FORCE_INSTALL" != true && -n "$archive_pi_version" && -n "$installed_pi_version" && "$archive_pi_version" == "$installed_pi_version" && "$archive_node_version" == "$installed_node_version" && "$archive_manifest_hash" == "$installed_manifest_hash" ]]; then
-        log "✓ pi ${installed_pi_version} with Node ${installed_node_version} is already installed (manifest unchanged)"
+    if [[ "$FORCE_INSTALL" != true && -n "$archive_pi_version" && -n "$installed_pi_version" && "$archive_pi_version" == "$installed_pi_version" && "$archive_node_version" == "$installed_node_version" && "$archive_manifest_hash" == "$installed_manifest_hash" && "$archive_rtk_version" == "$installed_rtk_version" ]]; then
+        if [[ "$archive_rtk_required" == true ]]; then
+            ensure_rtk_installed
+        fi
+        log "✓ pi ${installed_pi_version} with Node ${installed_node_version} is already installed (package set unchanged)"
         exit 0
     fi
 
