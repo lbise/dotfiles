@@ -675,12 +675,9 @@ export default function (pi: ExtensionAPI) {
 
     renderCreditsWidget(ctx);
 
-    // If headers gave us current quota for this prompt, avoid an extra API call.
-    // Otherwise force a user-info refresh so the overall usage does not remain stale.
-    if (activePromptSawQuotaHeader) {
-      renderStatus(ctx);
-    } else {
-      await updateStatus(ctx, undefined, { force: true });
-    }
+    // Always refresh the overall Copilot usage at the end of a completed prompt.
+    // This intentionally bypasses the status cache and does not rely only on
+    // quota headers, so the footer reflects the latest account-level usage.
+    await updateStatus(ctx, undefined, { force: true });
   });
 }
