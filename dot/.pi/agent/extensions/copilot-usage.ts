@@ -102,6 +102,7 @@ const TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
 const STATUS_KEY = "copilot-usage";
 const CREDITS_WIDGET_KEY = "copilot-ai-credits";
 const DEFAULT_COPILOT_API_BASE_URL = "https://api.githubcopilot.com";
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const COPILOT_HEADERS = {
   Accept: "application/json",
@@ -392,42 +393,77 @@ function quotaStateFromHeaders(headers: Record<string, string>): QuotaState | nu
   }
 }
 
+function usagePercentUsed(quota: QuotaState): number | undefined {
+  if (quota.percentRemaining !== undefined) return Math.max(0, 100 - quota.percentRemaining);
+
+  const used = quota.totalUsedUnits ?? quota.usedUnits;
+  if (used !== undefined && quota.entitlement !== undefined && quota.entitlement > 0) {
+    return Math.max(0, (used / quota.entitlement) * 100);
+  }
+
+  return undefined;
+}
+
+function usageColor(quota: QuotaState | null, percentUsed: number | undefined): "success" | "warning" | "error" {
+  if (quota?.overageCount && quota.overageCount > 0) return "error";
+  if (percentUsed !== undefined && percentUsed >= 90) return "error";
+  if (percentUsed !== undefined && percentUsed >= 70) return "warning";
+  return "success";
+}
+
+function formatUsageBar(quota: QuotaState, theme: any): string | null {
+  const percentUsed = usagePercentUsed(quota);
+  if (percentUsed === undefined || !Number.isFinite(percentUsed)) return null;
+
+  const displayPercent = Math.max(0, percentUsed);
+  const clamped = Math.max(0, Math.min(100, displayPercent));
+  const width = 10;
+  const filled = clamped === 0 ? 0 : Math.max(1, Math.round((clamped / 100) * width));
+  const filledWidth = Math.min(width, filled);
+  const color = usageColor(quota, displayPercent);
+
+  return (
+    theme.fg(color, "█".repeat(filledWidth)) +
+    theme.fg("dim", "░".repeat(width - filledWidth)) +
+    theme.fg(color, ` ${formatAmount(displayPercent)}%`)
+  );
+}
+
 function formatUsageLine(
   quota: QuotaState | null,
   theme: any,
-  options: { plan?: string } = {}
+  options: { plan?: string; resetDate?: string } = {}
 ): string {
   const parts: string[] = [];
+  const reset = formatResetInfo(quota?.resetDate ?? options.resetDate);
 
   if (quota?.unlimited) {
-    const reset = formatResetDate(quota.resetDate);
     parts.push(theme.fg("success", "unlimited"));
-    if (reset) parts.push(theme.fg("dim", `resets ${reset}`));
   } else if (quota) {
-    if (quota.percentRemaining !== undefined) {
-      const percentUsed = Math.max(0, 100 - quota.percentRemaining);
-      const color = percentUsed >= 90 ? "error" : percentUsed >= 70 ? "warning" : "success";
-      parts.push(theme.fg(color, `${formatAmount(percentUsed)}% used`));
-    }
+    const usageBar = formatUsageBar(quota, theme);
+    if (usageBar) parts.push(usageBar);
 
     const used = quota.totalUsedUnits ?? quota.usedUnits;
     if (used !== undefined && quota.entitlement !== undefined) {
-      parts.push(theme.fg("dim", `(${formatAmount(used)}/${formatAmount(quota.entitlement)})`));
+      parts.push(theme.fg("dim", `${formatAmount(used)}/${formatAmount(quota.entitlement)} used`));
     }
 
     if (quota.overageCount && quota.overageCount > 0) {
       parts.push(theme.fg("warning", `+${formatAmount(quota.overageCount)} overage`));
     }
-
-    const reset = formatResetDate(quota.resetDate);
-    if (reset) parts.push(theme.fg("dim", `resets ${reset}`));
   } else if (options.plan) {
     parts.push(theme.fg("dim", options.plan));
   } else {
     parts.push(theme.fg("dim", "active"));
   }
 
-  return theme.fg("dim", "Copilot: ") + parts.join(theme.fg("dim", " · "));
+  if (parts.length === 0) {
+    parts.push(theme.fg("dim", options.plan || "active"));
+  }
+
+  if (reset) parts.push(theme.fg("dim", reset));
+
+  return theme.fg("dim", "Copilot") + theme.fg("dim", " · ") + parts.join(theme.fg("dim", " · "));
 }
 
 function formatCreditsWidgetLine(lastPrompt: LastPromptUsage, theme: any): string {
@@ -448,15 +484,24 @@ function formatAmount(value: number): string {
   return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-function formatResetDate(value: string | undefined): string | null {
+function formatResetInfo(value: string | undefined): string | null {
   if (!value) return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat("en-GB", {
+
+  const date = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     timeZone: "UTC",
   }).format(parsed);
+
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const resetUtc = Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+  const daysUntil = Math.max(0, Math.round((resetUtc - todayUtc) / DAY_MS));
+  const relative = daysUntil === 0 ? "Reset today" : `Reset in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`;
+
+  return `${relative} (${date})`;
 }
 
 function isGitHubCopilotModel(model: unknown): boolean {
@@ -484,6 +529,7 @@ export default function (pi: ExtensionAPI) {
   let cachedModelId: string | null = null;
   let currentQuota: QuotaState | null = null;
   let currentPlan: string | undefined;
+  let currentResetDate: string | undefined;
   let lastQuotaTotalUsed: number | null = null;
   let lastBilling: ModelBillingInfo | null = null;
   let lastPrompt: LastPromptUsage | null = null;
@@ -518,6 +564,7 @@ export default function (pi: ExtensionAPI) {
     cachedModelId = modelId;
     cachedLine = formatUsageLine(currentQuota, ctx.ui.theme, {
       plan: currentPlan,
+      resetDate: currentResetDate,
     });
     cachedAt = Date.now();
     ctx.ui.setStatus(STATUS_KEY, cachedLine);
@@ -575,13 +622,14 @@ export default function (pi: ExtensionAPI) {
 
     const token = await getGitHubToken();
     if (!token) {
-      ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("dim", "Copilot: no token"));
+      ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("dim", "Copilot · no token"));
       return;
     }
 
     try {
       const info = await fetchCopilotUsage(token);
       currentPlan = info.copilot_plan;
+      currentResetDate = info.quota_reset_date_utc ?? info.quota_reset_date;
       currentQuota = quotaStateFromUserInfo(info);
       if (currentQuota?.totalUsedUnits !== undefined) {
         lastQuotaTotalUsed = currentQuota.totalUsedUnits;
@@ -590,10 +638,24 @@ export default function (pi: ExtensionAPI) {
     } catch (err: any) {
       ctx.ui.setStatus(
         STATUS_KEY,
-        ctx.ui.theme.fg("error", `Copilot: ${err.message || "fetch failed"}`)
+        ctx.ui.theme.fg("error", `Copilot · ${err.message || "fetch failed"}`)
       );
     }
   }
+
+  pi.registerCommand("copilot-usage-refresh", {
+    description: "Refresh GitHub Copilot usage display",
+    handler: async (_args, ctx) => {
+      if (!isGitHubCopilotModel(ctx.model)) {
+        clearStatus(ctx);
+        ctx.ui.notify("Copilot usage is only shown for GitHub Copilot models", "info");
+        return;
+      }
+
+      await updateStatus(ctx, undefined, { force: true });
+      ctx.ui.notify("Copilot usage refreshed", "info");
+    },
+  });
 
   // Show usage on session start only if the restored model is GitHub Copilot.
   pi.on("session_start", async (_event, ctx) => {

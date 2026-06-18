@@ -16,17 +16,21 @@ type QuotaSnapshot = {
   percent_remaining?: number
   quota_remaining?: number
   remaining?: number
-  entitlement?: number
+  entitlement?: number | string
   unlimited?: boolean
+  overage_count?: number
+  reset_date?: string
 }
 
 type CopilotUserInfo = {
   copilot_plan?: string
+  quota_reset_date?: string
   quota_reset_date_utc?: string
   endpoints?: {
     api?: string
   }
   quota_snapshots?: {
+    premium_models?: QuotaSnapshot
     premium_interactions?: QuotaSnapshot
     chat?: QuotaSnapshot
     completions?: QuotaSnapshot
@@ -135,6 +139,9 @@ type OpencodeClient = {
 const CACHE_TTL_MS = 5 * 60 * 1000
 const GITHUB_API_BASE = "https://api.github.com"
 const CAPI_BASE = "https://api.githubcopilot.com"
+const DAY_MS = 24 * 60 * 60 * 1000
+const FOOTER_PREFIX = "Copilot · "
+const FOOTER_SEPARATOR = " · "
 const processedMessages = new Set<string>()
 
 function authPaths() {
@@ -157,25 +164,105 @@ async function readAuth(): Promise<AuthFile | null> {
   return null
 }
 
+function numberValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
 function formatNumber(value: number | undefined): string | null {
-  if (typeof value !== "number") return null
+  if (typeof value !== "number" || !Number.isFinite(value)) return null
   return new Intl.NumberFormat().format(Math.floor(value))
 }
 
-function formatUsedPercent(value: number | undefined): string | null {
-  if (typeof value !== "number") return null
-  return `${(100 - value).toFixed(1)}% used`
+function formatAmount(value: number): string {
+  if (Number.isInteger(value)) return String(value)
+  if (Math.abs(value) >= 10) return value.toFixed(1)
+  return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
 }
 
-function formatResetDate(value: string | undefined): string | null {
+function formatUsedPercent(value: number | undefined): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null
+  return `${formatAmount(Math.max(0, value))}%`
+}
+
+function calculatePercentUsed(input: {
+  percentRemaining?: number
+  remaining?: number
+  entitlement?: number
+}): number | undefined {
+  if (typeof input.percentRemaining === "number" && Number.isFinite(input.percentRemaining)) {
+    return Math.max(0, 100 - input.percentRemaining)
+  }
+
+  if (
+    typeof input.remaining === "number" &&
+    Number.isFinite(input.remaining) &&
+    typeof input.entitlement === "number" &&
+    Number.isFinite(input.entitlement) &&
+    input.entitlement > 0
+  ) {
+    return Math.max(0, ((input.entitlement - input.remaining) / input.entitlement) * 100)
+  }
+
+  return undefined
+}
+
+function formatUsageBar(percentUsed: number | undefined): string | null {
+  if (typeof percentUsed !== "number" || !Number.isFinite(percentUsed)) return null
+
+  const displayPercent = Math.max(0, percentUsed)
+  const clamped = Math.max(0, Math.min(100, displayPercent))
+  const width = 10
+  const filled = clamped === 0 ? 0 : Math.max(1, Math.round((clamped / 100) * width))
+  const filledWidth = Math.min(width, filled)
+  const percent = formatUsedPercent(displayPercent)
+  if (!percent) return null
+
+  return `${"█".repeat(filledWidth)}${"░".repeat(width - filledWidth)} **${percent}**`
+}
+
+function formatResetInfo(value: string | undefined): string | null {
   if (!value) return null
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
-  return new Intl.DateTimeFormat("en-GB", {
+
+  const date = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
-    month: "long",
+    month: "short",
     timeZone: "UTC",
   }).format(parsed)
+
+  const now = new Date()
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const resetUtc = Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate())
+  const daysUntil = Math.max(0, Math.round((resetUtc - todayUtc) / DAY_MS))
+  const relative = daysUntil === 0 ? "Reset today" : `Reset in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`
+
+  return `${relative} (${date})`
+}
+
+function hasFooterLine(text: string): boolean {
+  return /\n\nCopilot(?::| ·) /.test(text)
+}
+
+function findFooterRange(text: string): { footerIndex: number; nextLineIndex: number } | null {
+  const regex = /\n\nCopilot(?::| ·) /g
+  let match: RegExpExecArray | null = null
+  let lastMatch: RegExpExecArray | null = null
+
+  while ((match = regex.exec(text))) {
+    lastMatch = match
+  }
+
+  if (!lastMatch) return null
+
+  const footerIndex = lastMatch.index
+  const nextLineIndex = text.indexOf("\n\n", footerIndex + 2)
+  return { footerIndex, nextLineIndex }
 }
 
 function isGitHubCopilotModel(model: SessionModel | undefined): model is SessionModel {
@@ -202,18 +289,22 @@ function withTurnCost(line: string, cost: number): string {
   if (!formatted) return line
 
   const turn = `turn ${formatted} est`
-  const cleaned = line.replace(/ \| turn (?:~?\$[\d,.]+|~?[\d,.]+ AIC) est/g, "").replace(/ \| model .*/, "")
-  return `${cleaned} | ${turn}`
+  const cleaned = line
+    .replace(/ (?:\||·) turn (?:~?\$[\d,.]+|~?[\d,.]+ AIC) est/g, "")
+    .replace(/ (?:\||·) model .*/, "")
+  return `${cleaned}${FOOTER_SEPARATOR}${turn}`
 }
 
 function upsertTurnCost(text: string, cost: number, usageLine: string): string {
-  const footerIndex = text.lastIndexOf("\n\nCopilot: ")
-  const nextLineIndex = footerIndex >= 0 ? text.indexOf("\n\n", footerIndex + 2) : -1
-  const replacement = withTurnCost(footerIndex >= 0 ? text.slice(footerIndex + 2, nextLineIndex >= 0 ? nextLineIndex : undefined) : usageLine, cost)
+  const footer = findFooterRange(text)
+  const replacement = withTurnCost(
+    footer ? text.slice(footer.footerIndex + 2, footer.nextLineIndex >= 0 ? footer.nextLineIndex : undefined) : usageLine,
+    cost,
+  )
 
-  if (footerIndex < 0) return `${text}\n\n${replacement}`
-  if (nextLineIndex < 0) return `${text.slice(0, footerIndex + 2)}${replacement}`
-  return `${text.slice(0, footerIndex + 2)}${replacement}${text.slice(nextLineIndex)}`
+  if (!footer) return `${text}\n\n${replacement}`
+  if (footer.nextLineIndex < 0) return `${text.slice(0, footer.footerIndex + 2)}${replacement}`
+  return `${text.slice(0, footer.footerIndex + 2)}${replacement}${text.slice(footer.nextLineIndex)}`
 }
 
 function totalStepCost(parts: SessionPart[], fallback: number | undefined): number | undefined {
@@ -223,7 +314,7 @@ function totalStepCost(parts: SessionPart[], fallback: number | undefined): numb
 
 function footerTextPart(parts: SessionPart[]): SessionTextPart | undefined {
   const textParts = parts.filter((part): part is SessionTextPart => part.type === "text" && typeof part.text === "string")
-  return [...textParts].reverse().find((part) => part.text.includes("\n\nCopilot: ")) || textParts[textParts.length - 1]
+  return [...textParts].reverse().find((part) => hasFooterLine(part.text)) || textParts[textParts.length - 1]
 }
 
 function tokenPrices(model: CopilotModel): CopilotTokenPrices | undefined {
@@ -315,26 +406,45 @@ async function buildModelCostsOutput(): Promise<string> {
 }
 
 function buildUsageLine(info: CopilotUserInfo): string {
-  const premium = info.quota_snapshots?.premium_interactions
-  const remaining = formatNumber(premium?.remaining ?? premium?.quota_remaining)
-  const entitlement = formatNumber(premium?.entitlement)
-  const used = formatUsedPercent(premium?.percent_remaining)
-  const reset = formatResetDate(info.quota_reset_date_utc)
+  const premium = info.quota_snapshots?.premium_models ?? info.quota_snapshots?.premium_interactions
   const plan = info.copilot_plan || "copilot"
+  const entitlement = numberValue(premium?.entitlement)
+  const percentRemaining = numberValue(premium?.percent_remaining)
+  const remaining = numberValue(premium?.remaining ?? premium?.quota_remaining)
+  const derivedRemaining =
+    remaining !== undefined
+      ? remaining
+      : entitlement !== undefined && percentRemaining !== undefined
+        ? entitlement * (percentRemaining / 100)
+        : undefined
+  const usedUnits =
+    entitlement !== undefined && derivedRemaining !== undefined
+      ? Math.max(0, entitlement - derivedRemaining) + (numberValue(premium?.overage_count) ?? 0)
+      : undefined
+  const percentUsed = calculatePercentUsed({
+    percentRemaining,
+    remaining: derivedRemaining,
+    entitlement,
+  })
+  const usageBar = formatUsageBar(percentUsed)
+  const used = formatNumber(usedUnits)
+  const total = formatNumber(entitlement)
+  const overage = formatNumber(numberValue(premium?.overage_count))
+  const reset = formatResetInfo(premium?.reset_date ?? info.quota_reset_date_utc ?? info.quota_reset_date)
+  const parts: string[] = []
 
   if (premium?.unlimited) {
-    return `Copilot: premium unlimited${reset ? ` | reset ${reset}` : ""}`
+    parts.push("unlimited")
+  } else {
+    if (usageBar) parts.push(usageBar)
+    if (used && total) parts.push(`${used}/${total} used`)
+    if (overage && overage !== "0") parts.push(`+${overage} overage`)
   }
 
-  if (remaining && entitlement) {
-    return `Copilot: ${used ? `**${used}**` : "usage unavailable"} (${remaining}/${entitlement} left)${reset ? ` | reset ${reset}` : ""}`
-  }
+  if (parts.length === 0) parts.push(plan)
+  if (reset) parts.push(reset)
 
-  if (used) {
-    return `Copilot: **${used}**${reset ? ` | reset ${reset}` : ""}`
-  }
-
-  return `Copilot: ${plan}${reset ? ` | reset ${reset}` : ""}`
+  return `${FOOTER_PREFIX}${parts.join(FOOTER_SEPARATOR)}`
 }
 
 async function fetchJSON(url: string, token: string): Promise<unknown> {
@@ -506,13 +616,13 @@ async function fetchCopilotModels(token: string, apiBase?: string): Promise<Mode
 async function fetchUsageLine(): Promise<string> {
   const auth = await readAuth()
   const token = auth?.["github-copilot"]?.access || auth?.github?.access
-  if (!token) return "Copilot usage unavailable (missing GitHub auth)"
+  if (!token) return `${FOOTER_PREFIX}unavailable (missing GitHub auth)`
 
   try {
     const data = (await fetchJSON("https://api.github.com/copilot_internal/user", token)) as CopilotUserInfo
     return buildUsageLine(data)
   } catch {
-    return "Copilot usage unavailable (request failed)"
+    return `${FOOTER_PREFIX}unavailable (request failed)`
   }
 }
 
@@ -610,7 +720,7 @@ const CopilotUsagePlugin: Plugin = async ({ client, serverUrl }) => {
       if (processedMessages.has(processedKey)) return
       processedMessages.add(processedKey)
 
-      if (output.text.includes("\n\nCopilot: ")) return
+      if (hasFooterLine(output.text)) return
       output.text += `\n\n${await cachedUsageLine(input.sessionID)}`
     },
   }
