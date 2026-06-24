@@ -38,7 +38,7 @@ PI_MIN_NODE_VERSION=""
 MANIFEST_HASH=""
 PACKAGE_SOURCE_KIND=""
 PACKAGE_SOURCE_PATH=""
-BUNDLE_RTK=false
+BUNDLE_RTK="${PI_BUNDLE_RTK:-true}"
 CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 log() {
@@ -58,7 +58,7 @@ Create an offline pi bundle containing:
 - a bundled Node runtime compatible with the installed pi CLI
 - the pi CLI package and its dependencies
 - packages from Pi settings.json pre-installed into bundled global npm
-- a bundled RTK tool when required by packaged extensions (for example pi-rtk-optimizer)
+- a bundled RTK tool so Pi's RTK-accelerated tools work offline
 - an install.sh helper for target machines without npm access
 
 Options:
@@ -67,6 +67,7 @@ Options:
   --node-version VER    Override bundled Node version (default from pi's minimum supported version)
   --pool-dir DIR        Publish archive to DIR (default: $DEFAULT_POOL_DIR)
   --no-publish          Keep the archive in output_directory instead of moving it to the pool
+  --no-rtk              Do not bundle RTK (not recommended; Pi will fall back to slower built-ins)
   --help, -h            Show this help message
 
 Arguments:
@@ -115,7 +116,7 @@ ensure_command() {
 
 check_dependencies() {
     log "Checking packaging dependencies..."
-    for cmd in curl tar git npm node; do
+    for cmd in curl tar git npm node find; do
         ensure_command "$cmd"
     done
     log "✓ Dependencies available"
@@ -188,20 +189,6 @@ NODE
     if [[ ${#PACKAGE_SPECS[@]} -eq 0 ]]; then
         log "Package source contains no third-party packages; bundle will only include pi itself"
     fi
-}
-
-bundle_requires_rtk() {
-    local spec
-    for spec in "${PACKAGE_SPECS[@]}"; do
-        local source="${spec%%$'\t'*}"
-        case "$source" in
-            *pi-rtk-optimizer*)
-                return 0
-                ;;
-        esac
-    done
-
-    return 1
 }
 
 resolve_pi_package_dir() {
@@ -385,8 +372,45 @@ setup_bundled_node() {
     [[ -x "$NPM_BIN" ]] || error "Bundled npm executable not found after extraction"
 }
 
+find_existing_rtk_binary() {
+    local explicit_path="${PI_RTK_PATH:-}"
+    local candidate=""
+
+    for candidate in "$explicit_path" "$(command -v rtk 2>/dev/null || true)" "$HOME/.local/bin/rtk"; do
+        [[ -n "$candidate" && -x "$candidate" ]] || continue
+
+        local resolved_candidate="$candidate"
+        if grep -q 'node/bin/rtk' "$candidate" 2>/dev/null; then
+            resolved_candidate="$HOME/.local/share/pi-runtime/node/bin/rtk"
+            [[ -x "$resolved_candidate" ]] || continue
+        fi
+
+        local version_output
+        version_output="$("$resolved_candidate" --version 2>/dev/null || true)"
+        [[ -n "$version_output" ]] || continue
+
+        if [[ "$version_output" == *"$RTK_VERSION"* ]]; then
+            printf '%s\n' "$resolved_candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 install_rtk_into_bundled_runtime() {
     [[ "$BUNDLE_RTK" == true ]] || return 0
+
+    mkdir -p "$STAGE_DIR/node/bin"
+
+    local existing_rtk
+    existing_rtk="$(find_existing_rtk_binary || true)"
+    if [[ -n "$existing_rtk" ]]; then
+        log "Bundling existing RTK ${RTK_VERSION}: $existing_rtk"
+        cp "$existing_rtk" "$STAGE_DIR/node/bin/rtk"
+        chmod +x "$STAGE_DIR/node/bin/rtk"
+        return 0
+    fi
 
     local download_dir="${XDG_CACHE_HOME:-$HOME/.cache}/pi-offline"
     local rtk_archive="$download_dir/${RTK_ARCHIVE_NAME}"
@@ -402,11 +426,14 @@ install_rtk_into_bundled_runtime() {
     fi
 
     rm -rf "$extract_dir"
-    mkdir -p "$extract_dir" "$STAGE_DIR/node/bin"
+    mkdir -p "$extract_dir"
     tar -xzf "$rtk_archive" -C "$extract_dir"
 
     local rtk_bin="$extract_dir/rtk"
-    [[ -x "$rtk_bin" ]] || error "Bundled RTK executable not found after extraction"
+    if [[ ! -x "$rtk_bin" ]]; then
+        rtk_bin="$(find "$extract_dir" -type f -name rtk -perm -u+x | head -1)"
+    fi
+    [[ -n "$rtk_bin" && -x "$rtk_bin" ]] || error "Bundled RTK executable not found after extraction"
 
     cp "$rtk_bin" "$STAGE_DIR/node/bin/rtk"
     chmod +x "$STAGE_DIR/node/bin/rtk"
@@ -741,6 +768,8 @@ RUNTIME_DIR="${HOME}/.local/share/pi-runtime"
 exec "${RUNTIME_DIR}/node/bin/rtk" "$@"
 RTK_WRAPPER
     chmod +x "$TARGET_BIN_DIR/rtk"
+elif [[ -f "$TARGET_BIN_DIR/rtk" ]] && grep -q 'node/bin/rtk' "$TARGET_BIN_DIR/rtk" 2>/dev/null; then
+    rm -f "$TARGET_BIN_DIR/rtk"
 fi
 
 if [[ -f "$TARGET_RUNTIME_DIR/manifest.env" ]]; then
@@ -782,7 +811,7 @@ This archive contains an offline pi runtime bundle.
 - the pi CLI package and its dependencies under \`pi-runtime/pi/\`
 - a bundled Node ${NODE_VERSION} runtime under \`pi-runtime/node/\`
 - configured Pi packages pre-installed into bundled global npm under \`pi-runtime/node/lib/node_modules/\`
-- a bundled RTK binary under \`pi-runtime/node/bin/rtk\` when required by packaged extensions
+- a bundled RTK binary under \`pi-runtime/node/bin/rtk\` so Pi can use RTK offline
 - \`install.sh\` to install the bundle on a machine without npm access
 
 ## Installation
@@ -872,6 +901,10 @@ parse_args() {
                 PUBLISH=false
                 shift
                 ;;
+            --no-rtk)
+                BUNDLE_RTK=false
+                shift
+                ;;
             --help|-h)
                 usage
                 exit 0
@@ -891,9 +924,6 @@ main() {
     parse_args "$@"
     check_dependencies
     load_package_specs
-    if bundle_requires_rtk; then
-        BUNDLE_RTK=true
-    fi
     load_pi_package_metadata
     resolve_bundled_node_version
     validate_requested_node_version

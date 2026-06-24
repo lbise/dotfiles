@@ -34,6 +34,7 @@ const RTK_STATUS_TTL_MS = 30_000;
 const DEFAULT_GREP_LIMIT = 100;
 const RTK_NOTICE_MAX_LENGTH = 140;
 const RTK_READ_COMPACT_BYTE_THRESHOLD = DEFAULT_MAX_BYTES;
+const RTK_USER_ONLY_CUSTOM_TYPES = new Set(["rtk-stats", "rtk-clear-stats"]);
 
 const readSchema = Type.Object({
   path: Type.String({ description: "Path to the file to read (relative or absolute)" }),
@@ -651,6 +652,16 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
     if (ctx.hasUI) {
       ctx.ui.setWidget("rtk-unavailable", undefined);
     }
+  });
+
+  pi.on("context", (event) => {
+    // `/rtk stats` output is for the human transcript only. `sendMessage()` custom
+    // messages normally become user messages in the next LLM request, so strip
+    // these RTK command messages from model context while keeping them displayed.
+    const messages = event.messages.filter(
+      (message: any) => message.role !== "custom" || !RTK_USER_ONLY_CUSTOM_TYPES.has(message.customType),
+    );
+    return messages.length === event.messages.length ? undefined : { messages };
   });
 
   pi.on("tool_call", async (event, ctx) => {
