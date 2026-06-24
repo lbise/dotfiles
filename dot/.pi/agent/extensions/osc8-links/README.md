@@ -2,6 +2,8 @@
 
 This extension emits clickable OSC8 links from pi and routes `pi-open://file` URLs to a Neovim instance running in the originating tmux session.
 
+It also automatically linkifies existing file paths in assistant/tool output when the path exists on disk.
+
 ## Flow
 
 ```text
@@ -90,14 +92,16 @@ Emit a test handler link:
 /osc8-test
 ```
 
-Emit a file link:
+Emit a file link manually:
 
 ```text
 /osc8-link dot/.zshrc:10
 /osc8-link src/foo.ts:42:3
 ```
 
-Clicking the link should open/select the file in the tmux session's Neovim and jump to the requested line/column.
+Assistant/tool output paths such as `dot/.zshrc:10` are also linkified automatically if the file exists.
+
+Clicking a link should open/select the file in the tmux session's Neovim and jump to the requested line/column.
 
 ## Troubleshooting
 
@@ -118,6 +122,12 @@ If those are missing, restart Neovim with:
 
 ```sh
 ~/.scripts/nvim-tmux-session
+```
+
+Disable automatic linkification with `~/.pi/agent/osc8-links.json`:
+
+```json
+{ "autoLink": false }
 ```
 
 If Windows clicks are slow and print `wsl: Processing /etc/fstab with mount -a failed`, fix WSL `/etc/fstab` or make slow mounts `noauto,nofail,x-systemd.automount`, then restart WSL with `wsl --shutdown` when convenient.

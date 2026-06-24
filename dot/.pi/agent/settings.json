@@ -1,8 +1,8 @@
 {
-  "lastChangelogVersion": "0.79.4",
-  "defaultProvider": "github-copilot",
-  "defaultModel": "gpt-5.4",
-  "defaultThinkingLevel": "xhigh",
+  "lastChangelogVersion": "0.80.2",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
+  "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
   "extensions": [
     "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"

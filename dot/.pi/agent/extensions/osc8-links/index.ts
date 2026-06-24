@@ -13,6 +13,8 @@ type Osc8Config = {
    * If unset, the extension builds a pi-open://file URL and omits empty fields.
    */
   template?: string;
+  /** Automatically linkify existing file paths in assistant/tool output. Default: true. */
+  autoLink?: boolean;
 };
 
 type Osc8MessageDetails = {
@@ -37,6 +39,20 @@ const CONFIG_PATHS = [
 ];
 
 export default function (pi: ExtensionAPI) {
+  pi.on("message_end", async (event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    const config = loadConfig(ctx as ExtensionCommandContext);
+    if (config.autoLink === false) return;
+
+    const message = mapMessageText(event.message, (text) => linkifyFilePaths(text, ctx.cwd));
+    if (message !== event.message) return { message };
+  });
+
+  pi.on("context", async (event) => {
+    const messages = event.messages.map((message: any) => mapMessageText(message, stripOsc8Links));
+    return { messages };
+  });
+
   pi.registerMessageRenderer<Osc8MessageDetails>("osc8-link", (message, { expanded }, theme) => {
     const details = message.details;
     if (!details?.target || !details?.label) return undefined;
@@ -183,6 +199,8 @@ function parsePathLineCol(input: string): { path: string; line?: number; col?: n
 }
 
 function resolvePath(path: string, cwd: string): string {
+  if (path === "~") return homedir();
+  if (path.startsWith("~/")) return resolve(homedir(), path.slice(2));
   return isAbsolute(path) ? path : resolve(cwd, path);
 }
 
@@ -252,6 +270,79 @@ function buildPiOpenUrl(action: string, data: Record<string, string | number | u
     if (value !== undefined && value !== "") params.set(key, String(value));
   }
   return `pi-open://${action}?${params.toString()}`;
+}
+
+function linkifyFilePaths(text: string, cwd: string): string {
+  if (!text || text.includes("\x1b]8;;")) return text;
+
+  return text.replace(/(^|[\s("'`])((?:\.{1,2}\/|\/|~\/|[A-Za-z0-9_.-]+\/)[^\s"'`<>|{}\[\]]+)/g, (match, prefix: string, token: string) => {
+    const linked = linkifyToken(token, cwd);
+    return linked === token ? match : `${prefix}${linked}`;
+  });
+}
+
+function linkifyToken(token: string, cwd: string): string {
+  const trailingMatch = token.match(/[),.;!?]+$/);
+  const trailing = trailingMatch?.[0] ?? "";
+  const core = trailing ? token.slice(0, -trailing.length) : token;
+  if (!core || isUrl(core) || core.includes("\x1b")) return token;
+
+  const parsed = parsePathLineCol(core);
+  const abs = resolvePath(parsed.path, cwd);
+  if (!existsSync(abs)) return token;
+
+  const line = parsed.line ?? 1;
+  const col = parsed.col ?? 1;
+  const rel = relative(cwd, abs) || ".";
+  const data: Record<string, string | number | undefined> = {
+    ...getRuntimeContext(cwd),
+    abs,
+    path: abs,
+    rel,
+    label: core,
+    line,
+    col,
+  };
+  const url = buildPiOpenUrl("file", data);
+  return hyperlink(safeTerminalText(core), safeOscParam(url)) + trailing;
+}
+
+function stripOsc8Links(text: string): string {
+  if (!text || !text.includes("\x1b]8;;")) return text;
+  return text.replace(/\x1b\]8;;[^\x07\x1b]*(?:\x07|\x1b\\)/g, "");
+}
+
+function mapMessageText(message: any, mapper: (text: string) => string): any {
+  if (!message || typeof message !== "object") return message;
+  let changed = false;
+  const next = { ...message };
+
+  if (Array.isArray(message.content)) {
+    const content = message.content.map((part: any) => {
+      if (!part || part.type !== "text" || typeof part.text !== "string") return part;
+      const text = mapper(part.text);
+      if (text === part.text) return part;
+      changed = true;
+      return { ...part, text };
+    });
+    if (changed) next.content = content;
+  } else if (typeof message.content === "string") {
+    const content = mapper(message.content);
+    if (content !== message.content) {
+      changed = true;
+      next.content = content;
+    }
+  }
+
+  if (typeof message.output === "string") {
+    const output = mapper(message.output);
+    if (output !== message.output) {
+      changed = true;
+      next.output = output;
+    }
+  }
+
+  return changed ? next : message;
 }
 
 function applyTemplate(template: string, data: Record<string, string | number | undefined>): string {
