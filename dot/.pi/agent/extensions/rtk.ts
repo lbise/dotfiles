@@ -9,6 +9,7 @@
 //   safety guards for known-bad RTK rewrites.
 
 import {
+  createBashToolDefinition,
   createFindToolDefinition,
   createGrepToolDefinition,
   createLsToolDefinition,
@@ -79,6 +80,14 @@ type RtkRunResult = {
   code: number;
   killed: boolean;
   args: string[];
+};
+
+type BashRewriteRoute = {
+  route: "rtk" | "pi";
+  reason: "hit" | "miss" | "unavailable" | "unsupported" | "disabled" | "failed" | "explicit-rtk";
+  command: string;
+  originalCommand: string;
+  detail?: string;
 };
 
 const IMAGE_EXTENSIONS = new Set([
@@ -236,6 +245,38 @@ function buildPiReadDisplay(params: any): string {
     ? `:${params?.offset ?? 1}${params?.limit !== undefined ? `-${(params?.offset ?? 1) + params.limit - 1}` : ""}`
     : "";
   return `read ${path}${range}`;
+}
+
+function buildBashDisplay(params: any, route?: BashRewriteRoute): string {
+  const command = route?.command ?? toolArgText(params?.command, "...");
+  return `$ ${command}`;
+}
+
+function renderRtkBashToolCall(
+  theme: any,
+  args: any,
+  route: BashRewriteRoute | undefined,
+  context: { state?: Record<string, unknown>; executionStarted?: boolean; lastComponent?: any },
+): Text {
+  const state = context.state ?? {};
+  if (context.executionStarted && state.startedAt === undefined) {
+    state.startedAt = Date.now();
+    state.endedAt = undefined;
+  }
+
+  const routeLabel = route?.route === "rtk"
+    ? theme.fg("accent", " ↪ RTK")
+    : theme.fg("dim", " ↪ Pi") + (route?.reason === "miss" ? theme.fg("muted", " (RTK miss)") : "");
+  const detail = route?.detail && route.reason !== "miss" ? theme.fg("muted", ` (${route.detail})`) : "";
+  const timeoutSuffix = typeof args?.timeout === "number" && args.timeout > 0
+    ? theme.fg("muted", ` (timeout ${args.timeout}s)`)
+    : "";
+  const commandDisplay = compactNoticeText(buildBashDisplay(args, route), 130);
+  const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+  text.setText(
+    `${theme.fg("toolTitle", theme.bold("bash"))}${routeLabel}${detail} ${theme.fg("toolOutput", commandDisplay)}${timeoutSuffix}`,
+  );
+  return text;
 }
 
 async function chooseRtkReadLevel(cwd: string, filePath: string): Promise<"none" | "minimal"> {
@@ -514,6 +555,7 @@ async function refreshRtkStatus(pi: ExtensionAPI): Promise<RtkStatus> {
 export default function rtkPiExtension(pi: ExtensionAPI): void {
   let status: RtkStatus = { available: false, commands: new Set(), checkedAt: 0 };
   let warnedMissing = false;
+  const bashRewriteRoutes = new Map<string, BashRewriteRoute>();
 
   const updateRtkAvailabilityWarning = (ctx?: ExtensionContext | ExtensionCommandContext): void => {
     if (!ctx?.hasUI) {
@@ -644,6 +686,7 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (_event, ctx) => {
     warnedMissing = false;
+    bashRewriteRoutes.clear();
     status = await refreshRtkStatus(pi);
     updateRtkAvailabilityWarning(ctx);
   });
@@ -674,13 +717,53 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
       return {};
     }
 
+    const rememberBashRoute = (route: BashRewriteRoute): void => {
+      bashRewriteRoutes.set(event.toolCallId, route);
+    };
+
     const trimmed = command.trimStart();
-    if (trimmed === "rtk" || trimmed.startsWith("rtk ") || process.env.RTK_DISABLED === "1") {
+    if (trimmed === "rtk" || trimmed.startsWith("rtk ")) {
+      rememberBashRoute({
+        route: "rtk",
+        reason: "explicit-rtk",
+        command,
+        originalCommand: command,
+        detail: "explicit",
+      });
+      return {};
+    }
+
+    if (process.env.RTK_DISABLED === "1") {
+      rememberBashRoute({
+        route: "pi",
+        reason: "disabled",
+        command,
+        originalCommand: command,
+        detail: "RTK disabled",
+      });
       return {};
     }
 
     const currentStatus = await ensureStatus(ctx);
+    if (!currentStatus.available) {
+      rememberBashRoute({
+        route: "pi",
+        reason: "unavailable",
+        command,
+        originalCommand: command,
+        detail: "RTK unavailable",
+      });
+      return {};
+    }
+
     if (!commandSupported(currentStatus, "rewrite")) {
+      rememberBashRoute({
+        route: "pi",
+        reason: "unsupported",
+        command,
+        originalCommand: command,
+        detail: "rewrite unsupported",
+      });
       return {};
     }
 
@@ -695,18 +778,61 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
           const rtkRgCommand = commandSupported(currentStatus, "rg") ? rewriteRgFilesCommandToRtkRg(command) : undefined;
           if (rtkRgCommand) {
             event.input.command = rtkRgCommand;
+            rememberBashRoute({ route: "rtk", reason: "hit", command: rtkRgCommand, originalCommand: command });
             recordRtkHit(ctx, "bash rg", rtkRgCommand);
+          } else {
+            rememberBashRoute({
+              route: "pi",
+              reason: "failed",
+              command,
+              originalCommand: command,
+              detail: "unsafe rewrite skipped",
+            });
           }
         } else if (nextCommand !== command) {
           event.input.command = nextCommand;
+          rememberBashRoute({ route: "rtk", reason: "hit", command: nextCommand, originalCommand: command });
           recordRtkHit(ctx, "bash", nextCommand);
+        } else {
+          rememberBashRoute({ route: "pi", reason: "miss", command, originalCommand: command });
         }
+      } else {
+        rememberBashRoute({ route: "pi", reason: "miss", command, originalCommand: command });
       }
     } catch {
+      rememberBashRoute({
+        route: "pi",
+        reason: "failed",
+        command,
+        originalCommand: command,
+        detail: "rewrite failed",
+      });
       // Fail open. Bash tool execution must never depend on RTK being healthy.
     }
 
     return {};
+  });
+
+  const bashToolMetadata = createBashToolDefinition(process.cwd());
+  pi.registerTool({
+    ...bashToolMetadata,
+    label: "bash (rtk)",
+    description:
+      `${bashToolMetadata.description} Eligible commands are preflighted through \`rtk rewrite\`; the tool row shows whether RTK rewrote the command or missed and fell back to plain bash.`,
+    promptGuidelines: [
+      "Use bash normally; this Pi extension preflights eligible bash commands through RTK and shows RTK/Pi routing in the bash tool row.",
+    ],
+    renderCall(args, theme, context) {
+      return renderRtkBashToolCall(theme, args, bashRewriteRoutes.get(context.toolCallId), context);
+    },
+    renderResult(result, options, theme, context) {
+      const definition = createBashToolDefinition(context.cwd);
+      return definition.renderResult?.(result, options, theme, context) ?? new Text("", 0, 0);
+    },
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
+      const definition = createBashToolDefinition(ctx.cwd);
+      return definition.execute(toolCallId, params, signal, onUpdate, ctx);
+    },
   });
 
   pi.registerTool({
