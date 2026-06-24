@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+if [[ -z "${TMUX:-}" || -z "${TMUX_PANE:-}" ]]; then
+  echo "nvim-tmux-session must be started inside tmux" >&2
+  exit 1
+fi
+
+session="$(tmux display-message -p '#S')"
+safe_session="$(printf '%s' "$session" | tr -c 'A-Za-z0-9_.-' '_')"
+safe_host="$(hostname | tr -c 'A-Za-z0-9_.-' '_')"
+runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
+server="${PI_NVIM_SERVER:-$runtime_dir/nvim-${USER:-user}-${safe_host}-${safe_session}.sock}"
+
+mkdir -p "$(dirname "$server")"
+
+# Record the Neovim RPC socket and the pane that owns the UI in the tmux session.
+tmux set-environment -t "$session" PI_NVIM_SERVER "$server"
+tmux set-environment -t "$session" PI_NVIM_PANE "$TMUX_PANE"
+
+echo "Neovim server for tmux session '$session': $server" >&2
+exec nvim --listen "$server" "$@"

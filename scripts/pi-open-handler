@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+url="${1:-}"
+# Windows protocol handlers invoke us through wsl.exe without a terminal. tmux
+# commands still need TERM set, even for non-interactive commands like
+# show-environment.
+export TERM="${TERM:-xterm-256color}"
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/pi-open-handler"
+log_file="$cache_dir/urls.log"
+mkdir -p "$cache_dir"
+
+log() {
+  printf '[%s] %s\n' "$(date -Is)" "$*" >> "$log_file"
+}
+
+notify() {
+  local title="${1:-pi-open handler}"
+  local body="${2:-}"
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send "$title" "$body" >/dev/null 2>&1 || true
+  else
+    printf '%s: %s\n' "$title" "$body"
+  fi
+}
+
+parse_url() {
+  python3 - "$url" <<'PY'
+import shlex
+import sys
+from urllib.parse import parse_qs, unquote, urlparse
+
+url = sys.argv[1]
+parsed = urlparse(url)
+qs = parse_qs(parsed.query, keep_blank_values=True)
+
+def first(key):
+    values = qs.get(key)
+    return values[0] if values else ""
+
+fields = {
+    "PI_OPEN_SCHEME": parsed.scheme,
+    "PI_OPEN_ACTION": parsed.netloc,
+    "PI_OPEN_URL_PATH": unquote(parsed.path),
+    "PI_OPEN_HOST": first("host"),
+    "PI_OPEN_USER": first("user"),
+    "PI_OPEN_WSL_DISTRO": first("wslDistro"),
+    "PI_OPEN_CWD": first("cwd"),
+    "PI_OPEN_FILE": first("path") or first("abs"),
+    "PI_OPEN_LINE": first("line") or "1",
+    "PI_OPEN_COL": first("col") or "1",
+    "PI_OPEN_TMUX_SOCKET": first("tmuxSocket"),
+    "PI_OPEN_TMUX_SESSION": first("tmuxSession"),
+    "PI_OPEN_TMUX_PANE": first("tmuxPane"),
+    "PI_OPEN_MESSAGE": first("message"),
+}
+for key, value in fields.items():
+    print(f"{key}={shlex.quote(value)}")
+PY
+}
+
+log_url_details() {
+  {
+    printf '[%s] %s\n' "$(date -Is)" "$url"
+    printf '  action=%s\n' "${PI_OPEN_ACTION:-}"
+    printf '  host=%s\n' "${PI_OPEN_HOST:-}"
+    printf '  user=%s\n' "${PI_OPEN_USER:-}"
+    printf '  wslDistro=%s\n' "${PI_OPEN_WSL_DISTRO:-}"
+    printf '  cwd=%s\n' "${PI_OPEN_CWD:-}"
+    printf '  file=%s\n' "${PI_OPEN_FILE:-}"
+    printf '  line=%s\n' "${PI_OPEN_LINE:-}"
+    printf '  col=%s\n' "${PI_OPEN_COL:-}"
+    printf '  tmuxSocket=%s\n' "${PI_OPEN_TMUX_SOCKET:-}"
+    printf '  tmuxSession=%s\n' "${PI_OPEN_TMUX_SESSION:-}"
+    printf '  tmuxPane=%s\n' "${PI_OPEN_TMUX_PANE:-}"
+    [[ -n "${PI_OPEN_MESSAGE:-}" ]] && printf '  message=%s\n' "$PI_OPEN_MESSAGE"
+    printf '\n'
+  } >> "$log_file"
+}
+
+is_local_host() {
+  local host="$1"
+  [[ -z "$host" ]] && return 0
+  case "$host" in
+    localhost|127.0.0.1|::1) return 0 ;;
+  esac
+
+  local h short fqdn etc_host
+  h="$(hostname 2>/dev/null || true)"
+  short="$(hostname -s 2>/dev/null || true)"
+  fqdn="$(hostname -f 2>/dev/null || true)"
+  etc_host="$(cat /etc/hostname 2>/dev/null || true)"
+  [[ "$host" == "$h" || "$host" == "$short" || "$host" == "$fqdn" || "$host" == "$etc_host" ]]
+}
+
+nvim_bin() {
+  if [[ -n "${PI_OPEN_NVIM_BIN:-}" ]]; then
+    printf '%s\n' "$PI_OPEN_NVIM_BIN"
+  elif [[ -x "$HOME/.local/bin/nvim" ]]; then
+    printf '%s\n' "$HOME/.local/bin/nvim"
+  else
+    command -v nvim
+  fi
+}
+
+tmux_bin() {
+  if [[ -n "${PI_OPEN_TMUX_BIN:-}" ]]; then
+    printf '%s\n' "$PI_OPEN_TMUX_BIN"
+  elif [[ -x "$HOME/.local/bin/tmux" ]]; then
+    # wsl.exe non-login invocations often have a minimal PATH and may find an
+    # older distro tmux client. Prefer the user's tmux when available, otherwise
+    # client/server version mismatches can look like "server exited unexpectedly".
+    printf '%s\n' "$HOME/.local/bin/tmux"
+  else
+    command -v tmux
+  fi
+}
+
+run_tmux() {
+  local cmd
+  cmd=("$(tmux_bin)")
+  if [[ -n "${PI_OPEN_TMUX_SOCKET:-}" ]]; then
+    cmd+=(-S "$PI_OPEN_TMUX_SOCKET")
+  fi
+  "${cmd[@]}" "$@"
+}
+
+resolve_tmux_session() {
+  if [[ -n "${PI_OPEN_TMUX_SESSION:-}" ]]; then
+    printf '%s\n' "$PI_OPEN_TMUX_SESSION"
+    return 0
+  fi
+  if [[ -n "${PI_OPEN_TMUX_PANE:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    run_tmux display-message -p -t "$PI_OPEN_TMUX_PANE" '#S' 2>/dev/null || true
+  fi
+}
+
+show_tmux_env() {
+  local session="$1"
+  local name="$2"
+  [[ -z "$session" ]] && return 1
+  { run_tmux show-environment -t "$session" "$name" 2>/dev/null || true; } | sed -n "s/^$name=//p"
+}
+
+vim_single_quote() {
+  local value="$1"
+  value=${value//\'/\'\'}
+  printf "'%s'" "$value"
+}
+
+open_file_local() {
+  local file="${PI_OPEN_FILE:-}"
+  local line="${PI_OPEN_LINE:-1}"
+  local col="${PI_OPEN_COL:-1}"
+  [[ -z "$file" ]] && { notify "pi-open" "No file path in URL"; return 1; }
+  [[ "$line" =~ ^[0-9]+$ ]] || line=1
+  [[ "$col" =~ ^[0-9]+$ ]] || col=1
+
+  local session server nvim_pane
+  session="$(resolve_tmux_session | head -n1)"
+  server="${PI_NVIM_SERVER:-}"
+  nvim_pane="${PI_NVIM_PANE:-}"
+
+  if [[ -z "$server" && -n "$session" ]] && command -v tmux >/dev/null 2>&1; then
+    server="$(show_tmux_env "$session" PI_NVIM_SERVER | head -n1)"
+  fi
+  if [[ -z "$nvim_pane" && -n "$session" ]] && command -v tmux >/dev/null 2>&1; then
+    nvim_pane="$(show_tmux_env "$session" PI_NVIM_PANE | head -n1)"
+  fi
+
+  if [[ -z "$server" ]]; then
+    log "No PI_NVIM_SERVER found for session '$session'; cannot remote-open $file"
+    notify "pi-open" "No PI_NVIM_SERVER found for tmux session '$session'"
+    return 1
+  fi
+
+  if [[ ! -S "$server" ]]; then
+    log "Configured Neovim server socket does not exist: $server"
+    notify "pi-open" "Neovim server socket not found: $server"
+    return 1
+  fi
+
+  log "Opening in Neovim server=$server file=$file line=$line col=$col session=$session pane=$nvim_pane"
+  # Use one synchronous remote expression so :drop and cursor movement happen in
+  # the same target window. Doing --remote followed by --remote-send can race or
+  # move the cursor in the previously focused split.
+  local nvim_cmd expr quoted_file
+  nvim_cmd="$(nvim_bin)"
+  quoted_file="$(vim_single_quote "$file")"
+  expr="[execute('drop ' . fnameescape($quoted_file)), cursor($line,$col)]"
+  "$nvim_cmd" --server "$server" --remote-expr "$expr" >/dev/null
+
+  # Best-effort focus of the pane that registered the Neovim server.
+  if [[ -n "$nvim_pane" && -n "$session" ]] && command -v tmux >/dev/null 2>&1; then
+    local nvim_window
+    nvim_window="$(run_tmux display-message -p -t "$nvim_pane" '#{window_id}' 2>/dev/null || true)"
+    [[ -n "$nvim_window" ]] && run_tmux switch-client -t "$nvim_window" 2>/dev/null || true
+    run_tmux select-pane -t "$nvim_pane" 2>/dev/null || true
+  fi
+}
+
+if [[ -z "$url" ]]; then
+  echo "Usage: pi-open-handler 'pi-open://file?...'" >&2
+  exit 2
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required" >&2
+  exit 1
+fi
+
+eval "$(parse_url)"
+log_url_details
+
+case "${PI_OPEN_ACTION:-}" in
+  file)
+    if is_local_host "${PI_OPEN_HOST:-}"; then
+      open_file_local
+    else
+      log "Remote host '${PI_OPEN_HOST:-}' is not implemented yet for this POC"
+      notify "pi-open" "Remote host is not implemented yet: ${PI_OPEN_HOST:-unknown}"
+    fi
+    ;;
+  echo)
+    notify "pi-open handler" "${PI_OPEN_MESSAGE:-Logged URL to $log_file}"
+    ;;
+  *)
+    notify "pi-open handler" "Logged URL to $log_file"
+    ;;
+esac
