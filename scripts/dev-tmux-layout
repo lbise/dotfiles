@@ -4,7 +4,7 @@ tmux rename-window "dev"
 tmux send-keys 'vim' Enter
 # Vertical split
 tmux split-window -h -l 70
-tmux send-keys 'opencode' Enter
+tmux send-keys 'pi' Enter
 # Horizontal split
 #tmux split-window -v -l 10
 # Select vim pane

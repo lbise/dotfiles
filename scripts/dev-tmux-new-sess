@@ -4,9 +4,9 @@
 tmux new-window -n dev
 tmux send-keys 'vim' Enter
 
-# opencode
-tmux new-window -n opencode
-tmux send-keys 'opencode' Enter
+# pi
+tmux new-window -n agent
+tmux send-keys 'pi' Enter
 
 # shell
 tmux new-window -n exec
