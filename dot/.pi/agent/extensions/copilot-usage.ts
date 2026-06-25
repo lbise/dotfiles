@@ -2,7 +2,8 @@
  * Copilot Usage Extension for pi
  *
  * Shows GitHub Copilot premium request usage, quota reset date, and the
- * last prompt's Copilot credit/rate in the TUI footer status bar.
+ * last prompt's summed Copilot AI credit usage plus USD/CHF estimate in the
+ * TUI footer status bar.
  *
  * Token source (in order):
  *   1. pi's own auth.json (~/.pi/agent/auth.json, github-copilot refresh token)
@@ -93,7 +94,7 @@ type ModelBillingInfo = {
 
 type LastPromptUsage = {
   credits: number;
-  source: "pi-usage-cost" | "quota-delta" | "model-rate";
+  source: "quota-delta" | "model-rate";
 };
 
 const USAGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -103,6 +104,12 @@ const STATUS_KEY = "copilot-usage";
 const CREDITS_WIDGET_KEY = "copilot-ai-credits";
 const DEFAULT_COPILOT_API_BASE_URL = "https://api.githubcopilot.com";
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// GitHub Copilot overage pricing is commonly quoted as USD 0.04 per premium
+// request/AI credit. Keep these configurable because billing terms and FX rates
+// can change independently of the extension.
+const DEFAULT_COPILOT_CREDIT_USD = 0.04;
+const DEFAULT_USD_TO_CHF = 0.89;
 
 const COPILOT_HEADERS = {
   Accept: "application/json",
@@ -469,13 +476,34 @@ function formatUsageLine(
 function formatCreditsWidgetLine(lastPrompt: LastPromptUsage, theme: any): string {
   const credits = lastPrompt.credits;
   const color = credits >= 10 ? "error" : credits >= 3 ? "warning" : "success";
-  const source =
-    lastPrompt.source === "pi-usage-cost"
-      ? ""
-      : lastPrompt.source === "quota-delta"
-        ? " quota delta"
-        : " rate fallback";
-  return theme.bold(theme.fg(color, `◆ AI credits: ${formatAmount(credits)} ◆`)) + theme.fg("dim", source);
+  const source = lastPrompt.source === "quota-delta" ? "from quota delta" : "est. from model rate";
+  const money = formatCreditCostEstimate(credits);
+  const suffix = [money, source].filter(Boolean).join(" · ");
+
+  return (
+    theme.bold(theme.fg(color, `◆ AI credits: ${formatAmount(credits)} ◆`)) +
+    (suffix ? theme.fg("dim", ` ${suffix}`) : "")
+  );
+}
+
+function formatCreditCostEstimate(credits: number): string | null {
+  const usdPerCredit = numberValue(process.env.COPILOT_CREDIT_USD) ?? DEFAULT_COPILOT_CREDIT_USD;
+  if (!Number.isFinite(usdPerCredit) || usdPerCredit <= 0) return null;
+
+  const usd = credits * usdPerCredit;
+  const usdToChf = numberValue(process.env.COPILOT_USD_TO_CHF) ?? DEFAULT_USD_TO_CHF;
+  const parts = [`≈${formatCurrency("$", usd)}`];
+
+  if (Number.isFinite(usdToChf) && usdToChf > 0) {
+    parts.push(`≈CHF ${formatCurrency("", usd * usdToChf)}`);
+  }
+
+  return parts.join(" / ");
+}
+
+function formatCurrency(prefix: string, value: number): string {
+  if (value > 0 && value < 0.01) return `${prefix}<0.01`;
+  return `${prefix}${value.toFixed(2)}`;
 }
 
 function formatAmount(value: number): string {
@@ -534,9 +562,9 @@ export default function (pi: ExtensionAPI) {
   let lastBilling: ModelBillingInfo | null = null;
   let lastPrompt: LastPromptUsage | null = null;
   let activePromptQuotaDeltaCredits = 0;
-  let activePromptUsageCostCredits = 0;
+  let activePromptModelRateCredits = 0;
   let activePromptHasQuotaDelta = false;
-  let activePromptHasUsageCost = false;
+  let activePromptHasModelRate = false;
   let activePromptSawQuotaHeader = false;
 
   function clearStatus(ctx: { ui: any }) {
@@ -581,9 +609,7 @@ export default function (pi: ExtensionAPI) {
         if (delta > 0.001 && delta < 1000) {
           activePromptQuotaDeltaCredits += delta;
           activePromptHasQuotaDelta = true;
-          if (!activePromptHasUsageCost) {
-            lastPrompt = { credits: activePromptQuotaDeltaCredits, source: "quota-delta" };
-          }
+          lastPrompt = { credits: activePromptQuotaDeltaCredits, source: "quota-delta" };
         }
       }
       lastQuotaTotalUsed = quota.totalUsedUnits;
@@ -678,9 +704,9 @@ export default function (pi: ExtensionAPI) {
     }
 
     activePromptQuotaDeltaCredits = 0;
-    activePromptUsageCostCredits = 0;
+    activePromptModelRateCredits = 0;
     activePromptHasQuotaDelta = false;
-    activePromptHasUsageCost = false;
+    activePromptHasModelRate = false;
     activePromptSawQuotaHeader = false;
     lastPrompt = null;
     clearCreditsWidget(ctx);
@@ -695,11 +721,21 @@ export default function (pi: ExtensionAPI) {
 
   // Copilot sends fresh quota snapshots as response headers. This lets us update
   // the footer immediately and compute per-prompt credit deltas without waiting
-  // for a separate /copilot_internal/user request.
+  // for a separate /copilot_internal/user request. If headers are unavailable,
+  // sum the model billing multiplier once per provider response as a fallback.
   pi.on("after_provider_response", async (event, ctx) => {
     if (!isGitHubCopilotModel(ctx.model)) return;
 
     await updateBilling(ctx);
+
+    const multiplier = numberValue(lastBilling?.multiplier);
+    if (multiplier !== undefined && multiplier >= 0) {
+      activePromptModelRateCredits += multiplier;
+      activePromptHasModelRate = true;
+      if (!activePromptHasQuotaDelta) {
+        lastPrompt = { credits: activePromptModelRateCredits, source: "model-rate" };
+      }
+    }
 
     const quota = quotaStateFromHeaders(event.headers);
     if (quota) {
@@ -709,29 +745,19 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  // Prefer pi's token-based usage cost when available. For Copilot models this
-  // uses the model credit rates and gives decimal values similar to VS Code.
-  pi.on("turn_end", async (event, ctx) => {
-    if (!isGitHubCopilotModel(ctx.model)) return;
-
-    const cost = numberValue((event.message as any)?.usage?.cost?.total);
-    if (cost !== undefined && cost >= 0) {
-      activePromptUsageCostCredits += cost;
-      activePromptHasUsageCost = true;
-      lastPrompt = { credits: activePromptUsageCostCredits, source: "pi-usage-cost" };
-      renderStatus(ctx);
-    }
-  });
-
-  // Finalize the prompt display. If usage cost and quota deltas are unavailable,
-  // fall back to VS Code-style model rate/multiplier metadata.
+  // Finalize the prompt display. Prefer real Copilot quota deltas; otherwise use
+  // the summed VS Code-style model rate/multiplier fallback.
   pi.on("agent_end", async (_event, ctx) => {
     if (!isGitHubCopilotModel(ctx.model)) {
       clearStatus(ctx);
       return;
     }
 
-    if (!activePromptHasUsageCost && !activePromptHasQuotaDelta && lastBilling?.multiplier !== undefined) {
+    if (activePromptHasQuotaDelta) {
+      lastPrompt = { credits: activePromptQuotaDeltaCredits, source: "quota-delta" };
+    } else if (activePromptHasModelRate) {
+      lastPrompt = { credits: activePromptModelRateCredits, source: "model-rate" };
+    } else if (lastBilling?.multiplier !== undefined) {
       lastPrompt = { credits: lastBilling.multiplier, source: "model-rate" };
     }
 
