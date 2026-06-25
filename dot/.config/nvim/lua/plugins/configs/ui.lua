@@ -203,7 +203,11 @@ local config = {
 		opts = {
 			bigfile = { enabled = true },
 			dashboard = { enabled = true },
-			indent = { enabled = true },
+			indent = {
+				enabled = true,
+				-- Keep scope line but do not highlight as it seem to be heavy to handle over ssh?
+				scope = { enabled = false },
+			},
 			input = { enabled = true },
 			notifier = { enabled = true },
 			quickfile = { enabled = true },
