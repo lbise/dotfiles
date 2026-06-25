@@ -12,12 +12,12 @@
  *
  * Notes:
  *   - Overall quota is fetched from https://api.github.com/copilot_internal/user.
- *   - Per-response quota snapshots are read from Copilot response headers.
- *   - Model premium multipliers are fetched from https://api.githubcopilot.com/models.
+ *   - Prompt cost is shown from pi's token-based USD cost converted to AI
+ *     credits using GitHub's documented 1 AI credit = $0.01 USD rate.
+ *   - Per-response and account quota deltas are shown as reconciliation only.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -67,48 +67,21 @@ type QuotaState = {
   totalUsedUnits?: number;
 };
 
-type CopilotTokenEnvelope = {
-  token?: string;
-  expires_at?: number;
-  refresh_in?: number;
-  endpoints?: {
-    api?: string;
-  };
-};
-
-type CopilotModelMetadata = {
-  id?: string;
-  name?: string;
-  billing?: {
-    is_premium?: boolean;
-    multiplier?: number;
-  };
-};
-
-type ModelBillingInfo = {
-  id: string;
-  name?: string;
-  isPremium?: boolean;
-  multiplier?: number;
-};
-
 type LastPromptUsage = {
   credits: number;
-  source: "quota-delta" | "model-rate";
+  source: "quota-delta" | "token-estimate";
+  quotaDelta?: number;
+  quotaPending?: boolean;
 };
 
 const USAGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const MODEL_CACHE_TTL_MS = 10 * 60 * 1000; // VS Code refreshes model metadata every ~10 minutes
-const TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
 const STATUS_KEY = "copilot-usage";
 const CREDITS_WIDGET_KEY = "copilot-ai-credits";
-const DEFAULT_COPILOT_API_BASE_URL = "https://api.githubcopilot.com";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// GitHub Copilot overage pricing is commonly quoted as USD 0.04 per premium
-// request/AI credit. Keep these configurable because billing terms and FX rates
-// can change independently of the extension.
-const DEFAULT_COPILOT_CREDIT_USD = 0.04;
+// GitHub's usage-based Copilot billing docs define 1 AI credit as $0.01 USD.
+// Keep this configurable in case GitHub changes the conversion rate.
+const DEFAULT_COPILOT_CREDIT_USD = 0.01;
 const DEFAULT_USD_TO_CHF = 0.89;
 
 const COPILOT_HEADERS = {
@@ -159,73 +132,6 @@ async function getGitHubToken(): Promise<string | null> {
   return null;
 }
 
-function parseSemicolonToken(token: string | undefined): Record<string, string> {
-  if (!token) return {};
-  const fields: Record<string, string> = {};
-  for (const part of token.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    fields[part.slice(0, idx)] = part.slice(idx + 1);
-  }
-  return fields;
-}
-
-function isUsableCopilotApiToken(token: string | undefined): token is string {
-  if (!token) return false;
-  const exp = Number(parseSemicolonToken(token).exp);
-  if (!Number.isFinite(exp)) return true;
-  return exp * 1000 > Date.now() + TOKEN_EXPIRY_SKEW_MS;
-}
-
-let cachedCopilotApiToken: string | null = null;
-let cachedCopilotApiTokenExpiresAt = 0;
-let cachedCopilotApiBaseUrl = DEFAULT_COPILOT_API_BASE_URL;
-
-async function mintCopilotApiToken(githubToken: string): Promise<CopilotTokenEnvelope> {
-  const response = await fetch("https://api.github.com/copilot_internal/v2/token", {
-    headers: {
-      ...COPILOT_HEADERS,
-      Authorization: `Bearer ${githubToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Copilot token API returned ${response.status}`);
-  }
-
-  return response.json() as Promise<CopilotTokenEnvelope>;
-}
-
-async function getCopilotApiToken(): Promise<string | null> {
-  const now = Date.now();
-  if (cachedCopilotApiToken && cachedCopilotApiTokenExpiresAt > now + TOKEN_EXPIRY_SKEW_MS) {
-    return cachedCopilotApiToken;
-  }
-
-  const auth = await readPiAuth();
-  const storedAccess = auth?.["github-copilot"]?.access;
-  if (isUsableCopilotApiToken(storedAccess)) {
-    cachedCopilotApiToken = storedAccess;
-    const exp = Number(parseSemicolonToken(storedAccess).exp);
-    cachedCopilotApiTokenExpiresAt = Number.isFinite(exp) ? exp * 1000 : now + MODEL_CACHE_TTL_MS;
-    return storedAccess;
-  }
-
-  const githubToken = await getGitHubToken();
-  if (!githubToken) return null;
-
-  const envelope = await mintCopilotApiToken(githubToken);
-  if (!envelope.token) return null;
-
-  cachedCopilotApiToken = envelope.token;
-  cachedCopilotApiTokenExpiresAt = envelope.expires_at
-    ? envelope.expires_at * 1000
-    : now + Math.max(60, envelope.refresh_in ?? 1500) * 1000;
-  cachedCopilotApiBaseUrl = envelope.endpoints?.api || DEFAULT_COPILOT_API_BASE_URL;
-
-  return envelope.token;
-}
-
 async function fetchCopilotUsage(token: string): Promise<CopilotUserInfo> {
   const response = await fetch("https://api.github.com/copilot_internal/user", {
     headers: {
@@ -239,63 +145,6 @@ async function fetchCopilotUsage(token: string): Promise<CopilotUserInfo> {
   }
 
   return response.json() as Promise<CopilotUserInfo>;
-}
-
-let cachedModelBilling = new Map<string, ModelBillingInfo>();
-let cachedModelBillingAt = 0;
-
-async function fetchCopilotModelBilling(): Promise<Map<string, ModelBillingInfo>> {
-  const token = await getCopilotApiToken();
-  if (!token) return cachedModelBilling;
-
-  const requestId = randomUUID();
-  const response = await fetch(`${cachedCopilotApiBaseUrl.replace(/\/$/, "")}/models`, {
-    headers: {
-      ...COPILOT_HEADERS,
-      Authorization: `Bearer ${token}`,
-      "X-Request-Id": requestId,
-      "OpenAI-Intent": "model-access",
-      "X-GitHub-Api-Version": "2025-10-01",
-      "X-Interaction-Type": "model-access",
-      "X-Agent-Task-Id": requestId,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Copilot models API returned ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { data?: CopilotModelMetadata[] };
-  const next = new Map<string, ModelBillingInfo>();
-
-  for (const model of payload.data ?? []) {
-    if (!model.id) continue;
-    next.set(model.id, {
-      id: model.id,
-      name: model.name,
-      isPremium: model.billing?.is_premium,
-      multiplier: model.billing?.multiplier,
-    });
-  }
-
-  cachedModelBilling = next;
-  cachedModelBillingAt = Date.now();
-  return cachedModelBilling;
-}
-
-async function getModelBilling(model: unknown): Promise<ModelBillingInfo | null> {
-  const id = getCopilotModelId(model);
-  if (!id) return null;
-
-  if (Date.now() - cachedModelBillingAt > MODEL_CACHE_TTL_MS) {
-    try {
-      await fetchCopilotModelBilling();
-    } catch {
-      // Keep stale model metadata if refresh fails.
-    }
-  }
-
-  return cachedModelBilling.get(id) ?? { id };
 }
 
 function numberValue(value: unknown): number | undefined {
@@ -323,10 +172,12 @@ function buildQuotaState(input: {
   let usedUnits: number | undefined;
 
   if (!unlimited && entitlement !== undefined) {
-    if (input.percentRemaining !== undefined) {
-      remaining = entitlement * (input.percentRemaining / 100);
+    // Prefer explicit remaining counts when GitHub provides them. Percentages
+    // can be rounded and are mainly useful for response-header snapshots.
+    if (remaining !== undefined) {
       usedUnits = Math.max(0, entitlement - remaining);
-    } else if (remaining !== undefined) {
+    } else if (input.percentRemaining !== undefined) {
+      remaining = entitlement * (input.percentRemaining / 100);
       usedUnits = Math.max(0, entitlement - remaining);
     }
   }
@@ -476,9 +327,17 @@ function formatUsageLine(
 function formatCreditsWidgetLine(lastPrompt: LastPromptUsage, theme: any): string {
   const credits = lastPrompt.credits;
   const color = credits >= 10 ? "error" : credits >= 3 ? "warning" : "success";
-  const source = lastPrompt.source === "quota-delta" ? "from quota delta" : "est. from model rate";
+  const source = lastPrompt.source === "quota-delta" ? "from quota delta" : "token estimate";
   const money = formatCreditCostEstimate(credits);
-  const suffix = [money, source].filter(Boolean).join(" · ");
+  const quota =
+    lastPrompt.source === "token-estimate"
+      ? lastPrompt.quotaDelta !== undefined
+        ? `quota delta ${formatAmount(lastPrompt.quotaDelta)}`
+        : lastPrompt.quotaPending
+          ? "quota delta pending"
+          : null
+      : null;
+  const suffix = [money, source, quota].filter(Boolean).join(" · ");
 
   return (
     theme.bold(theme.fg(color, `◆ AI credits: ${formatAmount(credits)} ◆`)) +
@@ -559,13 +418,12 @@ export default function (pi: ExtensionAPI) {
   let currentPlan: string | undefined;
   let currentResetDate: string | undefined;
   let lastQuotaTotalUsed: number | null = null;
-  let lastBilling: ModelBillingInfo | null = null;
   let lastPrompt: LastPromptUsage | null = null;
   let activePromptQuotaDeltaCredits = 0;
-  let activePromptModelRateCredits = 0;
+  let activePromptTokenUsd = 0;
+  let activePromptStartTotalUsed: number | null = null;
   let activePromptHasQuotaDelta = false;
-  let activePromptHasModelRate = false;
-  let activePromptSawQuotaHeader = false;
+  let activePromptHasTokenUsd = false;
 
   function clearStatus(ctx: { ui: any }) {
     ctx.ui.setStatus(STATUS_KEY, undefined);
@@ -600,7 +458,6 @@ export default function (pi: ExtensionAPI) {
 
   function applyQuotaStateFromResponse(ctx: { ui: any; model?: unknown }, quota: QuotaState) {
     currentQuota = quota;
-    activePromptSawQuotaHeader = true;
 
     if (quota.totalUsedUnits !== undefined) {
       if (lastQuotaTotalUsed !== null) {
@@ -618,38 +475,29 @@ export default function (pi: ExtensionAPI) {
     renderStatus(ctx);
   }
 
-  async function updateBilling(ctx: { ui: any; model?: unknown }, modelOverride?: unknown) {
-    const billing = await getModelBilling(modelOverride ?? ctx.model);
-    if (billing) {
-      lastBilling = billing;
-    }
-  }
-
   async function updateStatus(
     ctx: { ui: any; model?: unknown },
     modelOverride?: unknown,
     options: { force?: boolean } = {}
-  ) {
+  ): Promise<QuotaState | null> {
     const model = modelOverride ?? ctx.model;
     const modelId = getCopilotModelId(model);
 
     if (!modelId) {
       clearStatus(ctx);
-      return;
+      return null;
     }
 
     const now = Date.now();
     if (!options.force && cachedLine && cachedModelId === modelId && now - cachedAt < USAGE_CACHE_TTL_MS) {
       ctx.ui.setStatus(STATUS_KEY, cachedLine);
-      return;
+      return currentQuota;
     }
-
-    await updateBilling(ctx, model);
 
     const token = await getGitHubToken();
     if (!token) {
       ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("dim", "Copilot · no token"));
-      return;
+      return null;
     }
 
     try {
@@ -661,11 +509,13 @@ export default function (pi: ExtensionAPI) {
         lastQuotaTotalUsed = currentQuota.totalUsedUnits;
       }
       renderStatus(ctx, model);
+      return currentQuota;
     } catch (err: any) {
       ctx.ui.setStatus(
         STATUS_KEY,
         ctx.ui.theme.fg("error", `Copilot · ${err.message || "fetch failed"}`)
       );
+      return null;
     }
   }
 
@@ -691,7 +541,6 @@ export default function (pi: ExtensionAPI) {
   // Show/hide immediately when the user changes models.
   pi.on("model_select", async (event, ctx) => {
     lastPrompt = null;
-    lastBilling = null;
     clearCreditsWidget(ctx);
     await updateStatus(ctx, event.model, { force: true });
   });
@@ -704,38 +553,24 @@ export default function (pi: ExtensionAPI) {
     }
 
     activePromptQuotaDeltaCredits = 0;
-    activePromptModelRateCredits = 0;
+    activePromptTokenUsd = 0;
+    activePromptStartTotalUsed = null;
     activePromptHasQuotaDelta = false;
-    activePromptHasModelRate = false;
-    activePromptSawQuotaHeader = false;
+    activePromptHasTokenUsd = false;
     lastPrompt = null;
     clearCreditsWidget(ctx);
 
-    if (currentQuota || currentPlan) {
-      await updateBilling(ctx);
-      renderStatus(ctx);
-    } else {
-      await updateStatus(ctx);
-    }
+    // Capture an account-level baseline so agent_end can compute the real
+    // prompt delta even when per-response quota headers are absent.
+    const startQuota = await updateStatus(ctx, undefined, { force: true });
+    activePromptStartTotalUsed = startQuota?.totalUsedUnits ?? null;
   });
 
   // Copilot sends fresh quota snapshots as response headers. This lets us update
   // the footer immediately and compute per-prompt credit deltas without waiting
-  // for a separate /copilot_internal/user request. If headers are unavailable,
-  // sum the model billing multiplier once per provider response as a fallback.
+  // for a separate /copilot_internal/user request.
   pi.on("after_provider_response", async (event, ctx) => {
     if (!isGitHubCopilotModel(ctx.model)) return;
-
-    await updateBilling(ctx);
-
-    const multiplier = numberValue(lastBilling?.multiplier);
-    if (multiplier !== undefined && multiplier >= 0) {
-      activePromptModelRateCredits += multiplier;
-      activePromptHasModelRate = true;
-      if (!activePromptHasQuotaDelta) {
-        lastPrompt = { credits: activePromptModelRateCredits, source: "model-rate" };
-      }
-    }
 
     const quota = quotaStateFromHeaders(event.headers);
     if (quota) {
@@ -745,27 +580,58 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  // Finalize the prompt display. Prefer real Copilot quota deltas; otherwise use
-  // the summed VS Code-style model rate/multiplier fallback.
+  // Track pi's token-priced USD cost as a fallback. GitHub documents Copilot
+  // model prices per 1M tokens and converts USD to credits at $0.01/credit.
+  pi.on("turn_end", async (event, ctx) => {
+    if (!isGitHubCopilotModel(ctx.model)) return;
+
+    const cost = numberValue((event.message as any)?.usage?.cost?.total);
+    if (cost !== undefined && cost >= 0) {
+      activePromptTokenUsd += cost;
+      activePromptHasTokenUsd = true;
+    }
+  });
+
+  // Finalize the prompt display. Use token-priced usage as the stable per-prompt
+  // value, and show quota deltas only as reconciliation because account-level
+  // quota updates can lag or include usage from other clients.
   pi.on("agent_end", async (_event, ctx) => {
     if (!isGitHubCopilotModel(ctx.model)) {
       clearStatus(ctx);
       return;
     }
 
-    if (activePromptHasQuotaDelta) {
-      lastPrompt = { credits: activePromptQuotaDeltaCredits, source: "quota-delta" };
-    } else if (activePromptHasModelRate) {
-      lastPrompt = { credits: activePromptModelRateCredits, source: "model-rate" };
-    } else if (lastBilling?.multiplier !== undefined) {
-      lastPrompt = { credits: lastBilling.multiplier, source: "model-rate" };
+    const endQuota = await updateStatus(ctx, undefined, { force: true });
+    let quotaDelta: number | undefined;
+    let quotaPending = false;
+
+    if (activePromptStartTotalUsed !== null && endQuota?.totalUsedUnits !== undefined) {
+      const accountDelta = endQuota.totalUsedUnits - activePromptStartTotalUsed;
+      if (accountDelta > 0.001 && accountDelta < 10000) {
+        quotaDelta = accountDelta;
+      } else {
+        quotaPending = activePromptHasTokenUsd;
+      }
+    } else if (activePromptHasQuotaDelta) {
+      quotaDelta = activePromptQuotaDeltaCredits;
+    } else {
+      quotaPending = activePromptHasTokenUsd;
+    }
+
+    if (activePromptHasTokenUsd) {
+      const usdPerCredit = numberValue(process.env.COPILOT_CREDIT_USD) ?? DEFAULT_COPILOT_CREDIT_USD;
+      if (Number.isFinite(usdPerCredit) && usdPerCredit > 0) {
+        lastPrompt = {
+          credits: activePromptTokenUsd / usdPerCredit,
+          source: "token-estimate",
+          quotaDelta,
+          quotaPending: quotaDelta === undefined && quotaPending,
+        };
+      }
+    } else if (quotaDelta !== undefined) {
+      lastPrompt = { credits: quotaDelta, source: "quota-delta" };
     }
 
     renderCreditsWidget(ctx);
-
-    // Always refresh the overall Copilot usage at the end of a completed prompt.
-    // This intentionally bypasses the status cache and does not rely only on
-    // quota headers, so the footer reflects the latest account-level usage.
-    await updateStatus(ctx, undefined, { force: true });
   });
 }
