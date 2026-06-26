@@ -92,36 +92,19 @@ eval "$(fzf --zsh)"
 # Default options: Ignore case, full style, 40% height
 export FZF_DEFAULT_OPTS="-i --style full --height 40%"
 
-# Bindings
-bindkey -s '^@' "^utmux-sessionizer\n"
+# Bindings outside tmux. Inside tmux, use tmux-native bindings instead:
+#   prefix + f       tmux sessionizer
+#   prefix + Shift-s SSH machine picker
+if [[ -z "${TMUX:-}" ]]; then
+    # tmux session picker: Ctrl-Space
+    bindkey -M emacs -s '^@' "^utmux-sessionizer\n"
+    bindkey -M viins -s '^@' "^utmux-sessionizer\n"
 
-# !! Old stuff to be removed !!
-#alias tmux_env="tmux refresh-client -S && eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')"
-#
-#check_tty_integrity() {
-#    if [[ "$(stty -a)" == *"-icrnl"* ]]; then
-#        print -P "%F{red}[WARNING]%f TTY flag '%F{yellow}$flag%f' is OFF (corrupted state detected)"
-#        stty icrnl
-#    fi
-#}
-#
-## If running tmux, add hook to update tmux env in shell
-#if [[ -n "$TMUX" ]]; then
-#precmd() {
-#    tmux refresh-client -S
-#    eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
-#    check_tty_integrity
-#}
-#fi
-#
-#if [[ -n "$IS_WSL" || -n "$WSL_DISTRO_NAME" ]]; then
-#    # Running WSL
-#    # Use regular x11, requires vcxsrv to be running on Windows
-#    # export DISPLAY=$(ip route list default | awk '{print $3}'):0
-#    # Use WSLg built-in
-#    export DISPLAY=":0"
-#    echo "- WSL detected: Setting DISPLAY=$DISPLAY"
-#fi
+    # SSH machine picker: Ctrl-X then s
+    # Avoid Ctrl-S because terminal flow control can intercept it.
+    bindkey -M emacs -s '^Xs' "^ussh_phc.sh\n"
+    bindkey -M viins -s '^Xs' "^ussh_phc.sh\n"
+fi
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
