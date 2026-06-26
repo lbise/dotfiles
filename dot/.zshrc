@@ -49,15 +49,27 @@ function update_title() {
 
 update_title
 
+typeset -g __TMUX_ENV_CACHE=""
 update_tmux_env() {
-    if [[ -n "$TMUX" ]]; then
-        # Refresh local env when attaching to an existing tmux session over ssh.
-        tmux refresh-client -S
-        eval $(tmux showenv -s | grep -E '^(SSH|DISPLAY)')
-    fi
+    [[ -n "${TMUX:-}" ]] || return
+
+    # Existing tmux panes do not automatically inherit environment updates when
+    # a client re-attaches, so sync the interactive shell from tmux's session
+    # environment. preexec makes the first command after re-attach see the new
+    # values; precmd keeps prompts/new shells up to date.
+    local env_vars='(DISPLAY|WAYLAND_DISPLAY|XAUTHORITY|SSH_AUTH_SOCK|SSH_AGENT_PID|SSH_CONNECTION|SSH_CLIENT|SSH_TTY|KRB5CCNAME)'
+    local tmux_env
+    tmux_env=$(tmux show-environment -s 2>/dev/null | grep -E "^${env_vars}=|^unset ${env_vars};") || true
+
+    [[ -n "$tmux_env" ]] || return
+    [[ "$tmux_env" == "$__TMUX_ENV_CACHE" ]] && return
+
+    __TMUX_ENV_CACHE="$tmux_env"
+    eval "$tmux_env"
 }
 
 add-zsh-hook precmd update_tmux_env
+add-zsh-hook preexec update_tmux_env
 
 source $ZSH/oh-my-zsh.sh
 # --------------------------------------------------------------------------------
