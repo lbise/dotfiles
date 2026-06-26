@@ -115,5 +115,7 @@
     path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/rink_rat/"]
     path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/G722_GM/"]
+    path = ~/.gitconfigwork
 [gpg]
 	format = ssh
