@@ -2,7 +2,7 @@
 
 This extension emits clickable OSC8 links from pi and routes `pi-open://file` URLs to a Neovim instance running in the originating tmux session.
 
-It also automatically linkifies existing file paths in assistant/tool output when the path exists on disk.
+It also automatically linkifies existing file paths in assistant/tool output when the path resolves to an existing regular file on disk.
 
 ## Flow
 

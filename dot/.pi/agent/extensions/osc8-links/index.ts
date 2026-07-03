@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir, hostname, userInfo } from "node:os";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
@@ -289,7 +289,7 @@ function linkifyToken(token: string, cwd: string): string {
 
   const parsed = parsePathLineCol(core);
   const abs = resolvePath(parsed.path, cwd);
-  if (!existsSync(abs)) return token;
+  if (!isExistingRegularFile(abs)) return token;
 
   const line = parsed.line ?? 1;
   const col = parsed.col ?? 1;
@@ -305,6 +305,14 @@ function linkifyToken(token: string, cwd: string): string {
   };
   const url = buildPiOpenUrl("file", data);
   return hyperlink(safeTerminalText(core), safeOscParam(url)) + trailing;
+}
+
+function isExistingRegularFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function stripOsc8Links(text: string): string {
