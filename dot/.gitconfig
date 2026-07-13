@@ -119,3 +119,5 @@
     path = ~/.gitconfigwork
 [gpg]
 	format = ssh
+[lfs "remote"]
+	autodetect = true
