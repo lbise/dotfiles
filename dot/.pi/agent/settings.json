@@ -15,5 +15,6 @@
   "packages": [
     "npm:@tintinweb/pi-subagents"
   ],
-  "hideThinkingBlock": false
+  "hideThinkingBlock": false,
+  "showCacheMissNotices": true
 }
