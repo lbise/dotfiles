@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage:
+  ai-install-skills [options] <category> [project-dir]
+  ai-install-skills --list
+
+Install a category of skills from the dotfiles skill catalog into a project's
+.agents/skills directory. Skills are symlinked from the catalog; nothing is
+installed globally.
+
+Arguments:
+  category     Category file name from dot/.agents/skills-categories/
+  project-dir  Project directory to install into. Defaults to the current git
+               repository root, or the current directory if not in a git repo.
+
+Options:
+  -l, --list     List available categories and their skills
+  -f, --force    Replace existing project skill entries with catalog links
+  -n, --dry-run  Show what would be done without changing files
+  -h, --help     Show this help
+
+Add categories by creating a file in dot/.agents/skills-categories/. Add skills
+by adding one skill directory name from dot/.agents/skills-catalog/ per line.
+EOF
+}
+
+resolve_script_dir() {
+    local source dir
+    source="${BASH_SOURCE[0]}"
+    while [[ -L "$source" ]]; do
+        dir="$(cd -P "$(dirname "$source")" && pwd)"
+        source="$(readlink "$source")"
+        [[ "$source" != /* ]] && source="$dir/$source"
+    done
+    cd -P "$(dirname "$source")" && pwd
+}
+
+trim_skill_line() {
+    local line="$1"
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    printf '%s' "$line"
+}
+
+read_category_skills() {
+    local category_file="$1"
+    local line skill
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        skill="$(trim_skill_line "$line")"
+        [[ -z "$skill" ]] && continue
+        printf '%s\n' "$skill"
+    done < "$category_file"
+}
+
+list_categories() {
+    local category_file category skills
+
+    if ! compgen -G "$CATEGORIES_DIR/*" > /dev/null; then
+        echo "No skill categories found in $CATEGORIES_DIR"
+        return 0
+    fi
+
+    echo "Available skill categories:"
+    for category_file in "$CATEGORIES_DIR"/*; do
+        [[ -f "$category_file" ]] || continue
+        category="$(basename "$category_file")"
+        [[ "$category" == README* ]] && continue
+        skills="$(read_category_skills "$category_file" | paste -sd, - | sed 's/,/, /g')"
+        printf '  %-16s %s\n' "$category" "$skills"
+    done
+}
+
+find_project_root() {
+    local explicit_dir="${1:-}"
+
+    if [[ -n "$explicit_dir" ]]; then
+        cd "$explicit_dir" && pwd
+        return
+    fi
+
+    if git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+        printf '%s\n' "$git_root"
+    else
+        pwd
+    fi
+}
+
+SCRIPT_DIR="$(resolve_script_dir)"
+DOTFILES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+AGENTS_ROOT="$DOTFILES_ROOT/dot/.agents"
+CATALOG_DIR="$AGENTS_ROOT/skills-catalog"
+CATEGORIES_DIR="$AGENTS_ROOT/skills-categories"
+
+FORCE=0
+DRY_RUN=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -l|--list)
+            list_categories
+            exit 0
+            ;;
+        -f|--force)
+            FORCE=1
+            shift
+            ;;
+        -n|--dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    usage >&2
+    exit 2
+fi
+
+CATEGORY="$1"
+PROJECT_DIR="$(find_project_root "${2:-}")"
+CATEGORY_FILE="$CATEGORIES_DIR/$CATEGORY"
+PROJECT_SKILLS_DIR="$PROJECT_DIR/.agents/skills"
+
+if [[ ! -d "$CATALOG_DIR" ]]; then
+    echo "Skill catalog not found: $CATALOG_DIR" >&2
+    exit 1
+fi
+
+if [[ ! -f "$CATEGORY_FILE" ]]; then
+    echo "Unknown skill category: $CATEGORY" >&2
+    echo >&2
+    list_categories >&2
+    exit 1
+fi
+
+echo "Category: $CATEGORY"
+echo "Project:  $PROJECT_DIR"
+echo "Target:   $PROJECT_SKILLS_DIR"
+[[ "$DRY_RUN" == 1 ]] && echo "Mode:     dry-run"
+echo
+
+if [[ "$DRY_RUN" == 0 ]]; then
+    mkdir -p "$PROJECT_SKILLS_DIR"
+fi
+
+installed=0
+had_error=0
+while IFS= read -r skill; do
+    source_dir="$CATALOG_DIR/$skill"
+    dest="$PROJECT_SKILLS_DIR/$skill"
+
+    if [[ ! -f "$source_dir/SKILL.md" ]]; then
+        echo "ERROR: catalog skill not found or invalid: $skill ($source_dir)" >&2
+        had_error=1
+        continue
+    fi
+
+    if [[ -e "$dest" || -L "$dest" ]]; then
+        if [[ -L "$dest" && "$(readlink -f "$dest")" == "$(readlink -f "$source_dir")" ]]; then
+            echo "Already installed: $skill"
+            continue
+        fi
+
+        if [[ "$FORCE" == 1 ]]; then
+            if [[ "$DRY_RUN" == 1 ]]; then
+                echo "Would replace existing project skill: $skill"
+            else
+                echo "Replacing existing project skill: $skill"
+                rm -rf "$dest"
+            fi
+        else
+            echo "ERROR: $dest already exists. Use --force to replace it." >&2
+            had_error=1
+            continue
+        fi
+    fi
+
+    if [[ "$DRY_RUN" == 1 ]]; then
+        echo "Would install: $skill -> $dest"
+    else
+        echo "Install: $skill -> $dest"
+        ln -s "$source_dir" "$dest"
+    fi
+    installed=$((installed + 1))
+done < <(read_category_skills "$CATEGORY_FILE")
+
+if [[ "$had_error" == 1 ]]; then
+    exit 1
+fi
+
+if [[ "$installed" == 0 ]]; then
+    echo
+    echo "No new skills installed."
+elif [[ "$DRY_RUN" == 1 ]]; then
+    echo
+    echo "Would install $installed skill(s)."
+else
+    echo
+    echo "Installed $installed skill(s)."
+fi

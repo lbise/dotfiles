@@ -27,6 +27,7 @@ COMMON_LINKS=(
     ".pi/agent/prompts"
     ".pi/agent/extensions"
     ".pi/agent/themes"
+    ".agents/skills"
 )
 
 # Desktop-only symlinks (Hyprland, Waybar, etc.)
