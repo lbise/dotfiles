@@ -9,6 +9,8 @@ OPTS=(-X -A -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o TCPKeepAlive=y
 
 INDEX_LIST=()
 COMMENT_LIST=()
+LAST_ADDED_MACHINE=""
+LAST_ADD_WAS_NEW=0
 
 function print_help {
     cat <<EOF
@@ -25,7 +27,7 @@ Usage: $0 [OPTION] [INDEX|MACHINE] [ARGS...]
       -u/--user USER       User to use
       -c/--copy            SSH copy key to remote host before connection
       -f/--fzf             Force fzf picker, even if an argument is provided
-      --add [HOST] [DESC]  Add a new machine to the SSH host pool and exit
+      --add [HOST] [DESC]  Add a new machine, copy SSH keys to it, and exit
       --save [DESC]        Save the selected/direct host to the pool before connecting
       -h/--help            Show this help
 
@@ -90,6 +92,9 @@ function add_machine {
     local comment="${2:-}"
     local entry tmp
 
+    LAST_ADDED_MACHINE=""
+    LAST_ADD_WAS_NEW=0
+
     if [[ -z "$machine" ]]; then
         read -rp "Machine name: " machine
     fi
@@ -99,6 +104,7 @@ function add_machine {
 
     # Store short names in the pool; the domain is added by ssh config / this script.
     machine="${machine%.$DOMAIN}"
+    LAST_ADDED_MACHINE="$machine"
 
     if [[ "$machine" =~ [[:space:]] ]]; then
         echo "Machine names cannot contain whitespace: $machine" >&2
@@ -123,6 +129,7 @@ function add_machine {
 
     INDEX_LIST+=("$machine")
     COMMENT_LIST+=("$comment")
+    LAST_ADD_WAS_NEW=1
     echo "Added $machine to $SSH_HOSTS_FILE"
 }
 
@@ -208,6 +215,23 @@ function normalize_host {
     printf '%s.%s' "$host" "$DOMAIN"
 }
 
+function copy_keys_to_machine {
+    local machine="$1"
+    local normalized_machine
+    local extra_key="$HOME/.ssh/13lbisex2go_id_rsa"
+
+    normalized_machine=$(normalize_host "$machine")
+
+    echo "Copying SSH keys to $normalized_machine"
+    ssh-copy-id "$USER@$normalized_machine"
+
+    if [[ -f "$extra_key" || -f "$extra_key.pub" ]]; then
+        ssh-copy-id -i "$extra_key" "$USER@$normalized_machine"
+    else
+        echo "Skipping optional key (not found): $extra_key"
+    fi
+}
+
 load_machines
 
 POSITIONAL_ARGS=()
@@ -286,6 +310,9 @@ done
 
 if [[ "$ADD_ONLY" == 1 ]]; then
     add_machine "$ADD_MACHINE" "$ADD_COMMENT"
+    if [[ "$LAST_ADD_WAS_NEW" == 1 ]]; then
+        copy_keys_to_machine "$LAST_ADDED_MACHINE"
+    fi
     exit 0
 fi
 
@@ -316,9 +343,7 @@ fi
 MACHINE=$(normalize_host "$MACHINE")
 
 if [[ "$COPY_KEY" == 1 ]]; then
-    echo "Copying key to $MACHINE"
-    ssh-copy-id -f "$USER@$MACHINE"
-    ssh-copy-id -f -i ~/.ssh/13lbisex2go_id_rsa "$USER@$MACHINE"
+    copy_keys_to_machine "$MACHINE"
 fi
 
 echo "Connecting to $MACHINE with args ${OPTS[*]} ${POSITIONAL_ARGS[*]}"
