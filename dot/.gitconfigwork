@@ -12,7 +12,6 @@
 [user]
 	name = Leonard Bise
 	email = leonard.bise@sonova.com
-	signingkey = /home/13lbise/.ssh/id_ed25519_git_sonova.pub
 
 [filter "lfs"]
 	clean = git-lfs clean -- %f
@@ -36,6 +35,5 @@
 # Match URLs with any username (e.g., https://username@ch03git.phonak.com/)
 [url "git@ch03git.phonak.com:"]
 	insteadOf = https://13lbise@ch03git.phonak.com/
-
 [url "git@git.sonova.com:"]
     insteadOf = https://git.sonova.com/

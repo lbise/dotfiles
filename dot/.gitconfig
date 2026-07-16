@@ -15,7 +15,6 @@
 [user]
     name = Léonard Bise
     email = leonard.bise@gmail.com
-    signingkey = /home/leo/.ssh/id_rsa.pub
 
 [difftool]
 	prompt = false
@@ -121,3 +120,5 @@
 	format = ssh
 [lfs "remote"]
 	autodetect = true
+[gpg "ssh"]
+	defaultKeyCommand = ssh-add -L
