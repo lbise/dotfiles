@@ -1,20 +1,20 @@
 {
-  "lastChangelogVersion": "0.80.2",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
+  "lastChangelogVersion": "0.84.0",
+  "defaultProvider": "github-copilot",
+  "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
   "extensions": [
     "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
   ],
   "enabledModels": [
-    "github-copilot/gpt-5.4",
-    "openai-codex/gpt-5.5",
-    "github-copilot/gpt-5.5"
+    "github-copilot/gpt-5.6-sol",
+    "github-copilot/gpt-5.6-terra"
   ],
   "packages": [
     "npm:@tintinweb/pi-subagents"
   ],
   "hideThinkingBlock": false,
-  "showCacheMissNotices": true
+  "showCacheMissNotices": true,
+  "tuiMode": "fullscreen"
 }
