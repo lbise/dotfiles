@@ -19,6 +19,7 @@ COMMON_LINKS=(
     ".tmux/plugins"
     ".config/nvim"
     ".config/opencode"
+    ".config/herdr/config.toml"
     ".ssh/config"
     ".gnupg/gpg-agent.conf"
     ".config/fcitx5"
