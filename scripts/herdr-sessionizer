@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Pick a project directory and create the standard Herdr workspace in it.
+set -Eeuo pipefail
+
+directories=("$HOME/gitrepo" "$HOME")
+if [[ ${USER:-} == "13lbise" ]]; then
+    # Work user
+    directories=("$HOME/andromeda" "${directories[@]}")
+fi
+
+if (( $# > 1 )); then
+    echo "Usage: $(basename "$0") [directory]" >&2
+    exit 2
+fi
+
+if (( $# == 1 )); then
+    selected=$1
+else
+    if ! command -v fzf >/dev/null 2>&1; then
+        echo "ERROR: fzf is not available" >&2
+        exit 1
+    fi
+
+    # Include $HOME itself and the immediate, non-hidden children of each root.
+    # Some roots are machine-specific, so silently skip any that do not exist.
+    selected=$(
+        {
+            printf '%s\n' "$HOME"
+            for directory in "${directories[@]}"; do
+                [[ -d $directory ]] || continue
+                find "$directory" -mindepth 1 -maxdepth 1 -type d -not -path '*/.*'
+            done
+        } | awk '!seen[$0]++' | fzf --no-height --reverse --prompt='Workspace directory: '
+    ) || exit 0
+fi
+
+[[ -n $selected ]] || exit 0
+
+if ! cd -- "$selected"; then
+    echo "ERROR: Directory does not exist: $selected" >&2
+    exit 1
+fi
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+exec "$script_dir/dev-herdr-new-workspace" "$PWD"
