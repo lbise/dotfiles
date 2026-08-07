@@ -623,11 +623,54 @@ fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify(pkg, null, 2
 NODE
 }
 
+verify_installed_pi_package() {
+    local package_name="$1"
+    local label="$2"
+    local installed_root="$STAGE_DIR/node/lib/node_modules/$package_name"
+
+    [[ -f "$installed_root/package.json" ]] || error "Package $label was not installed into the bundled npm prefix"
+
+    # Pi discovers resources declared in a package's `pi` manifest relative to
+    # its installed package root. Verify those resources survived npm packing,
+    # rather than only confirming that npm accepted the package.
+    "$NODE_BIN" - "$installed_root" "$label" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const [packageRoot, label] = process.argv.slice(2);
+const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"));
+const pi = pkg.pi;
+if (!pi || typeof pi !== "object") process.exit(0);
+
+for (const resourceType of ["extensions", "skills", "prompts", "themes"]) {
+  const resources = pi[resourceType];
+  if (resources === undefined) continue;
+  const entries = Array.isArray(resources) ? resources : [resources];
+  for (const entry of entries) {
+    if (typeof entry !== "string") {
+      throw new Error(`${label}: pi.${resourceType} must contain paths`);
+    }
+    // Resource globs are resolved by Pi; exact paths can be checked here.
+    if (/[*?\[]/.test(entry)) continue;
+    const resourcePath = path.resolve(packageRoot, entry);
+    if (!fs.existsSync(resourcePath)) {
+      throw new Error(`${label}: packaged pi.${resourceType} resource is missing: ${entry}`);
+    }
+  }
+}
+NODE
+
+    log "✓ Verified Pi resources for $label"
+}
+
 install_package_into_bundled_npm() {
     local package_root="$1"
     local label="$2"
 
     ensure_installable_package_json "$package_root" "$label"
+
+    local package_name
+    package_name="$(read_json_field "$package_root/package.json" name 2>/dev/null || true)"
+    [[ -n "$package_name" ]] || error "Could not determine package name for $label"
 
     local tarball
     tarball="$(
@@ -648,6 +691,7 @@ install_package_into_bundled_npm() {
     npm_config_fund=false \
     "$NPM_BIN" install -g --omit=dev --prefix "$STAGE_DIR/node" "$tarball_path"
 
+    verify_installed_pi_package "$package_name" "$label"
     rm -f "$tarball_path"
 }
 
