@@ -116,7 +116,7 @@ ensure_command() {
 
 check_dependencies() {
     log "Checking packaging dependencies..."
-    for cmd in curl tar git npm node find; do
+    for cmd in curl tar git npm node find cmp; do
         ensure_command "$cmd"
     done
     log "✓ Dependencies available"
@@ -859,21 +859,29 @@ publish_archive() {
     pool_parent="$(dirname "$POOL_DIR")"
     [[ -d "$pool_parent" ]] || error "Pool parent directory not accessible: $pool_parent"
     mkdir -p "$POOL_DIR"
+    POOL_DIR="$(realpath "$POOL_DIR")"
 
-    log "Publishing archive to $POOL_DIR"
-    mv "$PACKAGE_OUTPUT_PATH" "$POOL_DIR/"
-    PACKAGE_OUTPUT_PATH="$POOL_DIR/$PACKAGE_NAME"
+    local source_archive="$PACKAGE_OUTPUT_PATH"
+    local published_archive="$POOL_DIR/$PACKAGE_NAME"
+
+    # A pool may be a mounted filesystem. Copy first so a failed transfer never
+    # destroys the locally-created bundle, then explicitly remove that source.
+    # This also avoids relying on cross-filesystem mv behavior for cleanup.
+    if [[ "$source_archive" != "$published_archive" ]]; then
+        log "Publishing archive to $POOL_DIR"
+        cp -f -- "$source_archive" "$published_archive"
+        cmp -s -- "$source_archive" "$published_archive" || error "Published archive verification failed: $published_archive"
+        rm -f -- "$source_archive"
+        [[ ! -e "$source_archive" ]] || error "Could not remove local archive after publishing: $source_archive"
+    fi
+    PACKAGE_OUTPUT_PATH="$published_archive"
 
     log "Cleaning up older pi archives in $POOL_DIR"
-    local old_archives
-    old_archives=$(find "$POOL_DIR" -maxdepth 1 -name 'pi-v*-node*-offline-*.tar.gz' -type f ! -name "$PACKAGE_NAME" 2>/dev/null || true)
-    if [[ -n "$old_archives" ]]; then
-        while IFS= read -r old_archive; do
-            [[ -n "$old_archive" && -f "$old_archive" ]] || continue
-            log "Removing older archive: $(basename "$old_archive")"
-            rm -f "$old_archive"
-        done <<< "$old_archives"
-    fi
+    while IFS= read -r -d '' old_archive; do
+        [[ "$old_archive" == "$PACKAGE_OUTPUT_PATH" ]] && continue
+        log "Removing older archive: $(basename "$old_archive")"
+        rm -f -- "$old_archive"
+    done < <(find "$POOL_DIR" -maxdepth 1 -type f -name 'pi-v*-node*-offline-*.tar.gz' -print0 2>/dev/null)
 }
 
 parse_args() {
