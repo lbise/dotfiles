@@ -69,14 +69,13 @@ type QuotaState = {
 
 type LastPromptUsage = {
   credits: number;
-  source: "quota-delta" | "token-estimate";
-  quotaDelta?: number;
-  quotaPending?: boolean;
+  quotaStart?: number;
+  quotaEnd?: number;
 };
 
 const USAGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const STATUS_KEY = "copilot-usage";
-const CREDITS_WIDGET_KEY = "copilot-ai-credits";
+const CREDITS_STATUS_KEY = "copilot-ai-credits";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // GitHub's usage-based Copilot billing docs define 1 AI credit as $0.01 USD.
@@ -324,40 +323,33 @@ function formatUsageLine(
   return theme.fg("dim", "Copilot") + theme.fg("dim", " · ") + parts.join(theme.fg("dim", " · "));
 }
 
-function formatCreditsWidgetLine(lastPrompt: LastPromptUsage, theme: any): string {
+function formatCreditsStatusLine(lastPrompt: LastPromptUsage, theme: any): string {
   const credits = lastPrompt.credits;
   const color = credits >= 10 ? "error" : credits >= 3 ? "warning" : "success";
-  const source = lastPrompt.source === "quota-delta" ? "from quota delta" : "token estimate";
   const money = formatCreditCostEstimate(credits);
-  const quota =
-    lastPrompt.source === "token-estimate"
-      ? lastPrompt.quotaDelta !== undefined
-        ? `quota delta ${formatAmount(lastPrompt.quotaDelta)}`
-        : lastPrompt.quotaPending
-          ? "quota delta pending"
-          : null
+  const quotaCalculation =
+    lastPrompt.quotaStart !== undefined && lastPrompt.quotaEnd !== undefined
+      ? `${formatAmount(lastPrompt.quotaEnd)}-${formatAmount(lastPrompt.quotaStart)} = ${formatAmount(
+          lastPrompt.quotaEnd - lastPrompt.quotaStart
+        )} AI credits`
       : null;
-  const suffix = [money, source, quota].filter(Boolean).join(" · ");
 
   return (
-    theme.bold(theme.fg(color, `◆ AI credits: ${formatAmount(credits)} ◆`)) +
-    (suffix ? theme.fg("dim", ` ${suffix}`) : "")
+    theme.bold(theme.fg(color, "💸")) +
+    theme.bold(theme.fg(color, ` ${formatAmount(credits)} credits`)) +
+    (money ? theme.fg("dim", ` (${money})`) : "") +
+    theme.fg("dim", ` · ${quotaCalculation ?? "🥧 estimate"}`)
   );
 }
 
 function formatCreditCostEstimate(credits: number): string | null {
   const usdPerCredit = numberValue(process.env.COPILOT_CREDIT_USD) ?? DEFAULT_COPILOT_CREDIT_USD;
-  if (!Number.isFinite(usdPerCredit) || usdPerCredit <= 0) return null;
-
-  const usd = credits * usdPerCredit;
   const usdToChf = numberValue(process.env.COPILOT_USD_TO_CHF) ?? DEFAULT_USD_TO_CHF;
-  const parts = [`≈${formatCurrency("$", usd)}`];
-
-  if (Number.isFinite(usdToChf) && usdToChf > 0) {
-    parts.push(`≈CHF ${formatCurrency("", usd * usdToChf)}`);
+  if (!Number.isFinite(usdPerCredit) || usdPerCredit <= 0 || !Number.isFinite(usdToChf) || usdToChf <= 0) {
+    return null;
   }
 
-  return parts.join(" / ");
+  return `~${formatCurrency("", credits * usdPerCredit * usdToChf)}CHF`;
 }
 
 function formatCurrency(prefix: string, value: number): string {
@@ -427,21 +419,21 @@ export default function (pi: ExtensionAPI) {
 
   function clearStatus(ctx: { ui: any }) {
     ctx.ui.setStatus(STATUS_KEY, undefined);
-    ctx.ui.setWidget(CREDITS_WIDGET_KEY, undefined);
+    ctx.ui.setStatus(CREDITS_STATUS_KEY, undefined);
   }
 
-  function clearCreditsWidget(ctx: { ui: any }) {
-    ctx.ui.setWidget(CREDITS_WIDGET_KEY, undefined);
+  function clearCreditsStatus(ctx: { ui: any }) {
+    ctx.ui.setStatus(CREDITS_STATUS_KEY, undefined);
   }
 
-  function renderCreditsWidget(ctx: { ui: any }) {
+  function renderCreditsStatus(ctx: { ui: any }) {
     if (!lastPrompt) {
-      clearCreditsWidget(ctx);
+      clearCreditsStatus(ctx);
       return;
     }
-    ctx.ui.setWidget(CREDITS_WIDGET_KEY, [formatCreditsWidgetLine(lastPrompt, ctx.ui.theme)], {
-      placement: "belowEditor",
-    });
+    // Status lines are rendered by Pi after the editor and at the bottom of
+    // the built-in footer. A belowEditor widget would sit above that footer.
+    ctx.ui.setStatus(CREDITS_STATUS_KEY, formatCreditsStatusLine(lastPrompt, ctx.ui.theme));
   }
 
   function renderStatus(ctx: { ui: any; model?: unknown }, modelOverride?: unknown) {
@@ -466,7 +458,7 @@ export default function (pi: ExtensionAPI) {
         if (delta > 0.001 && delta < 1000) {
           activePromptQuotaDeltaCredits += delta;
           activePromptHasQuotaDelta = true;
-          lastPrompt = { credits: activePromptQuotaDeltaCredits, source: "quota-delta" };
+          lastPrompt = { credits: activePromptQuotaDeltaCredits };
         }
       }
       lastQuotaTotalUsed = quota.totalUsedUnits;
@@ -541,7 +533,7 @@ export default function (pi: ExtensionAPI) {
   // Show/hide immediately when the user changes models.
   pi.on("model_select", async (event, ctx) => {
     lastPrompt = null;
-    clearCreditsWidget(ctx);
+    clearCreditsStatus(ctx);
     await updateStatus(ctx, event.model, { force: true });
   });
 
@@ -558,7 +550,7 @@ export default function (pi: ExtensionAPI) {
     activePromptHasQuotaDelta = false;
     activePromptHasTokenUsd = false;
     lastPrompt = null;
-    clearCreditsWidget(ctx);
+    clearCreditsStatus(ctx);
 
     // Capture an account-level baseline so agent_end can compute the real
     // prompt delta even when per-response quota headers are absent.
@@ -603,19 +595,18 @@ export default function (pi: ExtensionAPI) {
 
     const endQuota = await updateStatus(ctx, undefined, { force: true });
     let quotaDelta: number | undefined;
-    let quotaPending = false;
+    let quotaStart: number | undefined;
+    let quotaEnd: number | undefined;
 
     if (activePromptStartTotalUsed !== null && endQuota?.totalUsedUnits !== undefined) {
       const accountDelta = endQuota.totalUsedUnits - activePromptStartTotalUsed;
       if (accountDelta > 0.001 && accountDelta < 10000) {
         quotaDelta = accountDelta;
-      } else {
-        quotaPending = activePromptHasTokenUsd;
+        quotaStart = activePromptStartTotalUsed;
+        quotaEnd = endQuota.totalUsedUnits;
       }
     } else if (activePromptHasQuotaDelta) {
       quotaDelta = activePromptQuotaDeltaCredits;
-    } else {
-      quotaPending = activePromptHasTokenUsd;
     }
 
     if (activePromptHasTokenUsd) {
@@ -623,15 +614,14 @@ export default function (pi: ExtensionAPI) {
       if (Number.isFinite(usdPerCredit) && usdPerCredit > 0) {
         lastPrompt = {
           credits: activePromptTokenUsd / usdPerCredit,
-          source: "token-estimate",
-          quotaDelta,
-          quotaPending: quotaDelta === undefined && quotaPending,
+          quotaStart,
+          quotaEnd,
         };
       }
     } else if (quotaDelta !== undefined) {
-      lastPrompt = { credits: quotaDelta, source: "quota-delta" };
+      lastPrompt = { credits: quotaDelta, quotaStart, quotaEnd };
     }
 
-    renderCreditsWidget(ctx);
+    renderCreditsStatus(ctx);
   });
 }

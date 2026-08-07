@@ -4,16 +4,19 @@
   "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
-  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
+  "extensions": [
+    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
+  ],
   "enabledModels": [
     "github-copilot/gpt-5.6-sol",
     "github-copilot/gpt-5.6-terra"
   ],
   "packages": [
     "npm:@tintinweb/pi-subagents",
-    "npm:@agnishc/edb-context-viewer"
+    "npm:@agnishc/edb-context-viewer",
+    "npm:@narumitw/pi-statusline"
   ],
-  "hideThinkingBlock": false,
+  "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen"
 }
