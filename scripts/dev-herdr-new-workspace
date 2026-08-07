@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Create a Herdr workspace with dev (Neovim), agent (Pi), and exec tabs.
+set -Eeuo pipefail
+
+usage() {
+    echo "Usage: $(basename "$0") [directory] [workspace-label]" >&2
+}
+
+if (( $# > 2 )); then
+    usage
+    exit 2
+fi
+
+HERDR_BIN="${HERDR_BIN:-herdr}"
+if ! command -v "$HERDR_BIN" >/dev/null 2>&1; then
+    echo "ERROR: herdr is not available" >&2
+    exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required to parse Herdr responses" >&2
+    exit 1
+fi
+
+if ! cwd=$(cd -- "${1:-$PWD}" 2>/dev/null && pwd -P); then
+    echo "ERROR: Directory does not exist: ${1:-$PWD}" >&2
+    exit 1
+fi
+label="${2:-$(basename "$cwd")}"
+
+json_get() {
+    local path="$1"
+    python3 -c '
+import json
+import sys
+
+value = json.load(sys.stdin)
+for part in sys.argv[1].split("."):
+    value = value[part]
+print(value)
+' "$path"
+}
+
+echo ">> Creating Herdr workspace '$label' in $cwd..."
+workspace_json=$("$HERDR_BIN" workspace create \
+    --cwd "$cwd" \
+    --label "$label" \
+    --focus)
+
+workspace_id=$(json_get result.workspace.workspace_id <<<"$workspace_json")
+dev_tab_id=$(json_get result.tab.tab_id <<<"$workspace_json")
+dev_pane_id=$(json_get result.root_pane.pane_id <<<"$workspace_json")
+
+"$HERDR_BIN" tab rename "$dev_tab_id" dev >/dev/null
+
+agent_json=$("$HERDR_BIN" tab create \
+    --workspace "$workspace_id" \
+    --cwd "$cwd" \
+    --label agent \
+    --no-focus)
+agent_pane_id=$(json_get result.root_pane.pane_id <<<"$agent_json")
+
+"$HERDR_BIN" tab create \
+    --workspace "$workspace_id" \
+    --cwd "$cwd" \
+    --label exec \
+    --no-focus >/dev/null
+
+# Finish with the Neovim tab selected.
+"$HERDR_BIN" workspace focus "$workspace_id" >/dev/null
+"$HERDR_BIN" tab focus "$dev_tab_id" >/dev/null
+
+"$HERDR_BIN" pane run "$dev_pane_id" nvim >/dev/null
+"$HERDR_BIN" agent start pi --kind pi --pane "$agent_pane_id" >/dev/null
+
+echo ">> Workspace '$label' is ready (dev, agent, exec)."

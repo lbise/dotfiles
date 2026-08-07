@@ -38,23 +38,15 @@ name = "tokyo-night"
 # manifest_check = true
 
 [keys]
-# Prefix key to enter prefix mode (default: "ctrl+b")
-# Examples: "ctrl+b", "f12", "esc", "-"
-# Action bindings use explicit syntax: "prefix+n" requires the prefix;
-# "ctrl+alt+n" is a direct terminal-mode shortcut.
-# Accepted key syntax: plain keys, ctrl/shift/alt/cmd/super modifiers, and special keys like enter/tab/esc/left/right/up/down.
-# Named punctuation such as minus, comma, ampersand, plus, and backtick is also accepted.
-# Most reliable direct bindings are ctrl+letter, function keys, and explicit modified chords.
-# alt+..., cmd/super, and punctuation-with-modifiers may depend on your terminal/tmux setup.
 prefix = "ctrl+space"
 
 # Prefix-mode actions
 # help = "prefix+?"
-settings = "prefix+s"
+# settings = "prefix+s"
 # detach = "prefix+q"
 reload_config = "prefix+R"
 # open_notification_target = "prefix+o"
-# workspace_picker = "prefix+w"
+workspace_picker = "prefix+w"
 # goto = "prefix+g"
 # new_workspace = "prefix+shift+n"
 # new_worktree = "prefix+shift+g"
@@ -73,7 +65,8 @@ reload_config = "prefix+R"
 # previous_tab = "prefix+p"
 # next_tab = "prefix+n"
 # switch_tab = "prefix+1..9"
-# switch_workspace = ""   # optional indexed binding, e.g. "prefix+shift+1..9"
+# Only works with windows terminal 1.26+ (canary)
+switch_workspace = "prefix+shift+1..9"   # optional indexed binding, e.g. "prefix+shift+1..9"
 # close_tab = "prefix+shift+x"
 # rename_pane = "prefix+shift+p"
 # edit_scrollback = "prefix+e"
@@ -84,8 +77,8 @@ reload_config = "prefix+R"
 # cycle_pane_next = "prefix+tab"
 # cycle_pane_previous = "prefix+shift+tab"
 # last_pane = ""          # optional, unset by default; bind e.g. "prefix+tab" for global back-and-forth
-split_vertical = "prefix+e"
-split_horizontal = "prefix+w"
+split_vertical = "prefix+v"
+split_horizontal = "prefix+s"
 # close_pane = "prefix+x"
 # zoom = "prefix+z"       # legacy alias: fullscreen
 # resize_mode = "prefix+r"
@@ -112,6 +105,11 @@ toggle_sidebar = "prefix+p"
 # command = "lazygit"
 # width = "80%"
 # height = "80%"
+
+[[keys.command]]
+key = "prefix+shift+n"
+type = "shell"
+command = "dev-herdr-new-workspace"
 
 # Legacy indexed shortcut config is still parsed for compatibility.
 # Prefer switch_tab, switch_workspace, and focus_agent for new configs.
@@ -164,7 +162,7 @@ toggle_sidebar = "prefix+p"
 # redraw_on_focus_gained = true
 
 # Pane scrollback lines to scroll per mouse wheel notch.
-# mouse_scroll_lines = 3
+mouse_scroll_lines = 5
 
 # Ask for confirmation before closing a workspace
 # confirm_close = true
@@ -184,7 +182,7 @@ prompt_new_tab_name = false
 
 # Hide the tab row when a workspace has exactly one tab.
 # New tabs can still be created with the configured keybinding.
-# hide_tab_bar_when_single_tab = false
+hide_tab_bar_when_single_tab = true
 
 # Agent panel ordering: "spaces" (grouped by space) or "priority" (attention queue).
 # "workspaces" is accepted as an alias for "spaces".
@@ -220,14 +218,14 @@ prompt_new_tab_name = false
 # system = ask the OS notification service directly
 # delivery = "off"
 # delay_seconds = 1
-
 delivery = "system"
+
 [ui.toast.herdr]
-# position = "bottom-right"
+position = "top-right"
 
 [ui.toast.clipboard]
 # enabled = true
-# position = "bottom-center"
+position = "top-right"
 
 # Play sounds when agents change state in background workspaces
 [ui.sound]
