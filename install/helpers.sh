@@ -89,14 +89,6 @@ get_github_latest_tag() {
     curl -sL "https://api.github.com/repos/${repo}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p'
 }
 
-# Get the most recently published GitHub release tag, including prereleases.
-# Usage: get_github_newest_release_tag "owner/repo"
-get_github_newest_release_tag() {
-    local repo="$1"
-    curl -fsSL "https://api.github.com/repos/${repo}/releases?per_page=1" |
-        sed -n '0,/"tag_name":/{s/^[[:space:]]*"tag_name": *"\([^"]*\)".*/\1/p}'
-}
-
 # Extract version number from a version string (strips leading 'v' and extra info)
 # Usage: normalize_version "v1.2.3" -> "1.2.3"
 #        normalize_version "NVIM v0.11.5" -> "0.11.5"
