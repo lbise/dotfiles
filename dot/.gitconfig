@@ -100,10 +100,15 @@
 # Note: hasconfig:remote requires Git 2.36+
 [includeIf "gitdir:~/andromeda/"]
     path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/G722_GM/"]
+    path = ~/.gitconfigwork
+[includeIf "gitdir:~/gitrepo/ai-skills/"]
+	path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/rig/"]
     path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/leo_dotfiles/"]
     path = ~/.gitconfigwork
+
 [includeIf "gitdir:~/gitrepo/smcode/"]
     path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/meridian/"]
@@ -114,8 +119,7 @@
     path = ~/.gitconfigwork
 [includeIf "gitdir:~/gitrepo/rink_rat/"]
     path = ~/.gitconfigwork
-[includeIf "gitdir:~/gitrepo/G722_GM/"]
-    path = ~/.gitconfigwork
+
 [gpg]
 	format = ssh
 [lfs "remote"]
