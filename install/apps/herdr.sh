@@ -6,10 +6,14 @@ source "$SCRIPT_DIR/../helpers.sh"
 
 echo ">> Installing herdr..."
 
-REPO="herdrdev/herdr"
+# Temporary source until the required feature is merged upstream.
+# REPO="herdrdev/herdr"
+REPO="tahaalibra/herdr"
 OS=$(get_os) || exit 1
 ARCH=$(get_arch) || exit 1
-TAG=$(get_github_latest_tag "$REPO")
+# The fork publishes its builds as prereleases, which GitHub's /latest endpoint
+# deliberately omits.
+TAG=$(get_github_newest_release_tag "$REPO")
 
 if [[ -z "$TAG" ]]; then
     echo "ERROR: Could not determine the latest herdr release" >&2
@@ -24,18 +28,21 @@ esac
 
 INSTALL_DIR="$HOME/.local/bin"
 BINARY_PATH="$INSTALL_DIR/herdr"
-LATEST_VERSION=$(normalize_version "$TAG")
+# Fork releases use non-version tags (for example, multi-remote-6), so the
+# binary's --version output cannot tell which fork build was installed.
+RELEASE_TAG_PATH="$INSTALL_DIR/.herdr-release-tag"
 
 if [[ -x "$BINARY_PATH" ]]; then
     CURRENT_VERSION=$(normalize_version "$("$BINARY_PATH" --version 2>/dev/null || true)" || true)
-    if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
-        echo "herdr is already up to date ($CURRENT_VERSION)"
+    CURRENT_TAG=$(cat "$RELEASE_TAG_PATH" 2>/dev/null || true)
+    if [[ "$CURRENT_TAG" == "$TAG" ]]; then
+        echo "herdr is already up to date ($CURRENT_VERSION, $TAG)"
         exit 0
     fi
 
-    echo "herdr ${CURRENT_VERSION:-unknown} is installed, upgrading to $LATEST_VERSION..."
+    echo "herdr ${CURRENT_VERSION:-unknown} is installed, upgrading to $TAG..."
 else
-    echo "Installing herdr $LATEST_VERSION..."
+    echo "Installing herdr $TAG..."
 fi
 
 BINARY_URL="https://github.com/${REPO}/releases/download/${TAG}/herdr-${OS}-${HERDR_ARCH}"
@@ -48,5 +55,6 @@ curl -fsSL "$BINARY_URL" -o "$TMP_DIR/herdr"
 mkdir -p "$INSTALL_DIR"
 chmod +x "$TMP_DIR/herdr"
 mv "$TMP_DIR/herdr" "$BINARY_PATH"
+printf '%s\n' "$TAG" > "$RELEASE_TAG_PATH"
 
 echo "herdr installed successfully to $BINARY_PATH"
