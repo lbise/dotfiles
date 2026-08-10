@@ -38,6 +38,7 @@ PI_MIN_NODE_VERSION=""
 MANIFEST_HASH=""
 PACKAGE_SOURCE_KIND=""
 PACKAGE_SOURCE_PATH=""
+PACKAGE_COUNT=0
 BUNDLE_RTK="${PI_BUNDLE_RTK:-true}"
 CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -155,8 +156,11 @@ const packages = rawPackages.map((item, index) => {
   }
   throw new Error(`Invalid package entry at packages[${index}] in ${sourcePath}`);
 });
-const normalizedPackages = packages.map((pkg) =>
-  pkg.name ? { source: pkg.source, name: pkg.name } : pkg.source
+// Hash the complete settings entries, including Pi's resource filters and
+// autoload flag. Otherwise changing only a filter could leave an old archive
+// looking current to pi_update.sh.
+const normalizedPackages = rawPackages.map((item) =>
+  typeof item === "string" ? item : JSON.parse(JSON.stringify(item))
 );
 const packageHash = crypto
   .createHash("sha256")
@@ -186,9 +190,38 @@ NODE
         NODE_VERSION="$manifest_node_version"
     fi
 
-    if [[ ${#PACKAGE_SPECS[@]} -eq 0 ]]; then
+    PACKAGE_COUNT=${#PACKAGE_SPECS[@]}
+    if (( PACKAGE_COUNT == 0 )); then
         log "Package source contains no third-party packages; bundle will only include pi itself"
+    else
+        log "Configured Pi packages ($PACKAGE_COUNT):"
+        local spec
+        for spec in "${PACKAGE_SPECS[@]}"; do
+            log "  - ${spec%%$'\t'*}"
+        done
     fi
+}
+
+current_package_source_hash() {
+    "$NODE_BIN" - "$PACKAGE_SOURCE_PATH" <<'NODE'
+const fs = require("fs");
+const crypto = require("crypto");
+const sourcePath = process.argv[2];
+const data = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+const packages = Array.isArray(data.packages) ? data.packages : [];
+process.stdout.write(
+  crypto.createHash("sha256").update(JSON.stringify({ packages })).digest("hex")
+);
+NODE
+}
+
+verify_package_source_unchanged() {
+    # Building the runtime can take several minutes. Never publish an archive
+    # from a stale in-memory snapshot if settings.json was edited meanwhile.
+    [[ -f "$PACKAGE_SOURCE_PATH" ]] || error "Package source disappeared while building: $PACKAGE_SOURCE_PATH"
+    local current_hash
+    current_hash="$(current_package_source_hash)"
+    [[ "$current_hash" == "$MANIFEST_HASH" ]] || error "Packages changed in $PACKAGE_SOURCE_PATH while the bundle was being built. Rerun $(basename "$0") so the archive includes the current settings."
 }
 
 resolve_pi_package_dir() {
@@ -749,13 +782,10 @@ RTK_ARCHIVE_NAME='$manifest_rtk_archive_name'
 EOF
 
     cp "$TEMP_DIR/manifest.env" "$STAGE_DIR/manifest.env"
-    node - "$STAGE_DIR/offline-packages.json" "$PACKAGE_SOURCE_KIND" "$PACKAGE_SOURCE_PATH" "$NODE_VERSION" "${PACKAGE_SPECS[@]}" <<'NODE'
+    node - "$STAGE_DIR/offline-packages.json" "$PACKAGE_SOURCE_KIND" "$PACKAGE_SOURCE_PATH" "$NODE_VERSION" <<'NODE'
 const fs = require("fs");
-const [outPath, sourceKind, sourcePath, nodeVersion, ...specs] = process.argv.slice(2);
-const packages = specs.map((spec) => {
-  const [source, name = ""] = spec.split("\t");
-  return name ? { source, name } : source;
-});
+const [outPath, sourceKind, sourcePath, nodeVersion] = process.argv.slice(2);
+const sourceData = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
 const manifest = {
   generated: true,
   source: {
@@ -763,7 +793,9 @@ const manifest = {
     path: sourcePath,
   },
   nodeVersion,
-  packages,
+  // Keep the exact settings entries so filters/autoload metadata are visible
+  // when diagnosing an offline archive.
+  packages: Array.isArray(sourceData.packages) ? sourceData.packages : [],
 };
 fs.writeFileSync(outPath, `${JSON.stringify(manifest, null, 2)}\n`);
 NODE
@@ -1007,6 +1039,7 @@ main() {
     create_manifest_files
     create_install_script
     create_readme
+    verify_package_source_unchanged
 
     PACKAGE_OUTPUT_PATH="$OUTPUT_DIR/$PACKAGE_NAME"
 

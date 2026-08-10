@@ -4,6 +4,8 @@ set -Eeuo pipefail
 
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
+SETTINGS_PATH="${PI_SETTINGS_PATH:-$DOTFILES_DIR/dot/.pi/agent/settings.json}"
 DEFAULT_ARCHIVES_DIR="/mnt/ch03pool/murten_mirror/shannon/linux/tools/pi"
 ARCHIVES_DIR="${PI_ARCHIVES_DIR:-$DEFAULT_ARCHIVES_DIR}"
 FORCE_INSTALL=false
@@ -35,6 +37,7 @@ By default the script looks for the newest archive in:
 Options:
   --archive PATH        Install a specific archive instead of the newest one in the archive directory
   --archives-dir DIR    Override the directory searched for archives
+  --settings PATH       Verify the archive matches this Pi settings file (default: $SETTINGS_PATH)
   --force               Reinstall even if the same pi + Node versions are already installed
   --help, -h            Show this help message
 
@@ -86,9 +89,37 @@ load_manifest_env() {
     local manifest_file="$1"
     [[ -f "$manifest_file" ]] || error "Manifest not found: $manifest_file"
 
-    unset PI_VERSION NODE_VERSION PI_NODE_ENGINE PI_MIN_NODE_VERSION MANIFEST_HASH RTK_VERSION RTK_TARGET RTK_ARCHIVE_NAME
+    unset PI_VERSION NODE_VERSION PI_NODE_ENGINE PI_MIN_NODE_VERSION MANIFEST_HASH PACKAGE_SOURCE_KIND RTK_VERSION RTK_TARGET RTK_ARCHIVE_NAME
     # shellcheck disable=SC1090
     source "$manifest_file"
+}
+
+verify_archive_package_set() {
+    [[ "${PACKAGE_SOURCE_KIND:-}" == "settings" ]] || return 0
+    [[ -f "$SETTINGS_PATH" ]] || {
+        log "⚠ Settings file not found; cannot verify archive package set: $SETTINGS_PATH"
+        return 0
+    }
+
+    local archive_node="$TEMP_DIR/pi-runtime/node/bin/node"
+    [[ -x "$archive_node" ]] || error "Bundled Node not found; cannot verify archive package set"
+
+    local settings_hash
+    settings_hash="$("$archive_node" - "$SETTINGS_PATH" <<'NODE'
+const fs = require("fs");
+const crypto = require("crypto");
+const sourcePath = process.argv[2];
+const data = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+const packages = Array.isArray(data.packages) ? data.packages : [];
+process.stdout.write(
+  crypto.createHash("sha256").update(JSON.stringify({ packages })).digest("hex")
+);
+NODE
+)"
+
+    [[ -n "${MANIFEST_HASH:-}" ]] || error "Archive has no package hash; rebuild it with scripts/pi_package.sh"
+    [[ "$settings_hash" == "$MANIFEST_HASH" ]] || error "Archive package set does not match $SETTINGS_PATH. The archive was built from stale settings; run scripts/pi_package.sh again before updating."
+    log "✓ Archive contains the current settings package set"
 }
 
 get_installed_versions() {
@@ -277,6 +308,10 @@ parse_args() {
                 ARCHIVES_DIR="$2"
                 shift 2
                 ;;
+            --settings)
+                SETTINGS_PATH="$2"
+                shift 2
+                ;;
             --force)
                 FORCE_INSTALL=true
                 shift
@@ -308,6 +343,7 @@ main() {
 
     extract_archive "$ARCHIVE_PATH"
     load_manifest_env "$TEMP_DIR/manifest.env"
+    verify_archive_package_set
 
     local archive_pi_version="${PI_VERSION:-}"
     local archive_node_version="${NODE_VERSION:-}"
