@@ -25,6 +25,7 @@ COMMON_LINKS=(
     ".config/fcitx5"
     ".config/environment.d"
     ".pi/agent/settings.json"
+    ".pi/agent/pi-statusline.json"
     ".pi/agent/prompts"
     ".pi/agent/extensions"
     ".pi/agent/themes"
