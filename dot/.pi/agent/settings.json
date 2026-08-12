@@ -12,10 +12,40 @@
     "github-copilot/gpt-5.6-terra"
   ],
   "packages": [
-    "npm:@tintinweb/pi-subagents",
+    "npm:pi-subagents",
     "npm:@agnishc/edb-context-viewer",
     "npm:pi-footer"
   ],
+  "subagents": {
+    "defaultModel": "github-copilot/gpt-5.6-luna",
+    "defaultThinking": "low",
+    "agentOverrides": {
+      "scout": {
+        "model": "github-copilot/gpt-5.6-luna",
+        "thinking": "low"
+      },
+      "researcher": {
+        "model": "github-copilot/gpt-5.6-luna",
+        "thinking": "medium"
+      },
+      "delegate": {
+        "model": "github-copilot/gpt-5.6-luna",
+        "thinking": "low"
+      },
+      "worker": {
+        "model": "github-copilot/gpt-5.6-terra",
+        "thinking": "medium"
+      },
+      "reviewer": {
+        "model": "github-copilot/gpt-5.6-terra",
+        "thinking": "medium"
+      },
+      "oracle": {
+        "model": "github-copilot/gpt-5.6-sol",
+        "thinking": "high"
+      }
+    }
+  },
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen"
