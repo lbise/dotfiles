@@ -10,8 +10,7 @@ local settings = {
 		-- Supports pinned version like ruff@0.11.2
 		mason_installed = {
 			"clangd",
-			-- Specific version required for work
-			"ruff@0.15.9",
+			"ruff",
 			"lua-language-server",
 			"stylua",
 			"ty",
