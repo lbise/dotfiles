@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock man-db man-pages waybar impala fcitx5 fcitx5-configtool fcitx5-gtk brightnessctl jq grim slurp satty"
-YAY_PKGS="neovim ghostty zen-browser-bin fzf ripgrep xdg-terminal-exec elephant-all-bin walker dropbox"
+YAY_PKGS="neovim ghostty zen-browser-bin fd fzf ripgrep xdg-terminal-exec elephant-all-bin walker dropbox"
 
 # Only install packages if needed
 sudo pacman -S --noconfirm --needed $PACMAN_PKGS
