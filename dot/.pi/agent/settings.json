@@ -14,7 +14,7 @@
   "packages": [
     "npm:@tintinweb/pi-subagents",
     "npm:@agnishc/edb-context-viewer",
-    "npm:@narumitw/pi-statusline"
+    "npm:pi-footer"
   ],
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,

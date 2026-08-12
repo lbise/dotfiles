@@ -1,7 +1,8 @@
 /**
  * OpenAI Codex Usage Extension for pi
  *
- * Shows ChatGPT/Codex subscription usage in the TUI footer status bar.
+ * Shows ChatGPT/Codex subscription usage by publishing ctx.ui.setStatus()
+ * values for a pi-footer External Status widget.
  * Codex exposes two rolling windows:
  *   - primary: usually 5 hours
  *   - secondary: usually weekly
@@ -72,6 +73,7 @@ type CodexUsageState = {
   resetCredits?: number;
 };
 
+// This key is the integration contract with pi-footer's External Status widget.
 const STATUS_KEY = "openai-codex-usage";
 const USAGE_CACHE_TTL_MS = 60 * 1000;
 const TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
@@ -317,7 +319,7 @@ function usageColor(percentUsed: number): "success" | "warning" | "error" {
 function formatUsageBar(percentUsed: number, theme: any): string {
   const displayPercent = Math.max(0, percentUsed);
   const clamped = Math.max(0, Math.min(100, displayPercent));
-  const width = 10;
+  const width = 8;
   const filled = clamped === 0 ? 0 : Math.max(1, Math.round((clamped / 100) * width));
   const filledWidth = Math.min(width, filled);
   const color = usageColor(displayPercent);
@@ -353,23 +355,17 @@ function formatResetInfo(resetsAt: number | undefined): string | null {
     relative = "Reset now";
   } else if (remainingMs < HOUR_MS) {
     const mins = Math.max(1, Math.ceil(remainingMs / MINUTE_MS));
-    relative = `Reset in ${mins}m`;
+    relative = `Reset ${mins}m`;
   } else if (remainingMs < DAY_MS) {
     const hours = Math.floor(remainingMs / HOUR_MS);
     const mins = Math.round((remainingMs % HOUR_MS) / MINUTE_MS);
-    relative = `Reset in ${hours}h${mins > 0 ? ` ${mins}m` : ""}`;
+    relative = `Reset ${hours}h${mins > 0 ? ` ${mins}m` : ""}`;
   } else {
     const days = Math.ceil(remainingMs / DAY_MS);
-    relative = `Reset in ${days} day${days === 1 ? "" : "s"}`;
+    relative = `Reset ${days} day${days === 1 ? "" : "s"}`;
   }
 
-  const date = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(parsed);
-
+  const date = `${String(parsed.getDate()).padStart(2, "0")}.${String(parsed.getMonth() + 1).padStart(2, "0")}`;
   return `${relative} (${date})`;
 }
 
@@ -393,16 +389,16 @@ function formatUsageLine(state: CodexUsageState | null, theme: any): string {
   }
 
   if (state?.credits?.unlimited) {
-    parts.push(theme.fg("success", "credits unlimited"));
+    parts.push(theme.fg("success", "unlimited"));
   } else if (state?.credits?.has_credits && state.credits.balance !== undefined && state.credits.balance !== null) {
-    parts.push(theme.fg("dim", `credits ${state.credits.balance}`));
+    parts.push(theme.fg("dim", `${state.credits.balance} credits`));
   }
 
   if (parts.length === 0) {
     parts.push(theme.fg("dim", state?.planType || "active"));
   }
 
-  return theme.fg("dim", "Codex") + separator + parts.join(separator);
+  return parts.join(separator);
 }
 
 export default function (pi: ExtensionAPI) {

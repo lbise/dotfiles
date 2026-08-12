@@ -2,8 +2,8 @@
  * Copilot Usage Extension for pi
  *
  * Shows GitHub Copilot premium request usage, quota reset date, and the
- * last prompt's summed Copilot AI credit usage plus USD/CHF estimate in the
- * TUI footer status bar.
+ * last prompt's summed Copilot AI credit usage plus USD/CHF estimate. Values
+ * are published with ctx.ui.setStatus() for pi-footer External Status widgets.
  *
  * Token source (in order):
  *   1. pi's own auth.json (~/.pi/agent/auth.json, github-copilot refresh token)
@@ -74,6 +74,7 @@ type LastPromptUsage = {
 };
 
 const USAGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// These keys are the integration contract with pi-footer's External Status widgets.
 const STATUS_KEY = "copilot-usage";
 const CREDITS_STATUS_KEY = "copilot-ai-credits";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -268,22 +269,19 @@ function usageColor(quota: QuotaState | null, percentUsed: number | undefined): 
   return "success";
 }
 
-function formatUsageBar(quota: QuotaState, theme: any): string | null {
+function formatUsageSummary(quota: QuotaState, theme: any): string | null {
   const percentUsed = usagePercentUsed(quota);
   if (percentUsed === undefined || !Number.isFinite(percentUsed)) return null;
 
   const displayPercent = Math.max(0, percentUsed);
-  const clamped = Math.max(0, Math.min(100, displayPercent));
-  const width = 10;
-  const filled = clamped === 0 ? 0 : Math.max(1, Math.round((clamped / 100) * width));
-  const filledWidth = Math.min(width, filled);
   const color = usageColor(quota, displayPercent);
+  const used = quota.totalUsedUnits ?? quota.usedUnits;
+  const counts =
+    used !== undefined && quota.entitlement !== undefined
+      ? theme.fg("dim", ` (${formatAmount(used)}/${formatAmount(quota.entitlement)})`)
+      : "";
 
-  return (
-    theme.fg(color, "█".repeat(filledWidth)) +
-    theme.fg("dim", "░".repeat(width - filledWidth)) +
-    theme.fg(color, ` ${formatAmount(displayPercent)}%`)
-  );
+  return theme.fg(color, `${formatAmount(displayPercent)}%`) + counts;
 }
 
 function formatUsageLine(
@@ -297,13 +295,8 @@ function formatUsageLine(
   if (quota?.unlimited) {
     parts.push(theme.fg("success", "unlimited"));
   } else if (quota) {
-    const usageBar = formatUsageBar(quota, theme);
-    if (usageBar) parts.push(usageBar);
-
-    const used = quota.totalUsedUnits ?? quota.usedUnits;
-    if (used !== undefined && quota.entitlement !== undefined) {
-      parts.push(theme.fg("dim", `${formatAmount(used)}/${formatAmount(quota.entitlement)} used`));
-    }
+    const usageSummary = formatUsageSummary(quota, theme);
+    if (usageSummary) parts.push(usageSummary);
 
     if (quota.overageCount && quota.overageCount > 0) {
       parts.push(theme.fg("warning", `+${formatAmount(quota.overageCount)} overage`));
@@ -320,7 +313,7 @@ function formatUsageLine(
 
   if (reset) parts.push(theme.fg("dim", reset));
 
-  return theme.fg("dim", "Copilot") + theme.fg("dim", " · ") + parts.join(theme.fg("dim", " · "));
+  return parts.join(theme.fg("dim", " · "));
 }
 
 function formatCreditsStatusLine(lastPrompt: LastPromptUsage, theme: any): string {
@@ -368,17 +361,13 @@ function formatResetInfo(value: string | undefined): string | null {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
 
-  const date = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  }).format(parsed);
+  const date = `${String(parsed.getUTCDate()).padStart(2, "0")}.${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
 
   const now = new Date();
   const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const resetUtc = Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
   const daysUntil = Math.max(0, Math.round((resetUtc - todayUtc) / DAY_MS));
-  const relative = daysUntil === 0 ? "Reset today" : `Reset in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`;
+  const relative = daysUntil === 0 ? "Reset today" : `Reset ${daysUntil} day${daysUntil === 1 ? "" : "s"}`;
 
   return `${relative} (${date})`;
 }
@@ -431,8 +420,7 @@ export default function (pi: ExtensionAPI) {
       clearCreditsStatus(ctx);
       return;
     }
-    // Status lines are rendered by Pi after the editor and at the bottom of
-    // the built-in footer. A belowEditor widget would sit above that footer.
+    // pi-footer renders this value in its configured External Status widget.
     ctx.ui.setStatus(CREDITS_STATUS_KEY, formatCreditsStatusLine(lastPrompt, ctx.ui.theme));
   }
 

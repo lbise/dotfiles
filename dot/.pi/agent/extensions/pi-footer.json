@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "enabled": true,
+  "preset": "compact",
+  "lines": [
+    [
+      {
+        "id": "model-provider-mspt4x2i-awx6yt",
+        "type": "model-provider",
+        "enabled": true,
+        "options": {
+          "raw": false,
+          "icon": "",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false
+        }
+      },
+      {
+        "id": "thinking-level-mspt3095-l09uvt",
+        "type": "thinking-level",
+        "enabled": true,
+        "options": {
+          "raw": false,
+          "hideWhenEmpty": false,
+          "icon": "",
+          "text": "",
+          "fg": "magenta",
+          "bg": "default",
+          "bold": false
+        }
+      },
+      {
+        "id": "context-length-mspt7rpn-n5hge3",
+        "type": "context-length",
+        "enabled": true,
+        "options": {
+          "raw": false,
+          "hideWhenZero": false,
+          "icon": "",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "tokenFormatStyle": "compact",
+          "contextConditionalColors": false,
+          "contextWarningPercent": 45,
+          "contextDangerPercent": 90,
+          "warningFg": "yellow",
+          "warningBg": "default",
+          "dangerFg": "red",
+          "dangerBg": "default"
+        }
+      },
+      {
+        "id": "git-root-msptausk-jla5ey",
+        "type": "git-root",
+        "enabled": true,
+        "options": {
+          "raw": false,
+          "hideWhenEmpty": false,
+          "icon": "",
+          "text": "",
+          "fg": "magenta",
+          "bg": "default",
+          "bold": false
+        }
+      },
+      {
+        "id": "git-branch-mspt3095-twxboq",
+        "type": "git-branch",
+        "enabled": true,
+        "options": {
+          "raw": false,
+          "hideWhenEmpty": false,
+          "icon": "",
+          "text": "",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "gitBranchDisplayStyle": "default",
+          "surroundLeft": "",
+          "surroundRight": ""
+        }
+      },
+      {
+        "id": "cost-msptbq1v-u8ixq2",
+        "type": "cost",
+        "enabled": true,
+        "options": {
+          "raw": false,
+          "icon": "",
+          "fg": "magenta",
+          "bg": "default",
+          "bold": false,
+          "costFormatStyle": "default",
+          "showSubscription": false
+        }
+      },
+      {
+        "id": "external-status-mspt6p4j-9irn3f",
+        "type": "external-status",
+        "enabled": true,
+        "options": {
+          "raw": true,
+          "hideWhenEmpty": true,
+          "icon": "",
+          "text": "-",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "externalStatusKey": "openai-codex-usage",
+          "trimValue": 0,
+          "preserveTrimStyles": true
+        }
+      },
+      {
+        "id": "external-status-msptlqdw-bxb6ll",
+        "type": "external-status",
+        "enabled": true,
+        "options": {
+          "raw": true,
+          "hideWhenEmpty": true,
+          "icon": "",
+          "text": "-",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "externalStatusKey": "copilot-usage",
+          "trimValue": 0,
+          "preserveTrimStyles": true
+        }
+      }
+    ]
+  ],
+  "separator": "dot",
+  "separatorFg": "white",
+  "separatorBg": "default",
+  "iconMode": "nerd",
+  "minimalist": false,
+  "terminal": {
+    "widthMode": "full-minus-40",
+    "colorLevel": "truecolor"
+  },
+  "extensionStatusRow": {
+    "hiddenKeys": [
+      "copilot-ai-credits",
+      "copilot-usage",
+      "openai-codex-usage"
+    ],
+    "knownKeys": [
+      "copilot-ai-credits",
+      "copilot-usage",
+      "openai-codex-usage"
+    ]
+  }
+}
