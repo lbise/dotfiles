@@ -57,7 +57,7 @@ update_tmux_env() {
     # a client re-attaches, so sync the interactive shell from tmux's session
     # environment. preexec makes the first command after re-attach see the new
     # values; precmd keeps prompts/new shells up to date.
-    local env_vars='(DISPLAY|WAYLAND_DISPLAY|XAUTHORITY|SSH_AUTH_SOCK|SSH_AGENT_PID|SSH_CONNECTION|SSH_CLIENT|SSH_TTY|KRB5CCNAME)'
+    local env_vars='(DISPLAY|WAYLAND_DISPLAY|XAUTHORITY|SSH_CONNECTION|SSH_CLIENT|SSH_TTY|KRB5CCNAME)'
     local tmux_env
     tmux_env=$(tmux show-environment -s 2>/dev/null | grep -E "^${env_vars}=|^unset ${env_vars};") || true
 
@@ -72,6 +72,9 @@ add-zsh-hook precmd update_tmux_env
 add-zsh-hook preexec update_tmux_env
 
 source $ZSH/oh-my-zsh.sh
+if [[ -f "$HOME/.config/shell/ssh-auth-sock.sh" ]]; then
+    source "$HOME/.config/shell/ssh-auth-sock.sh"
+fi
 # --------------------------------------------------------------------------------
 
 # Work specific

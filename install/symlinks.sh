@@ -24,6 +24,7 @@ COMMON_LINKS=(
     ".gnupg/gpg-agent.conf"
     ".config/fcitx5"
     ".config/environment.d"
+    ".config/shell/ssh-auth-sock.sh"
     ".pi/agent/settings.json"
     ".pi/agent/prompts"
     # Includes pi-footer.json at ~/.pi/agent/extensions/pi-footer.json.
@@ -82,4 +83,12 @@ SCRIPT_DST="$HOME/.scripts"
 if [ ! -e "$SCRIPT_DST" ]; then
     rm -rf "$SCRIPT_DST"
     create_symlink "$DOTFILES_ROOT/scripts" "$SCRIPT_DST"
+else
+    SCRIPT_SRC_REAL=$(cd "$DOTFILES_ROOT/scripts" && pwd -P)
+    SCRIPT_DST_REAL=$(cd "$SCRIPT_DST" && pwd -P)
+    if [[ "$SCRIPT_DST_REAL" != "$SCRIPT_SRC_REAL" ]]; then
+        echo "ERROR: $SCRIPT_DST already exists and does not point to $DOTFILES_ROOT/scripts" >&2
+        echo "Move it out of the way and rerun the installer." >&2
+        exit 1
+    fi
 fi

@@ -4,6 +4,23 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../helpers.sh"
 
+nvim_runtime_has_stale_files() {
+    local runtime_dir="$HOME/.local/share/nvim/runtime"
+    local stale_file
+    local stale_files=(
+        lua/vim/_defaults.lua
+        lua/vim/_editor.lua
+        lua/vim/_options.lua
+        lua/vim/_system.lua
+        lua/vim/shared.lua
+    )
+
+    for stale_file in "${stale_files[@]}"; do
+        [[ -e "$runtime_dir/$stale_file" ]] && return 0
+    done
+    return 1
+}
+
 install_nvim() {
     echo ">> Installing nvim..."
 
@@ -14,6 +31,12 @@ install_nvim() {
 
     local repo="neovim/neovim"
     local os arch tag tarball_url nvim_os nvim_arch
+    local force_reinstall=0
+
+    if nvim_runtime_has_stale_files; then
+        echo "Found stale files in the Neovim runtime; replacing the runtime directory..."
+        force_reinstall=1
+    fi
 
     os=$(get_os) || return 1
     arch=$(get_arch) || return 1
@@ -33,7 +56,7 @@ install_nvim() {
 
     tarball_url="https://github.com/${repo}/releases/download/${tag}/nvim-${nvim_os}-${nvim_arch}.tar.gz"
 
-    install_github_release "nvim" "$repo" "$tarball_url" "$tag" "nvim"
+    install_github_release "nvim" "$repo" "$tarball_url" "$tag" "nvim" "nvim" "$force_reinstall"
 }
 
 install_tree_sitter_with_cargo() {

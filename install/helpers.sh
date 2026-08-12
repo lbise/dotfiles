@@ -101,26 +101,35 @@ normalize_version() {
 
 # Install a binary from a GitHub release tarball to ~/.local/bin
 # Also installs share/ and lib/ directories to ~/.local if present in the archive
-# Usage: install_github_release "tool_name" "owner/repo" "tarball_url" "latest_tag" ["binary_name_in_archive"]
+# Usage: install_github_release "tool_name" "owner/repo" "tarball_url" "latest_tag" ["binary_name_in_archive"] ["managed_share_subdir"] ["force_reinstall"]
 # - tool_name: name of the tool (used for messages and default binary name)
 # - owner/repo: GitHub repository (e.g., "tmux/tmux-builds")
 # - tarball_url: full URL to the .tar.gz file
 # - latest_tag: the latest release tag (e.g., "v1.2.3")
 # - binary_name_in_archive: optional, name of binary inside archive (defaults to tool_name)
+# - managed_share_subdir: optional directory below ~/.local/share to replace instead of merge
+# - force_reinstall: optional, set to 1 to reinstall even when the version is current
 install_github_release() {
     local tool_name="$1"
     local repo="$2"
     local tarball_url="$3"
     local latest_tag="$4"
     local binary_name="${5:-$tool_name}"
+    local managed_share_subdir="${6:-}"
+    local force_reinstall="${7:-0}"
     local install_dir="$HOME/.local/bin"
     local local_dir="$HOME/.local"
+
+    if [[ -n "$managed_share_subdir" && ("$managed_share_subdir" == "." || "$managed_share_subdir" == ".." || "$managed_share_subdir" == */*) ]]; then
+        echo "Invalid managed share subdirectory: $managed_share_subdir" >&2
+        return 1
+    fi
 
     local latest_version
     latest_version=$(normalize_version "$latest_tag")
 
     # Check if already installed and up to date
-    if [[ -x "$install_dir/$tool_name" ]]; then
+    if [[ -x "$install_dir/$tool_name" && "$force_reinstall" != "1" ]]; then
         local current_version_raw current_version
         # Try --version first, then -V, then -v
         current_version_raw=$("$install_dir/$tool_name" --version 2>/dev/null | head -n1) ||
@@ -141,6 +150,8 @@ install_github_release() {
         else
             echo "$tool_name $current_version is installed, upgrading to $latest_version..."
         fi
+    elif [[ "$force_reinstall" == "1" ]]; then
+        echo "Reinstalling $tool_name $latest_version..."
     else
         echo "Installing $tool_name $latest_version..."
     fi
@@ -187,7 +198,14 @@ install_github_release() {
     share_dir=$(find "$tmp_dir" -type d -name "share" 2>/dev/null | head -n1)
     if [[ -n "$share_dir" && -d "$share_dir" ]]; then
         mkdir -p "$local_dir/share"
-        cp -r "$share_dir"/* "$local_dir/share/"
+        if [[ -n "$managed_share_subdir" ]]; then
+            if [[ ! -d "$share_dir/$managed_share_subdir" ]]; then
+                echo "Managed share directory '$managed_share_subdir' not found in archive" >&2
+                return 1
+            fi
+            rm -rf "$local_dir/share/$managed_share_subdir"
+        fi
+        cp -r "$share_dir"/. "$local_dir/share/"
         echo "Installed share files to $local_dir/share"
     fi
 
