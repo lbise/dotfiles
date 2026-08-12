@@ -74,3 +74,5 @@ mouse-scroll-multiplier = 0.95
 # Keyboard bindings
 keybind = shift+insert=paste_from_clipboard
 keybind = control+insert=copy_to_clipboard
+# Silly workaround for ghostty kitty keyboard protocol bug.. https://github.com/ghostty-org/ghostty/discussions/12192
+keybind = shift+right_bracket=text:!
