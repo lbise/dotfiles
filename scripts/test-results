@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Summarize Andromeda HIL test_results.xml files."""
+
+from collections import Counter, defaultdict
+from pathlib import Path
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+DEFAULT_ROOT = Path.home() / "andromeda/rom/_obj"
+
+if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1] in {"-h", "--help"}):
+    print(f"Usage: {Path(sys.argv[0]).name} [OBJ_DIR|test_results.xml]")
+    raise SystemExit(0 if len(sys.argv) == 2 else 2)
+
+root = (Path(sys.argv[1]).expanduser() if len(sys.argv) == 2 else DEFAULT_ROOT).resolve()
+files = [root] if root.is_file() else sorted(root.rglob("test_results.xml"))
+if not files:
+    print(f"No test_results.xml files found under {root}", file=sys.stderr)
+    raise SystemExit(2)
+
+exit_code = 0
+for path in files:
+    # These files contain concatenated XML documents, one per completed run.
+    text = path.read_text(errors="replace")
+    suites = re.findall(r"<testsuite\b.*?</testsuite>", text, re.DOTALL)
+    results = []
+
+    for run, fragment in enumerate(suites, 1):
+        try:
+            suite = ET.fromstring(fragment)
+        except ET.ParseError as error:
+            print(f"Warning: ignored malformed run {run} in {path}: {error}", file=sys.stderr)
+            continue
+        for case in suite.findall(".//testcase"):
+            status = "pass"
+            detail = ""
+            for candidate in ("failure", "error", "skipped"):
+                node = case.find(candidate)
+                if node is not None:
+                    status = candidate
+                    detail = " ".join("".join(node.itertext()).replace("#10;", "\n").split())
+                    break
+            test_file = suite.get("filename", "")
+            results.append((case.get("name", "<unnamed>"), status, run,
+                            suite.get("timestamp", "?"), detail, Path(test_file).stem))
+
+    try:
+        shown_path = path.relative_to(root if root.is_dir() else path.parent)
+    except ValueError:
+        shown_path = path
+    counts = Counter(result[1] for result in results)
+    print(shown_path)
+    print(f"  {len(suites)} complete runs, {len(results)} tests: "
+          f"pass={counts['pass']} failure={counts['failure']} "
+          f"error={counts['error']} skipped={counts['skipped']}")
+
+    by_test = defaultdict(Counter)
+    for name, status, *_ in results:
+        by_test[name][status] += 1
+    for name, test_counts in by_test.items():
+        label = "FAIL" if test_counts["failure"] or test_counts["error"] else "OK"
+        summary = ", ".join(f"{count} {status}" for status, count in test_counts.items())
+        print(f"  {label:4} {name} ({summary})")
+
+    bad = [result for result in results if result[1] in {"failure", "error"}]
+    if bad:
+        exit_code = 1
+        print(f"  Failures (results file: {path.resolve()}):")
+        for name, status, run, timestamp, detail, test_stem in bad:
+            print(f"    {status.upper():7} run {run}, {timestamp}: {name}")
+            if detail:
+                print(f"            {detail[:240]}")
+            sessions = sorted(path.parent.glob(f"log/*/{test_stem}"))
+            log_dir = sessions[-1] / str(run - 1) if sessions else None
+            log_files = sorted(log_dir.glob("*")) if log_dir and log_dir.is_dir() else []
+            for log_file in log_files:
+                if log_file.is_file():
+                    print(f"            Log: {log_file.resolve()}")
+    print()
+
+raise SystemExit(exit_code)
