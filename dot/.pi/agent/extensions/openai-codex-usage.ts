@@ -457,12 +457,7 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.notify("Codex usage refreshed", "info");
   }
 
-  pi.registerCommand("codex-usage-refresh", {
-    description: "Refresh OpenAI Codex usage display",
-    handler: async (_args, ctx) => refreshFromCommand(ctx),
-  });
-
-  pi.registerCommand("openai-codex-usage-refresh", {
+  pi.registerCommand("codex-refresh", {
     description: "Refresh OpenAI Codex usage display",
     handler: async (_args, ctx) => refreshFromCommand(ctx),
   });

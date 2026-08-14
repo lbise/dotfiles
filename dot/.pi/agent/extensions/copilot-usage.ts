@@ -499,7 +499,7 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  pi.registerCommand("copilot-usage-refresh", {
+  pi.registerCommand("copilot-refresh", {
     description: "Refresh GitHub Copilot usage display",
     handler: async (_args, ctx) => {
       if (!isGitHubCopilotModel(ctx.model)) {
