@@ -98,6 +98,7 @@ Usage:
     socklink.sh set-server-link-by-name client_name
     socklink.sh set-tmux-env
     socklink.sh show-server-link
+    socklink.sh check-server-link
     socklink.sh setup
     socklink.sh -V
     socklink.sh -h
@@ -242,6 +243,23 @@ get_server_link_path() {
 	pid="$(echo "$TMUX" | cut -d, -f2)"
 	if [ -n "$pid" ]; then
 		echo "$SERVERSDIR/$pid"
+	fi
+}
+
+# Verifies that this tmux server's stable link resolves to a usable agent
+# socket.  This makes a missing per-TTY mapping visible before Git or SSH
+# reports the less actionable "Permission denied (publickey)" error.
+check_server_link() {
+	server_link="$(get_server_link_path)"
+	if [ -z "$server_link" ]; then
+		echo "socklink: not running inside tmux; no server link to check" >&2
+		return 1
+	fi
+
+	if [ ! -S "$server_link" ]; then
+		echo "socklink: SSH agent mapping is unavailable: $server_link does not resolve to a socket" >&2
+		echo "socklink: attach through SSH with agent forwarding and start a new login shell so set-tty-link can record its socket" >&2
+		return 1
 	fi
 }
 
@@ -589,6 +607,8 @@ elif [ "$1" = "set-server-link-by-name" ]; then
 	set_server_link_by_name "$@"
 elif [ "$1" = "show-server-link" ]; then
 	get_server_link_path
+elif [ "$1" = "check-server-link" ]; then
+	check_server_link
 elif [ "$1" = "set-tmux-env" ]; then
 	set_tmux_env
 elif [ "$1" = "test-tmux-feature" ]; then
