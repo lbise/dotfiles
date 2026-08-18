@@ -12,7 +12,7 @@
     "network",
     "pulseaudio",
     "cpu",
-    "battery"
+    "battery",
   ],
   "hyprland/workspaces": {
     "on-click": "activate",
@@ -101,13 +101,21 @@
       "default": ["", "", ""]
     }
   },
+  "custom/printer": {
+    "exec": "system-printer-status.sh",
+    "return-type": "json",
+    "interval": 5,
+    "format": "{text}",
+    "escape": true,
+    "on-click": "system-config-printer"
+  },
   "group/tray-expander": {
     "orientation": "inherit",
     "drawer": {
       "transition-duration": 600,
       "children-class": "tray-group-item"
     },
-    "modules": ["custom/expand-icon", "tray"]
+    "modules": ["custom/expand-icon", "custom/printer", "tray"]
   },
   "custom/expand-icon": {
     "format": "",

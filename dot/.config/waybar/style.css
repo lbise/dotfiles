@@ -33,6 +33,7 @@
 #cpu,
 #battery,
 #pulseaudio,
+#custom-printer,
 #custom-omarchy,
 #custom-screenrecording-indicator,
 #custom-update {
@@ -42,6 +43,10 @@
 
 #tray {
   margin-right: 16px;
+}
+
+#custom-printer {
+  margin-right: 17px;
 }
 
 #bluetooth {
@@ -80,4 +85,12 @@ tooltip {
 
 #custom-screenrecording-indicator.active {
   color: #a55555;
+}
+
+#custom-printer.printing {
+  color: #e0af68;
+}
+
+#custom-printer.unavailable {
+  opacity: 0.5;
 }
