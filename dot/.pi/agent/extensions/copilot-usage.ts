@@ -74,8 +74,11 @@ type LastPromptUsage = {
 };
 
 const USAGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-// These keys are the integration contract with pi-footer's External Status widgets.
-const STATUS_KEY = "copilot-usage";
+// These keys are the integration contract with footer extensions. Keep each
+// independently renderable value under its own key so footers can arrange or
+// omit fields without parsing a combined status string.
+const USAGE_STATUS_KEY = "copilot-usage";
+const RESET_STATUS_KEY = "copilot-reset";
 const CREDITS_STATUS_KEY = "copilot-ai-credits";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -284,13 +287,8 @@ function formatUsageSummary(quota: QuotaState, theme: any): string | null {
   return theme.fg(color, `${formatAmount(displayPercent)}%`) + counts;
 }
 
-function formatUsageLine(
-  quota: QuotaState | null,
-  theme: any,
-  options: { plan?: string; resetDate?: string } = {}
-): string {
+function formatUsageStatus(quota: QuotaState | null, theme: any, plan?: string): string {
   const parts: string[] = [];
-  const reset = formatResetInfo(quota?.resetDate ?? options.resetDate);
 
   if (quota?.unlimited) {
     parts.push(theme.fg("success", "unlimited"));
@@ -301,17 +299,15 @@ function formatUsageLine(
     if (quota.overageCount && quota.overageCount > 0) {
       parts.push(theme.fg("warning", `+${formatAmount(quota.overageCount)} overage`));
     }
-  } else if (options.plan) {
-    parts.push(theme.fg("dim", options.plan));
+  } else if (plan) {
+    parts.push(theme.fg("dim", plan));
   } else {
     parts.push(theme.fg("dim", "active"));
   }
 
   if (parts.length === 0) {
-    parts.push(theme.fg("dim", options.plan || "active"));
+    parts.push(theme.fg("dim", plan || "active"));
   }
-
-  if (reset) parts.push(theme.fg("dim", reset));
 
   return parts.join(theme.fg("dim", " · "));
 }
@@ -392,7 +388,7 @@ function getCopilotModelId(model: unknown): string | null {
 }
 
 export default function (pi: ExtensionAPI) {
-  let cachedLine: string | null = null;
+  let hasCachedStatus = false;
   let cachedAt = 0;
   let cachedModelId: string | null = null;
   let currentQuota: QuotaState | null = null;
@@ -407,7 +403,8 @@ export default function (pi: ExtensionAPI) {
   let activePromptHasTokenUsd = false;
 
   function clearStatus(ctx: { ui: any }) {
-    ctx.ui.setStatus(STATUS_KEY, undefined);
+    ctx.ui.setStatus(USAGE_STATUS_KEY, undefined);
+    ctx.ui.setStatus(RESET_STATUS_KEY, undefined);
     ctx.ui.setStatus(CREDITS_STATUS_KEY, undefined);
   }
 
@@ -424,16 +421,19 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setStatus(CREDITS_STATUS_KEY, formatCreditsStatusLine(lastPrompt, ctx.ui.theme));
   }
 
+  function publishStatus(ctx: { ui: any }) {
+    ctx.ui.setStatus(USAGE_STATUS_KEY, formatUsageStatus(currentQuota, ctx.ui.theme, currentPlan));
+
+    const reset = formatResetInfo(currentQuota?.resetDate ?? currentResetDate);
+    ctx.ui.setStatus(RESET_STATUS_KEY, reset ? ctx.ui.theme.fg("dim", reset) : undefined);
+  }
+
   function renderStatus(ctx: { ui: any; model?: unknown }, modelOverride?: unknown) {
     const model = modelOverride ?? ctx.model;
-    const modelId = getCopilotModelId(model);
-    cachedModelId = modelId;
-    cachedLine = formatUsageLine(currentQuota, ctx.ui.theme, {
-      plan: currentPlan,
-      resetDate: currentResetDate,
-    });
+    cachedModelId = getCopilotModelId(model);
+    hasCachedStatus = true;
     cachedAt = Date.now();
-    ctx.ui.setStatus(STATUS_KEY, cachedLine);
+    publishStatus(ctx);
   }
 
   function applyQuotaStateFromResponse(ctx: { ui: any; model?: unknown }, quota: QuotaState) {
@@ -469,14 +469,16 @@ export default function (pi: ExtensionAPI) {
     }
 
     const now = Date.now();
-    if (!options.force && cachedLine && cachedModelId === modelId && now - cachedAt < USAGE_CACHE_TTL_MS) {
-      ctx.ui.setStatus(STATUS_KEY, cachedLine);
+    if (!options.force && hasCachedStatus && cachedModelId === modelId && now - cachedAt < USAGE_CACHE_TTL_MS) {
+      publishStatus(ctx);
       return currentQuota;
     }
 
     const token = await getGitHubToken();
     if (!token) {
-      ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("dim", "Copilot · no token"));
+      hasCachedStatus = false;
+      ctx.ui.setStatus(RESET_STATUS_KEY, undefined);
+      ctx.ui.setStatus(USAGE_STATUS_KEY, ctx.ui.theme.fg("dim", "Copilot · no token"));
       return null;
     }
 
@@ -491,8 +493,10 @@ export default function (pi: ExtensionAPI) {
       renderStatus(ctx, model);
       return currentQuota;
     } catch (err: any) {
+      hasCachedStatus = false;
+      ctx.ui.setStatus(RESET_STATUS_KEY, undefined);
       ctx.ui.setStatus(
-        STATUS_KEY,
+        USAGE_STATUS_KEY,
         ctx.ui.theme.fg("error", `Copilot · ${err.message || "fetch failed"}`)
       );
       return null;

@@ -97,7 +97,7 @@
         }
       },
       {
-        "id": "external-status-mspt6p4j-9irn3f",
+        "id": "external-status-split-codex-primary-usage",
         "type": "external-status",
         "enabled": true,
         "options": {
@@ -108,13 +108,81 @@
           "fg": "brightGreen",
           "bg": "default",
           "bold": false,
-          "externalStatusKey": "openai-codex-usage",
+          "externalStatusKey": "openai-codex-primary-usage",
           "trimValue": 0,
           "preserveTrimStyles": true
         }
       },
       {
-        "id": "external-status-msptlqdw-bxb6ll",
+        "id": "external-status-split-codex-primary-reset",
+        "type": "external-status",
+        "enabled": true,
+        "options": {
+          "raw": true,
+          "hideWhenEmpty": true,
+          "icon": "",
+          "text": "-",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "externalStatusKey": "openai-codex-primary-reset",
+          "trimValue": 0,
+          "preserveTrimStyles": true
+        }
+      },
+      {
+        "id": "external-status-split-codex-secondary-usage",
+        "type": "external-status",
+        "enabled": true,
+        "options": {
+          "raw": true,
+          "hideWhenEmpty": true,
+          "icon": "",
+          "text": "-",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "externalStatusKey": "openai-codex-secondary-usage",
+          "trimValue": 0,
+          "preserveTrimStyles": true
+        }
+      },
+      {
+        "id": "external-status-split-codex-secondary-reset",
+        "type": "external-status",
+        "enabled": true,
+        "options": {
+          "raw": true,
+          "hideWhenEmpty": true,
+          "icon": "",
+          "text": "-",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "externalStatusKey": "openai-codex-secondary-reset",
+          "trimValue": 0,
+          "preserveTrimStyles": true
+        }
+      },
+      {
+        "id": "external-status-split-codex-credits",
+        "type": "external-status",
+        "enabled": true,
+        "options": {
+          "raw": true,
+          "hideWhenEmpty": true,
+          "icon": "",
+          "text": "-",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "externalStatusKey": "openai-codex-credits",
+          "trimValue": 0,
+          "preserveTrimStyles": true
+        }
+      },
+      {
+        "id": "external-status-split-copilot-usage",
         "type": "external-status",
         "enabled": true,
         "options": {
@@ -126,6 +194,23 @@
           "bg": "default",
           "bold": false,
           "externalStatusKey": "copilot-usage",
+          "trimValue": 0,
+          "preserveTrimStyles": true
+        }
+      },
+      {
+        "id": "external-status-split-copilot-reset",
+        "type": "external-status",
+        "enabled": true,
+        "options": {
+          "raw": true,
+          "hideWhenEmpty": true,
+          "icon": "",
+          "text": "-",
+          "fg": "brightGreen",
+          "bg": "default",
+          "bold": false,
+          "externalStatusKey": "copilot-reset",
           "trimValue": 0,
           "preserveTrimStyles": true
         }
@@ -145,12 +230,24 @@
     "hiddenKeys": [
       "copilot-ai-credits",
       "copilot-usage",
-      "openai-codex-usage"
+      "copilot-reset",
+      "openai-codex-usage",
+      "openai-codex-primary-usage",
+      "openai-codex-primary-reset",
+      "openai-codex-secondary-usage",
+      "openai-codex-secondary-reset",
+      "openai-codex-credits"
     ],
     "knownKeys": [
       "copilot-ai-credits",
       "copilot-usage",
-      "openai-codex-usage"
+      "copilot-reset",
+      "openai-codex-usage",
+      "openai-codex-primary-usage",
+      "openai-codex-primary-reset",
+      "openai-codex-secondary-usage",
+      "openai-codex-secondary-reset",
+      "openai-codex-credits"
     ]
   }
 }

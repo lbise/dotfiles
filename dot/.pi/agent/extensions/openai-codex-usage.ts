@@ -73,8 +73,23 @@ type CodexUsageState = {
   resetCredits?: number;
 };
 
-// This key is the integration contract with pi-footer's External Status widget.
-const STATUS_KEY = "openai-codex-usage";
+// These keys are the integration contract with footer extensions. Keep each
+// independently renderable value under its own key so footers can arrange or
+// omit fields without parsing a combined status string.
+const PRIMARY_USAGE_STATUS_KEY = "openai-codex-primary-usage";
+const PRIMARY_RESET_STATUS_KEY = "openai-codex-primary-reset";
+const SECONDARY_USAGE_STATUS_KEY = "openai-codex-secondary-usage";
+const SECONDARY_RESET_STATUS_KEY = "openai-codex-secondary-reset";
+const CREDITS_STATUS_KEY = "openai-codex-credits";
+const LEGACY_STATUS_KEY = "openai-codex-usage";
+const STATUS_KEYS = [
+  LEGACY_STATUS_KEY,
+  PRIMARY_USAGE_STATUS_KEY,
+  PRIMARY_RESET_STATUS_KEY,
+  SECONDARY_USAGE_STATUS_KEY,
+  SECONDARY_RESET_STATUS_KEY,
+  CREDITS_STATUS_KEY,
+] as const;
 const USAGE_CACHE_TTL_MS = 60 * 1000;
 const TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -369,54 +384,63 @@ function formatResetInfo(resetsAt: number | undefined): string | null {
   return `${relative} (${date})`;
 }
 
-function formatWindowSegment(label: string, window: CodexWindow, theme: any): string {
-  const reset = formatResetInfo(window.resetsAt);
-  const usage = theme.fg("dim", `${label} `) + formatUsageBar(window.usedPercent, theme);
-
-  return reset ? usage + theme.fg("dim", " · ") + theme.fg("dim", reset) : usage;
+function formatWindowUsage(label: string, window: CodexWindow, theme: any): string {
+  return theme.fg("dim", `${label} `) + formatUsageBar(window.usedPercent, theme);
 }
 
-function formatUsageLine(state: CodexUsageState | null, theme: any): string {
-  const separator = theme.fg("dim", " · ");
-  const parts: string[] = [];
-
-  if (state?.primary) {
-    parts.push(formatWindowSegment(labelForWindow(state.primary, "5h"), state.primary, theme));
+function formatCreditsStatus(credits: CodexCreditsRaw | undefined, theme: any): string | undefined {
+  if (credits?.unlimited) return theme.fg("success", "unlimited");
+  if (credits?.has_credits && credits.balance !== undefined && credits.balance !== null) {
+    return theme.fg("dim", `${credits.balance} credits`);
   }
-
-  if (state?.secondary) {
-    parts.push(formatWindowSegment(labelForWindow(state.secondary, "week"), state.secondary, theme));
-  }
-
-  if (state?.credits?.unlimited) {
-    parts.push(theme.fg("success", "unlimited"));
-  } else if (state?.credits?.has_credits && state.credits.balance !== undefined && state.credits.balance !== null) {
-    parts.push(theme.fg("dim", `${state.credits.balance} credits`));
-  }
-
-  if (parts.length === 0) {
-    parts.push(theme.fg("dim", state?.planType || "active"));
-  }
-
-  return parts.join(separator);
+  return undefined;
 }
 
 export default function (pi: ExtensionAPI) {
-  let cachedLine: string | null = null;
+  let hasCachedStatus = false;
   let cachedAt = 0;
   let cachedModelId: string | null = null;
   let currentUsage: CodexUsageState | null = null;
 
   function clearStatus(ctx: { ui: any }) {
-    ctx.ui.setStatus(STATUS_KEY, undefined);
+    for (const key of STATUS_KEYS) ctx.ui.setStatus(key, undefined);
+  }
+
+  function publishStatus(ctx: { ui: any }) {
+    // Remove the pre-split status after hot reloads so it cannot appear beside
+    // the semantic statuses in footers that render every extension status.
+    ctx.ui.setStatus(LEGACY_STATUS_KEY, undefined);
+
+    const primary = currentUsage?.primary;
+    const secondary = currentUsage?.secondary;
+    const primaryUsage = primary
+      ? formatWindowUsage(labelForWindow(primary, "5h"), primary, ctx.ui.theme)
+      : ctx.ui.theme.fg("dim", currentUsage?.planType || "active");
+    const primaryReset = formatResetInfo(primary?.resetsAt);
+    const secondaryReset = formatResetInfo(secondary?.resetsAt);
+
+    ctx.ui.setStatus(PRIMARY_USAGE_STATUS_KEY, primaryUsage);
+    ctx.ui.setStatus(
+      PRIMARY_RESET_STATUS_KEY,
+      primaryReset ? ctx.ui.theme.fg("dim", primaryReset) : undefined
+    );
+    ctx.ui.setStatus(
+      SECONDARY_USAGE_STATUS_KEY,
+      secondary ? formatWindowUsage(labelForWindow(secondary, "week"), secondary, ctx.ui.theme) : undefined
+    );
+    ctx.ui.setStatus(
+      SECONDARY_RESET_STATUS_KEY,
+      secondaryReset ? ctx.ui.theme.fg("dim", secondaryReset) : undefined
+    );
+    ctx.ui.setStatus(CREDITS_STATUS_KEY, formatCreditsStatus(currentUsage?.credits, ctx.ui.theme));
   }
 
   function renderStatus(ctx: { ui: any; model?: unknown }, modelOverride?: unknown) {
     const model = modelOverride ?? ctx.model;
     cachedModelId = getOpenAICodexModelId(model);
-    cachedLine = formatUsageLine(currentUsage, ctx.ui.theme);
+    hasCachedStatus = true;
     cachedAt = Date.now();
-    ctx.ui.setStatus(STATUS_KEY, cachedLine);
+    publishStatus(ctx);
   }
 
   async function updateStatus(
@@ -433,8 +457,8 @@ export default function (pi: ExtensionAPI) {
     }
 
     const now = Date.now();
-    if (!options.force && cachedLine && cachedModelId === modelId && now - cachedAt < USAGE_CACHE_TTL_MS) {
-      ctx.ui.setStatus(STATUS_KEY, cachedLine);
+    if (!options.force && hasCachedStatus && cachedModelId === modelId && now - cachedAt < USAGE_CACHE_TTL_MS) {
+      publishStatus(ctx);
       return;
     }
 
@@ -442,7 +466,12 @@ export default function (pi: ExtensionAPI) {
       currentUsage = await fetchCodexUsage();
       renderStatus(ctx, model);
     } catch (err: any) {
-      ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("error", `Codex · ${err.message || "fetch failed"}`));
+      hasCachedStatus = false;
+      clearStatus(ctx);
+      ctx.ui.setStatus(
+        PRIMARY_USAGE_STATUS_KEY,
+        ctx.ui.theme.fg("error", `Codex · ${err.message || "fetch failed"}`)
+      );
     }
   }
 
