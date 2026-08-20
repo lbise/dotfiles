@@ -223,7 +223,7 @@
   "iconMode": "nerd",
   "minimalist": false,
   "terminal": {
-    "widthMode": "full-minus-40",
+    "widthMode": "full",
     "colorLevel": "truecolor"
   },
   "extensionStatusRow": {
