@@ -1,0 +1,1241 @@
+#!/usr/bin/env python3
+"""Run dependency-ordered local Markdown tickets with headless Pi.
+
+Git commit trailers are the completion ledger. Runtime logs and Pi sessions are
+kept under $XDG_STATE_HOME/pi-ticket-loop (normally ~/.local/state).
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import fcntl
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import time
+import uuid
+from collections.abc import Sequence
+from pathlib import Path
+from typing import IO
+
+TICKET_FILE_RE = re.compile(r"^(?P<number>\d{2})-(?P<slug>.+)\.md$")
+TITLE_RE = re.compile(r"^#\s+(?P<number>\d{2})\s+[—-]\s+(?P<title>.+?)\s*$")
+STATUS_RE = re.compile(r"^(?:\*\*)?Status:(?:\*\*)?\s*(?P<status>\S+)\s*$", re.MULTILINE)
+BLOCKED_RE = re.compile(r"^(?:\*\*)?Blocked by:(?:\*\*)?\s*(?P<value>.+?)\s*$", re.MULTILINE)
+BLOCKER_PART_RE = re.compile(r"^\s*(?P<number>\d{2})(?:\s+[—-]\s+.+?)?\s*$")
+COMPLETION_TRAILERS = {"Pi-Ticket", "Pi-Ticket-SHA256", "Pi-Ticket-Status"}
+RUNNABLE_STATUS = "ready-for-agent"
+PROTECTED_BRANCHES = {"main", "master", "trunk"}
+DEFAULT_MODEL = "openai-codex/gpt-5.6-terra"
+DEFAULT_THINKING = "high"
+
+
+class RunnerError(RuntimeError):
+    pass
+
+
+class InterruptController:
+    def __init__(self) -> None:
+        self.stop_requested = False
+        self.force_abort = False
+        self.active_ticket: int | None = None
+
+    def begin_ticket(self, ticket_number: int) -> bool:
+        previous_sigmask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
+        try:
+            if self.stop_requested:
+                return False
+            self.active_ticket = ticket_number
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_sigmask)
+        return True
+
+    def handle_sigint(self, _signum: int, _frame: object) -> None:
+        if not self.stop_requested:
+            self.stop_requested = True
+            if self.active_ticket is None:
+                message = "\nStop requested; no additional ticket will be started.\n"
+            else:
+                message = (
+                    f"\nStop requested; ticket {self.active_ticket:02d} will be allowed to finish. "
+                    "Press Ctrl+C again to terminate immediately.\n"
+                )
+            try:
+                os.write(2, message.encode())
+            except OSError:
+                pass
+            return
+
+        self.force_abort = True
+        try:
+            os.write(2, b"\nSecond interrupt received; terminating immediately.\n")
+        except OSError:
+            pass
+        raise KeyboardInterrupt
+
+
+@dataclasses.dataclass(frozen=True)
+class Ticket:
+    number: int
+    path: Path
+    relative_path: str
+    title: str
+    status: str
+    blockers: tuple[int, ...]
+    digest: str
+
+
+@dataclasses.dataclass(frozen=True)
+class Completion:
+    status: str
+    digest: str | None
+    commit: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PiResult:
+    returncode: int
+    duration_seconds: float
+    session_id: str | None
+    saw_agent_end: bool
+    protocol_error: str | None
+    events_path: Path
+    stderr_path: Path
+
+
+def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(
+        ["git", "-C", str(root), *args],
+        text=True,
+        capture_output=True,
+    )
+    if check and proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
+        raise RunnerError(f"git {' '.join(args)} failed: {detail}")
+    return proc
+
+
+def discover_repo(path: Path) -> Path:
+    proc = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "--show-toplevel"],
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise RunnerError(f"Ticket directory is not inside a Git worktree: {path}")
+    return Path(proc.stdout.strip()).resolve()
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def relative_to_root(path: Path, root: Path) -> str:
+    try:
+        return path.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise RunnerError(f"Ticket directory must be inside repository {root}: {path}") from exc
+
+
+def load_tickets(issues_dir: Path, root: Path) -> list[Ticket]:
+    if not issues_dir.is_dir():
+        raise RunnerError(f"Issues directory does not exist: {issues_dir}")
+
+    tickets: list[Ticket] = []
+    numbers: dict[int, Path] = {}
+    for path in sorted(issues_dir.iterdir(), key=lambda item: item.name):
+        match = TICKET_FILE_RE.match(path.name)
+        if not match or not path.is_file():
+            continue
+
+        raw = path.read_bytes()
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise RunnerError(f"Ticket is not UTF-8: {path}") from exc
+
+        number = int(match.group("number"))
+        if number in numbers:
+            raise RunnerError(f"Duplicate ticket number {number:02d}: {numbers[number]} and {path}")
+        numbers[number] = path
+
+        first_line = text.splitlines()[0] if text.splitlines() else ""
+        title_match = TITLE_RE.match(first_line)
+        if not title_match or int(title_match.group("number")) != number:
+            raise RunnerError(f"Ticket title must start '# {number:02d} — <title>': {path}")
+
+        status_match = STATUS_RE.search(text)
+        if not status_match:
+            raise RunnerError(f"Ticket has no '**Status:**' field: {path}")
+        status = status_match.group("status")
+        if status != RUNNABLE_STATUS:
+            raise RunnerError(
+                f"Unsupported ticket status '{status}' in {path}; this runner only accepts '{RUNNABLE_STATUS}'"
+            )
+
+        blocked_match = BLOCKED_RE.search(text)
+        if not blocked_match:
+            raise RunnerError(f"Ticket has no '**Blocked by:**' field: {path}")
+        blocked_value = blocked_match.group("value")
+        if blocked_value.lower().startswith("none"):
+            blockers = ()
+        else:
+            parsed_blockers: list[int] = []
+            for part in re.split(r"[,;]", blocked_value):
+                blocker_match = BLOCKER_PART_RE.match(part.rstrip("."))
+                if not blocker_match:
+                    raise RunnerError(f"Could not parse blockers in {path}: {blocked_value}")
+                parsed_blockers.append(int(blocker_match.group("number")))
+            blockers = tuple(parsed_blockers)
+        if len(set(blockers)) != len(blockers):
+            raise RunnerError(f"Ticket lists a blocker more than once: {path}")
+
+        tickets.append(
+            Ticket(
+                number=number,
+                path=path.resolve(),
+                relative_path=relative_to_root(path, root),
+                title=title_match.group("title"),
+                status=status,
+                blockers=blockers,
+                digest=sha256_bytes(raw),
+            )
+        )
+
+    if not tickets:
+        raise RunnerError(f"No NN-slug.md tickets found in {issues_dir}")
+
+    known = {ticket.number for ticket in tickets}
+    for ticket in tickets:
+        missing = set(ticket.blockers) - known
+        if missing:
+            values = ", ".join(f"{value:02d}" for value in sorted(missing))
+            raise RunnerError(f"Ticket {ticket.number:02d} references missing blocker(s): {values}")
+        if ticket.number in ticket.blockers:
+            raise RunnerError(f"Ticket {ticket.number:02d} blocks itself")
+
+    validate_acyclic(tickets)
+    return sorted(tickets, key=lambda ticket: (ticket.number, ticket.path.name))
+
+
+def validate_acyclic(tickets: Sequence[Ticket]) -> None:
+    by_number = {ticket.number: ticket for ticket in tickets}
+    visiting: set[int] = set()
+    visited: set[int] = set()
+
+    def visit(number: int, stack: list[int]) -> None:
+        if number in visiting:
+            cycle = stack[stack.index(number) :] + [number]
+            raise RunnerError("Ticket dependency cycle: " + " -> ".join(f"{value:02d}" for value in cycle))
+        if number in visited:
+            return
+        visiting.add(number)
+        stack.append(number)
+        for blocker in by_number[number].blockers:
+            visit(blocker, stack)
+        stack.pop()
+        visiting.remove(number)
+        visited.add(number)
+
+    for ticket in tickets:
+        visit(ticket.number, [])
+
+
+def parse_trailers(root: Path, message: str) -> dict[str, str]:
+    proc = subprocess.run(
+        ["git", "-C", str(root), "interpret-trailers", "--parse"],
+        input=message,
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise RunnerError(f"git interpret-trailers failed: {proc.stderr.strip() or proc.returncode}")
+
+    values: dict[str, list[str]] = {}
+    for line in proc.stdout.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if key in COMPLETION_TRAILERS:
+            values.setdefault(key, []).append(value.strip())
+    duplicates = [key for key, items in values.items() if len(items) != 1]
+    if duplicates:
+        raise RunnerError("Duplicate completion trailer(s): " + ", ".join(sorted(duplicates)))
+    return {key: items[0] for key, items in values.items()}
+
+
+def load_completions(root: Path) -> dict[str, Completion]:
+    # Newest commit wins. A later Pi-Ticket-Status: invalidated trailer reopens a ticket.
+    output = git(root, "log", "--format=%H%x00%B%x00").stdout
+    fields = output.split("\x00")
+    completions: dict[str, Completion] = {}
+    for index in range(0, len(fields) - 1, 2):
+        commit = fields[index].strip()
+        message = fields[index + 1]
+        if not commit:
+            continue
+        if "Pi-Ticket" not in message:
+            continue
+        trailers = parse_trailers(root, message)
+        ticket_path = trailers.get("Pi-Ticket")
+        status = trailers.get("Pi-Ticket-Status")
+        if not ticket_path or status not in {"complete", "invalidated"}:
+            continue
+        normalized = Path(ticket_path[2:] if ticket_path.startswith("./") else ticket_path).as_posix()
+        if normalized not in completions:
+            completions[normalized] = Completion(
+                status=status,
+                digest=trailers.get("Pi-Ticket-SHA256"),
+                commit=commit,
+            )
+    return completions
+
+
+def completed_numbers(tickets: Sequence[Ticket], completions: dict[str, Completion]) -> set[int]:
+    by_number = {ticket.number: ticket for ticket in tickets}
+    memo: dict[int, bool] = {}
+
+    def is_complete(number: int) -> bool:
+        if number in memo:
+            return memo[number]
+        ticket = by_number[number]
+        completion = completions.get(ticket.relative_path)
+        own_completion = bool(completion and completion.status == "complete" and completion.digest == ticket.digest)
+        memo[number] = own_completion and all(is_complete(blocker) for blocker in ticket.blockers)
+        return memo[number]
+
+    return {ticket.number for ticket in tickets if is_complete(ticket.number)}
+
+
+def ticket_state(ticket: Ticket, complete: set[int], completions: dict[str, Completion]) -> tuple[str, str]:
+    if ticket.number in complete:
+        completion = completions[ticket.relative_path]
+        return "complete", completion.commit[:12]
+
+    completion = completions.get(ticket.relative_path)
+    if completion and completion.status == "complete" and completion.digest != ticket.digest:
+        return "stale", "ticket changed since completion"
+    if completion and completion.status == "invalidated":
+        return "ready" if all(value in complete for value in ticket.blockers) else "blocked", "completion invalidated"
+
+    pending = [value for value in ticket.blockers if value not in complete]
+    if pending:
+        return "blocked", "waiting for " + ", ".join(f"{value:02d}" for value in pending)
+    return "ready", "next frontier candidate"
+
+
+def print_status(issues_dir: Path, root: Path, tickets: Sequence[Ticket]) -> Ticket | None:
+    completions = load_completions(root)
+    complete = completed_numbers(tickets, completions)
+    frontier: Ticket | None = None
+
+    print(f"repository: {root}")
+    print(f"issues:     {issues_dir}")
+    print(f"branch:     {current_branch(root)}")
+    print()
+    for ticket in tickets:
+        state, reason = ticket_state(ticket, complete, completions)
+        if state == "ready" and frontier is None:
+            frontier = ticket
+        print(f"{ticket.number:02d}  {state.upper():8}  {ticket.title} ({reason})")
+    print()
+    if frontier:
+        print(f"frontier: {frontier.number:02d} — {frontier.title}")
+    elif len(complete) == len(tickets):
+        print("frontier: none — all tickets are complete")
+    else:
+        print("frontier: none — remaining tickets are blocked or stale")
+    return frontier
+
+
+def current_branch(root: Path) -> str:
+    proc = git(root, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    if proc.returncode != 0 or not proc.stdout.strip():
+        raise RunnerError("Detached HEAD is not supported")
+    return proc.stdout.strip()
+
+
+def assert_safe_worktree(root: Path, allow_protected_branch: bool, *, require_clean: bool = True) -> str:
+    for marker in ("MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD", "BISECT_LOG", "rebase-merge", "rebase-apply"):
+        marker_path = Path(git(root, "rev-parse", "--git-path", marker).stdout.strip())
+        if not marker_path.is_absolute():
+            marker_path = root / marker_path
+        if marker_path.exists():
+            raise RunnerError(f"Git operation in progress ({marker}); finish or abort it first")
+
+    branch = current_branch(root)
+    if branch in PROTECTED_BRANCHES and not allow_protected_branch:
+        raise RunnerError(
+            f"Refusing to create autonomous commits on protected-looking branch '{branch}'. "
+            "Use a feature branch or pass --allow-protected-branch explicitly."
+        )
+
+    status = git(root, "status", "--porcelain=v1", "--untracked-files=all").stdout
+    if require_clean and status.strip():
+        preview = "\n".join(status.rstrip().splitlines()[:20])
+        raise RunnerError("Worktree must be completely clean before starting Pi:\n" + preview)
+    return branch
+
+
+def state_directory(root: Path, issues_dir: Path) -> Path:
+    base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    repo_id = sha256_bytes(str(root).encode("utf-8"))[:16]
+    effort_id = sha256_bytes(str(issues_dir).encode("utf-8"))[:16]
+    return base / "pi-ticket-loop" / repo_id / effort_id
+
+
+def git_bytes(root: Path, *args: str) -> bytes:
+    process = subprocess.run(
+        ["git", "-C", str(root), *args],
+        capture_output=True,
+    )
+    if process.returncode != 0:
+        detail = process.stderr.decode(errors="replace").strip() or f"exit {process.returncode}"
+        raise RunnerError(f"git {' '.join(args)} failed: {detail}")
+    return process.stdout
+
+
+def dirty_submodules(root: Path) -> list[str]:
+    command = (
+        'status=$(git status --porcelain=v1 --untracked-files=all); '
+        'if test -n "$status"; then printf "%s\\n" "$displaypath"; fi'
+    )
+    output = git(root, "submodule", "foreach", "--recursive", "--quiet", command).stdout
+    return [line for line in output.splitlines() if line]
+
+
+def worktree_fingerprint(root: Path) -> str:
+    dirty_submodule_list = dirty_submodules(root)
+    if dirty_submodule_list:
+        raise RunnerError("Automatic resume is not supported with dirty submodules: " + ", ".join(dirty_submodule_list))
+
+    digest = hashlib.sha256()
+    for label, output in (
+        (b"status", git_bytes(root, "status", "--porcelain=v2", "-z", "--untracked-files=all")),
+        (b"diff", git_bytes(root, "diff", "--binary", "--full-index", "HEAD", "--")),
+    ):
+        digest.update(label + b"\0" + output + b"\0")
+
+    untracked = git_bytes(root, "ls-files", "--others", "--exclude-standard", "-z")
+    for raw_path in sorted(path for path in untracked.split(b"\0") if path):
+        path = root / os.fsdecode(raw_path)
+        try:
+            file_stat = path.lstat()
+        except OSError as exc:
+            raise RunnerError(f"Could not fingerprint untracked path {path}: {exc}") from exc
+        digest.update(b"untracked\0" + raw_path + b"\0")
+        digest.update(str(stat.S_IMODE(file_stat.st_mode)).encode() + b"\0")
+        if stat.S_ISLNK(file_stat.st_mode):
+            digest.update(b"symlink\0" + os.fsencode(os.readlink(path)) + b"\0")
+        elif stat.S_ISREG(file_stat.st_mode):
+            digest.update(b"file\0")
+            try:
+                with path.open("rb") as untracked_file:
+                    for chunk in iter(lambda: untracked_file.read(1024 * 1024), b""):
+                        digest.update(chunk)
+            except OSError as exc:
+                raise RunnerError(f"Could not fingerprint untracked file {path}: {exc}") from exc
+            digest.update(b"\0")
+        else:
+            digest.update(f"special:{stat.S_IFMT(file_stat.st_mode)}\0".encode())
+    return digest.hexdigest()
+
+
+def ticket_attempt_directory(state_dir: Path, ticket: Ticket) -> Path:
+    return state_dir / "attempts" / f"{ticket.number:02d}-{ticket.path.stem.split('-', 1)[1]}"
+
+
+def write_attempt_manifest(attempt_dir: Path, manifest: dict[str, object]) -> None:
+    path = attempt_dir / "attempt.json"
+    temporary_path = attempt_dir / f".attempt.{os.getpid()}.tmp"
+    with temporary_path.open("w", encoding="utf-8") as manifest_file:
+        json.dump(manifest, manifest_file, indent=2, sort_keys=True)
+        manifest_file.write("\n")
+        manifest_file.flush()
+        os.fsync(manifest_file.fileno())
+    temporary_path.replace(path)
+
+
+def session_verification_path(attempt_dir: Path, invocation: int) -> Path:
+    return attempt_dir / f"session-{invocation:04d}.id"
+
+
+def record_verified_session(attempt_dir: Path, invocation: int, session_id: str) -> None:
+    path = session_verification_path(attempt_dir, invocation)
+    temporary_path = path.with_suffix(f".tmp.{os.getpid()}")
+    try:
+        with temporary_path.open("w", encoding="utf-8") as session_file:
+            session_file.write(session_id + "\n")
+            session_file.flush()
+            os.fsync(session_file.fileno())
+        temporary_path.replace(path)
+    except OSError as exc:
+        raise RunnerError(f"Could not record verified Pi session {session_id}: {exc}") from exc
+
+
+def verified_session_for_attempt(attempt_dir: Path, manifest: dict[str, object]) -> str:
+    try:
+        invocation = int(manifest.get("invocation", 0))
+    except (TypeError, ValueError) as exc:
+        raise RunnerError(f"Attempt has an invalid invocation number: {attempt_dir}") from exc
+    expected_session_id = manifest.get("session_id")
+    path = session_verification_path(attempt_dir, invocation)
+    try:
+        opened_session_id = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise RunnerError(f"Pi session identity was not verified for invocation {invocation}: {exc}") from exc
+    if not isinstance(expected_session_id, str) or opened_session_id != expected_session_id:
+        raise RunnerError(f"Pi opened session {opened_session_id!r}, expected {expected_session_id!r}; refusing resume")
+    session_dir = attempt_dir / "session"
+    if not list(session_dir.glob(f"*_{opened_session_id}.jsonl")):
+        raise RunnerError(f"Pi session file for {opened_session_id} is missing from {session_dir}")
+    return opened_session_id
+
+
+def find_resumable_attempt(state_dir: Path, ticket: Ticket) -> tuple[Path, dict[str, object]] | None:
+    ticket_dir = ticket_attempt_directory(state_dir, ticket)
+    if not ticket_dir.is_dir():
+        return None
+    attempts = sorted(
+        (path for path in ticket_dir.iterdir() if path.is_dir() and path.name.isdigit()),
+        key=lambda path: int(path.name),
+        reverse=True,
+    )
+    for attempt_dir in attempts:
+        manifest_path = attempt_dir / "attempt.json"
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RunnerError(f"Could not read attempt manifest {manifest_path}: {exc}") from exc
+        if not isinstance(manifest, dict):
+            raise RunnerError(f"Attempt manifest is not a JSON object: {manifest_path}")
+        if (
+            manifest.get("ticket") == ticket.relative_path
+            and manifest.get("ticket_digest") == ticket.digest
+            and manifest.get("status") in {"interrupted", "incomplete"}
+        ):
+            return attempt_dir, manifest
+    return None
+
+
+def record_invocation_duration(manifest: dict[str, object], duration_seconds: float) -> float:
+    previous = manifest.get("agent_elapsed_seconds", 0.0)
+    try:
+        total = float(previous) + max(0.0, duration_seconds)
+    except (TypeError, ValueError) as exc:
+        raise RunnerError("Attempt has an invalid accumulated agent duration") from exc
+    manifest["agent_elapsed_seconds"] = total
+    manifest.pop("invocation_started_at", None)
+    return total
+
+
+def capture_attempt_state(
+    root: Path,
+    attempt_dir: Path,
+    manifest: dict[str, object],
+    status: str,
+) -> None:
+    verified_session_id = verified_session_for_attempt(attempt_dir, manifest)
+    invocation_started_at = manifest.get("invocation_started_at")
+    if isinstance(invocation_started_at, (int, float)):
+        record_invocation_duration(manifest, time.time() - invocation_started_at)
+    manifest.update(
+        {
+            "status": status,
+            "verified_session_id": verified_session_id,
+            "resume_branch": current_branch(root),
+            "resume_head": git(root, "rev-parse", "HEAD").stdout.strip(),
+            "worktree_fingerprint": worktree_fingerprint(root),
+            "updated_at": time.time(),
+        }
+    )
+    write_attempt_manifest(attempt_dir, manifest)
+
+
+def validate_resumable_attempt(
+    root: Path,
+    ticket: Ticket,
+    attempt_dir: Path,
+    manifest: dict[str, object],
+    allow_protected_branch: bool,
+) -> str:
+    branch = assert_safe_worktree(root, allow_protected_branch, require_clean=False)
+    problems: list[str] = []
+    if manifest.get("resume_branch") != manifest.get("base_branch"):
+        problems.append(f"Pi changed branch from {manifest.get('base_branch')!r} to {manifest.get('resume_branch')!r}")
+    if branch != manifest.get("resume_branch"):
+        problems.append(f"branch changed from {manifest.get('resume_branch')!r} to {branch!r}")
+    head = git(root, "rev-parse", "HEAD").stdout.strip()
+    if head != manifest.get("resume_head"):
+        problems.append(f"HEAD changed from {manifest.get('resume_head')!r} to {head!r}")
+    base_head = manifest.get("base_head")
+    if not isinstance(base_head, str) or not base_head:
+        problems.append("attempt has no original starting commit")
+    elif git(root, "merge-base", "--is-ancestor", base_head, head, check=False).returncode != 0:
+        problems.append("current HEAD is not descended from the attempt's original starting commit")
+    try:
+        fingerprint = worktree_fingerprint(root)
+    except RunnerError as exc:
+        problems.append(str(exc))
+    else:
+        if fingerprint != manifest.get("worktree_fingerprint"):
+            problems.append("worktree contents changed after the attempt was interrupted")
+
+    try:
+        verified_session_id = verified_session_for_attempt(attempt_dir, manifest)
+    except RunnerError as exc:
+        problems.append(str(exc))
+    else:
+        if manifest.get("verified_session_id") != verified_session_id:
+            problems.append("attempt manifest does not contain the verified Pi session identity")
+
+    if problems:
+        detail = "\n".join(f"- {problem}" for problem in problems)
+        raise RunnerError(
+            f"Refusing to resume ticket {ticket.number:02d}; its interrupted state is no longer exact:\n"
+            f"{detail}\nAttempt: {attempt_dir}"
+        )
+    return branch
+
+
+def acquire_lock(state_dir: Path) -> IO[str]:
+    state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock_path = state_dir / "runner.lock"
+    lock_file = lock_path.open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        lock_file.close()
+        raise RunnerError(f"Another ticket loop owns {lock_path}") from exc
+    lock_file.seek(0)
+    lock_file.truncate()
+    lock_file.write(json.dumps({"pid": os.getpid(), "cwd": str(Path.cwd())}) + "\n")
+    lock_file.flush()
+    os.fsync(lock_file.fileno())
+    return lock_file
+
+
+def build_prompt(ticket: Ticket, before_sha: str) -> str:
+    return f"""/skill:implement Implement exactly this local ticket: {ticket.path}
+Ticket digest: {ticket.digest}
+Starting Git commit: {before_sha}
+
+Completion contract:
+- If any acceptance criterion is unmet, do NOT claim completion and do NOT create a completion commit. Leave the
+  worktree with the evidence needed for a human to continue and explain the blocker.
+- If every acceptance criterion is met, commit all intended changes and leave the worktree clean.
+- The final commit must have a concise subject and these exact trailers:
+
+Pi-Ticket: {ticket.relative_path}
+Pi-Ticket-SHA256: {ticket.digest}
+Pi-Ticket-Status: complete
+
+Keep these three lines as one contiguous trailer block at the end of the commit message: use one blank line
+before `Pi-Ticket`, and no blank lines between the three trailer lines. The trailers attest that you implemented
+every criterion and ran the appropriate validation. Do not add them early or to a partial commit.
+
+If the ticket cannot be completed, explain the blocker without claiming completion.
+"""
+
+
+def build_resume_prompt(ticket: Ticket, before_sha: str) -> str:
+    return f"""Continue the interrupted implementation of ticket {ticket.path} from this session.
+Ticket digest: {ticket.digest}
+Original starting Git commit: {before_sha}
+
+The current Git state and worktree are exactly as they were when this session was interrupted. Inspect them and
+the prior conversation, then continue from the existing work rather than starting over. Finish every acceptance criterion,
+run the required validation and code review, and commit all intended changes. Leave the worktree clean.
+
+The final commit must have these exact trailers:
+
+Pi-Ticket: {ticket.relative_path}
+Pi-Ticket-SHA256: {ticket.digest}
+Pi-Ticket-Status: complete
+
+Keep these three lines as one contiguous trailer block at the end of the commit message: use one blank line
+before `Pi-Ticket`, and no blank lines between the three trailer lines. The trailers attest that you implemented
+every criterion and ran the appropriate validation. Do not add them early or to a partial commit.
+
+If the ticket cannot be completed, explain the blocker without claiming completion.
+"""
+
+
+def format_duration(duration_seconds: float) -> str:
+    whole_seconds = max(0, round(duration_seconds))
+    hours, remainder = divmod(whole_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes}m {seconds}s"
+    if minutes:
+        return f"{minutes}m {seconds}s"
+    return f"{seconds}s"
+
+
+def process_group_exists(process_group: int) -> bool:
+    try:
+        os.killpg(process_group, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def terminate_process_group(process: subprocess.Popen[str], *, force: bool) -> None:
+    process_group = process.pid
+    if force:
+        try:
+            os.killpg(process_group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+        return
+
+    try:
+        os.killpg(process_group, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+
+    deadline = time.monotonic() + 1
+    while time.monotonic() < deadline:
+        process.poll()
+        if not process_group_exists(process_group):
+            break
+        time.sleep(0.02)
+
+    if process_group_exists(process_group):
+        try:
+            os.killpg(process_group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    try:
+        process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
+def stream_pi(
+    root: Path,
+    ticket: Ticket,
+    before_sha: str,
+    attempt_dir: Path,
+    pi_command: str,
+    implement_skill: Path,
+    model: str | None,
+    thinking: str | None,
+    approve: bool,
+    interrupts: InterruptController,
+    session_id: str,
+    invocation: int,
+    resume: bool,
+) -> PiResult:
+    session_dir = attempt_dir / "session"
+    events_path = attempt_dir / f"events-{invocation:04d}.jsonl"
+    stderr_path = attempt_dir / f"stderr-{invocation:04d}.log"
+
+    executable = shutil.which(pi_command) if os.sep not in pi_command else pi_command
+    if not executable or not Path(executable).exists():
+        raise RunnerError(f"Pi executable not found: {pi_command}")
+    if not implement_skill.is_file():
+        raise RunnerError(f"Implement skill not found: {implement_skill}")
+
+    command = [
+        str(executable),
+        "--mode",
+        "json",
+        "--approve" if approve else "--no-approve",
+        "--skill",
+        str(implement_skill),
+        "--session-dir",
+        str(session_dir),
+        "--session" if resume else "--session-id",
+        session_id,
+        "--name",
+        f"ticket {ticket.number:02d}: {ticket.title}",
+    ]
+    if model:
+        command.extend(["--model", model])
+    if thinking:
+        command.extend(["--thinking", thinking])
+    prompt = build_resume_prompt(ticket, before_sha) if resume else build_prompt(ticket, before_sha)
+    command.append(prompt)
+
+    print(f"pi command: {executable} --mode json …")
+    print(f"pi session mode: {'resume' if resume else 'new'} ({session_id})")
+    print("pi prompt (verbatim):")
+    print("---")
+    print(prompt, end="" if prompt.endswith("\n") else "\n")
+    print("---")
+    print(f"pi model: {model}")
+    print(f"pi thinking: {thinking}")
+    print(f"attempt log: {attempt_dir}")
+    print()
+
+    emitted_session_id: str | None = None
+    saw_agent_end = False
+    protocol_error: str | None = None
+    first_event = True
+    printing_thinking = False
+    started_at = time.monotonic()
+
+    with events_path.open("w", encoding="utf-8") as events_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
+        process: subprocess.Popen[str] | None = None
+        previous_sigmask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=root,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=stderr_file,
+                bufsize=1,
+                start_new_session=True,
+            )
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_sigmask)
+            previous_sigmask = None
+            assert process.stdout is not None
+            for line_number, line in enumerate(process.stdout, 1):
+                events_file.write(line)
+                events_file.flush()
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    protocol_error = protocol_error or f"invalid JSON on stdout line {line_number}: {exc}"
+                    continue
+                if not isinstance(event, dict):
+                    protocol_error = protocol_error or f"non-object JSON on stdout line {line_number}"
+                    continue
+
+                if first_event:
+                    first_event = False
+                    if event.get("type") != "session" or not event.get("id"):
+                        protocol_error = "first Pi JSON event is not a session header"
+                    else:
+                        emitted_session_id = str(event["id"])
+                        print(f"pi session: {emitted_session_id}")
+                        if emitted_session_id != session_id:
+                            protocol_error = (
+                                f"Pi opened session {emitted_session_id}, expected recorded session {session_id}"
+                            )
+                        else:
+                            record_verified_session(attempt_dir, invocation, emitted_session_id)
+                    continue
+
+                event_type = event.get("type")
+                if event_type == "agent_end":
+                    saw_agent_end = True
+                elif event_type == "tool_execution_start":
+                    if printing_thinking:
+                        print()
+                        printing_thinking = False
+                    print(f"\n[tool] {event.get('toolName', '?')}")
+                    if "args" in event:
+                        print("request:")
+                        print(json.dumps(event["args"], indent=2, ensure_ascii=False, sort_keys=True))
+                elif event_type == "message_update":
+                    update = event.get("assistantMessageEvent") or {}
+                    update_type = update.get("type")
+                    if update_type == "thinking_start":
+                        if not printing_thinking:
+                            sys.stdout.write("\n[thinking] ")
+                            sys.stdout.flush()
+                            printing_thinking = True
+                    elif update_type == "thinking_delta":
+                        if not printing_thinking:
+                            sys.stdout.write("\n[thinking] ")
+                            printing_thinking = True
+                        sys.stdout.write(str(update.get("delta", "")))
+                        sys.stdout.flush()
+                    elif update_type == "thinking_end":
+                        if printing_thinking:
+                            print()
+                            printing_thinking = False
+                    elif update_type == "text_delta":
+                        if printing_thinking:
+                            print()
+                            printing_thinking = False
+                        sys.stdout.write(str(update.get("delta", "")))
+                        sys.stdout.flush()
+            returncode = process.wait()
+        except KeyboardInterrupt:
+            print("\nInterrupted; terminating Pi…", file=sys.stderr)
+            if process is not None:
+                terminate_process_group(process, force=interrupts.force_abort)
+            raise
+        finally:
+            if previous_sigmask is not None:
+                signal.pthread_sigmask(signal.SIG_SETMASK, previous_sigmask)
+
+    print()
+    return PiResult(
+        returncode=returncode,
+        duration_seconds=time.monotonic() - started_at,
+        session_id=emitted_session_id,
+        saw_agent_end=saw_agent_end,
+        protocol_error=protocol_error,
+        events_path=events_path,
+        stderr_path=stderr_path,
+    )
+
+
+def trailers_for_head(root: Path) -> dict[str, str]:
+    return parse_trailers(root, git(root, "show", "-s", "--format=%B", "HEAD").stdout)
+
+
+def verify_completion(
+    root: Path,
+    ticket: Ticket,
+    before_sha: str,
+    before_branch: str,
+    result: PiResult,
+) -> str:
+    problems: list[str] = []
+    if result.returncode != 0:
+        problems.append(f"Pi exited with {result.returncode}")
+    if result.protocol_error:
+        problems.append(f"Pi JSON protocol error: {result.protocol_error}")
+    if not result.session_id:
+        problems.append("Pi emitted no session ID")
+    if not result.saw_agent_end:
+        problems.append("Pi emitted no agent_end event")
+
+    after_branch = current_branch(root)
+    if after_branch != before_branch:
+        problems.append(f"Pi changed branch from {before_branch} to {after_branch}")
+
+    after_sha = git(root, "rev-parse", "HEAD").stdout.strip()
+    if after_sha == before_sha:
+        problems.append("HEAD did not advance")
+    elif git(root, "merge-base", "--is-ancestor", before_sha, after_sha, check=False).returncode != 0:
+        problems.append("new HEAD is not a descendant of the starting commit")
+    elif git(root, "diff", "--quiet", before_sha, after_sha, check=False).returncode == 0:
+        problems.append("completion commit did not change the repository tree")
+
+    status = git(root, "status", "--porcelain=v1", "--untracked-files=all").stdout
+    if status.strip():
+        problems.append("worktree is not clean after Pi")
+
+    try:
+        current_ticket_digest = sha256_bytes(ticket.path.read_bytes())
+    except OSError as exc:
+        problems.append(f"ticket could not be reread after Pi: {exc}")
+    else:
+        if current_ticket_digest != ticket.digest:
+            problems.append("Pi changed the dispatched ticket")
+
+    trailers = trailers_for_head(root)
+    if trailers.get("Pi-Ticket") != ticket.relative_path:
+        problems.append("final commit has no matching Pi-Ticket trailer")
+    if trailers.get("Pi-Ticket-SHA256") != ticket.digest:
+        problems.append("final commit has no matching Pi-Ticket-SHA256 trailer")
+    if trailers.get("Pi-Ticket-Status") != "complete":
+        problems.append("final commit has no 'Pi-Ticket-Status: complete' trailer")
+
+    if problems:
+        detail = "\n".join(f"- {problem}" for problem in problems)
+        raise RunnerError(
+            f"Ticket {ticket.number:02d} was not accepted:\n{detail}\n"
+            f"Events: {result.events_path}\nStderr: {result.stderr_path}"
+        )
+    return after_sha
+
+
+def next_attempt_directory(state_dir: Path, ticket: Ticket) -> Path:
+    ticket_dir = ticket_attempt_directory(state_dir, ticket)
+    ticket_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    existing = [path for path in ticket_dir.iterdir() if path.is_dir() and path.name.isdigit()]
+    next_number = max((int(path.name) for path in existing), default=0) + 1
+    return ticket_dir / f"{next_number:04d}"
+
+
+def select_frontier(tickets: Sequence[Ticket], root: Path) -> Ticket | None:
+    completions = load_completions(root)
+    complete = completed_numbers(tickets, completions)
+    for ticket in tickets:
+        state, _ = ticket_state(ticket, complete, completions)
+        if state == "ready":
+            return ticket
+    return None
+
+
+def command_status(args: argparse.Namespace) -> int:
+    issues_dir = Path(args.issues_directory).expanduser().resolve()
+    root = discover_repo(issues_dir)
+    tickets = load_tickets(issues_dir, root)
+    frontier = print_status(issues_dir, root, tickets)
+    if frontier:
+        resumable = find_resumable_attempt(state_directory(root, issues_dir), frontier)
+        if resumable:
+            attempt_dir, manifest = resumable
+            print(f"resumable Pi session: {manifest.get('session_id')} ({attempt_dir})")
+    completions = load_completions(root)
+    complete = completed_numbers(tickets, completions)
+    if frontier or len(complete) == len(tickets):
+        return 0
+    return 3
+
+
+def run_ticket_loop(
+    args: argparse.Namespace,
+    issues_dir: Path,
+    root: Path,
+    state_dir: Path,
+    interrupts: InterruptController,
+) -> int:
+    max_tickets = None if args.all else args.max_tickets
+    completed_this_run = 0
+
+    while max_tickets is None or completed_this_run < max_tickets:
+        if interrupts.stop_requested:
+            print("Stopped before starting another ticket.")
+            return 130
+
+        tickets = load_tickets(issues_dir, root)
+        ticket = select_frontier(tickets, root)
+        if ticket is None:
+            completions = load_completions(root)
+            complete = completed_numbers(tickets, completions)
+            print_status(issues_dir, root, tickets)
+            if len(complete) == len(tickets):
+                print("Ticket loop complete.")
+                return 0
+            raise RunnerError("No runnable frontier ticket remains")
+
+        # Re-check the frontier immediately before preparing a new or resumed dispatch.
+        refreshed = select_frontier(load_tickets(issues_dir, root), root)
+        if not refreshed or refreshed.relative_path != ticket.relative_path or refreshed.digest != ticket.digest:
+            print("Ticket frontier changed during selection; recomputing.")
+            continue
+
+        resumable = find_resumable_attempt(state_dir, ticket)
+        resume = resumable is not None
+        if resumable:
+            attempt_dir, manifest = resumable
+            branch = validate_resumable_attempt(
+                root,
+                ticket,
+                attempt_dir,
+                manifest,
+                args.allow_protected_branch,
+            )
+            before_sha_value = manifest.get("base_head")
+            session_id_value = manifest.get("session_id")
+            if not isinstance(before_sha_value, str) or not isinstance(session_id_value, str):
+                raise RunnerError(f"Invalid resumable attempt manifest: {attempt_dir / 'attempt.json'}")
+            before_sha = before_sha_value
+            session_id = session_id_value
+            invocation = int(manifest.get("invocation", 0)) + 1
+        else:
+            branch = assert_safe_worktree(root, args.allow_protected_branch)
+            before_sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            attempt_dir = next_attempt_directory(state_dir, ticket)
+            session_id = str(uuid.uuid4())
+            invocation = 1
+            manifest = {
+                "version": 1,
+                "status": "created",
+                "ticket": ticket.relative_path,
+                "ticket_digest": ticket.digest,
+                "ticket_number": ticket.number,
+                "base_branch": branch,
+                "base_head": before_sha,
+                "session_id": session_id,
+                "invocation": 0,
+                "agent_elapsed_seconds": 0.0,
+                "created_at": time.time(),
+            }
+
+        if not interrupts.begin_ticket(ticket.number):
+            print("Stopped before starting another ticket.")
+            return 130
+        try:
+            if not resume:
+                attempt_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
+                (attempt_dir / "session").mkdir(mode=0o700)
+            manifest.update(
+                {
+                    "status": "running",
+                    "invocation": invocation,
+                    "invocation_started_at": time.time(),
+                    "updated_at": time.time(),
+                }
+            )
+            write_attempt_manifest(attempt_dir, manifest)
+
+            print(f"\n=== Ticket {ticket.number:02d} — {ticket.title} ===")
+            if resume:
+                print(f"resuming interrupted Pi session {session_id} from {attempt_dir}")
+            result = stream_pi(
+                root=root,
+                ticket=ticket,
+                before_sha=before_sha,
+                attempt_dir=attempt_dir,
+                pi_command=args.pi,
+                implement_skill=Path(args.implement_skill).expanduser().resolve(),
+                model=args.model,
+                thinking=args.thinking,
+                approve=not args.no_approve,
+                interrupts=interrupts,
+                session_id=session_id,
+                invocation=invocation,
+                resume=resume,
+            )
+            after_sha = verify_completion(root, ticket, before_sha, branch, result)
+            completed_this_run += 1
+            total_duration = record_invocation_duration(manifest, result.duration_seconds)
+            manifest.update(
+                {
+                    "status": "complete",
+                    "completion_head": after_sha,
+                    "completed_at": time.time(),
+                    "updated_at": time.time(),
+                }
+            )
+            write_attempt_manifest(attempt_dir, manifest)
+            print(
+                f"accepted: {ticket.number:02d} at {after_sha[:12]} "
+                f"(implementation time: {format_duration(total_duration)})"
+            )
+        except KeyboardInterrupt:
+            try:
+                capture_attempt_state(root, attempt_dir, manifest, "interrupted")
+            except RunnerError as exc:
+                print(f"WARNING: could not record resumable Git state: {exc}", file=sys.stderr)
+            else:
+                print(
+                    f"Pi session {session_id} saved. Re-run the same ticket-loop command to resume it.",
+                    file=sys.stderr,
+                )
+                print(f"Attempt: {attempt_dir}", file=sys.stderr)
+            raise
+        except RunnerError:
+            try:
+                capture_attempt_state(root, attempt_dir, manifest, "incomplete")
+            except RunnerError as exc:
+                print(f"WARNING: could not record resumable Git state: {exc}", file=sys.stderr)
+            raise
+        finally:
+            interrupts.active_ticket = None
+
+        if interrupts.stop_requested:
+            print(f"Stopped after ticket {ticket.number:02d}; no additional ticket will be started.")
+            return 130
+
+    print()
+    print_status(issues_dir, root, load_tickets(issues_dir, root))
+    return 0
+
+
+def command_run(args: argparse.Namespace) -> int:
+    issues_dir = Path(args.issues_directory).expanduser().resolve()
+    root = discover_repo(issues_dir)
+    load_tickets(issues_dir, root)
+
+    if args.dry_run:
+        return command_status(args)
+
+    assert_safe_worktree(root, args.allow_protected_branch, require_clean=False)
+    state_dir = state_directory(root, issues_dir)
+    _lock_file = acquire_lock(state_dir)
+    # Keep the descriptor alive for the full run; closing it releases the flock.
+
+    interrupts = InterruptController()
+    previous_sigint_handler = signal.getsignal(signal.SIGINT)
+    if args.all:
+        signal.signal(signal.SIGINT, interrupts.handle_sigint)
+    try:
+        return run_ticket_loop(args, issues_dir, root, state_dir, interrupts)
+    finally:
+        if args.all:
+            signal.signal(signal.SIGINT, previous_sigint_handler)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="pi-ticket-loop",
+        description="Select dependency-ordered Markdown tickets from Git history and run them with Pi.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    status_parser = subparsers.add_parser("status", help="show completion state and the current frontier")
+    status_parser.add_argument("issues_directory", help="directory containing NN-slug.md ticket files")
+    status_parser.set_defaults(handler=command_status)
+
+    run_parser = subparsers.add_parser("run", help="run one or more frontier tickets")
+    run_parser.add_argument("issues_directory", help="directory containing NN-slug.md ticket files")
+    count_group = run_parser.add_mutually_exclusive_group()
+    count_group.add_argument(
+        "--all",
+        action="store_true",
+        help="continue until done; Ctrl+C once stops after the current ticket, twice aborts immediately",
+    )
+    count_group.add_argument(
+        "--max-tickets",
+        type=int,
+        default=1,
+        metavar="N",
+        help="maximum tickets to run; default: 1",
+    )
+    run_parser.add_argument("--dry-run", action="store_true", help="show the selected frontier without launching Pi")
+    run_parser.add_argument("--pi", default=os.environ.get("PI_TICKET_PI", "pi"), help="Pi executable; default: pi")
+    run_parser.add_argument(
+        "--implement-skill",
+        default=os.environ.get(
+            "PI_TICKET_IMPLEMENT_SKILL",
+            str(Path.home() / ".agents" / "skills" / "implement" / "SKILL.md"),
+        ),
+        help="implement SKILL.md passed to Pi and invoked with /skill:implement",
+    )
+    run_parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help=f"Pi model; default: {DEFAULT_MODEL}",
+    )
+    run_parser.add_argument(
+        "--thinking",
+        choices=("off", "minimal", "low", "medium", "high", "xhigh"),
+        default=DEFAULT_THINKING,
+        help=f"Pi reasoning level; default: {DEFAULT_THINKING}",
+    )
+    run_parser.add_argument(
+        "--no-approve",
+        action="store_true",
+        help="do not trust project-local Pi settings/resources (normally they are required for project skills)",
+    )
+    run_parser.add_argument(
+        "--allow-protected-branch",
+        action="store_true",
+        help="allow autonomous commits on main/master/trunk (not recommended)",
+    )
+    run_parser.set_defaults(handler=command_run)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if getattr(args, "max_tickets", 1) is not None and getattr(args, "max_tickets", 1) < 1:
+        parser.error("--max-tickets must be at least 1")
+    try:
+        return int(args.handler(args))
+    except KeyboardInterrupt:
+        return 130
+    except RunnerError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
