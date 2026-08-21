@@ -1,7 +1,7 @@
 // RTK integration for Pi.
 //
 // Goals:
-// - Keep Pi's normal tool names/schema so the model keeps using read/grep/find/ls/bash.
+// - Keep Pi's normal tool names/schema so the model keeps using grep/find/ls/bash.
 // - Route Pi tools with RTK equivalents through the `rtk` CLI when it is safe.
 // - Fall back to Pi's built-in implementations on missing RTK, unsupported RTK commands,
 //   unsupported argument shapes, or RTK execution failures.
@@ -13,7 +13,6 @@ import {
   createFindToolDefinition,
   createGrepToolDefinition,
   createLsToolDefinition,
-  createReadToolDefinition,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   isToolCallEventType,
@@ -22,9 +21,7 @@ import {
   type ExtensionCommandContext,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { statSync } from "node:fs";
-import { stat as fsStat } from "node:fs/promises";
-import { basename, extname, resolve as resolvePath } from "node:path";
+import { basename } from "node:path";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
@@ -34,14 +31,7 @@ const RTK_REWRITE_TIMEOUT_MS = 2_000;
 const RTK_STATUS_TTL_MS = 30_000;
 const DEFAULT_GREP_LIMIT = 100;
 const RTK_NOTICE_MAX_LENGTH = 140;
-const RTK_READ_COMPACT_BYTE_THRESHOLD = DEFAULT_MAX_BYTES;
 const RTK_USER_ONLY_CUSTOM_TYPES = new Set(["rtk-stats", "rtk-clear-stats"]);
-
-const readSchema = Type.Object({
-  path: Type.String({ description: "Path to the file to read (relative or absolute)" }),
-  offset: Type.Optional(Type.Number({ description: "Line number to start reading from (1-indexed)" })),
-  limit: Type.Optional(Type.Number({ description: "Maximum number of lines to read" })),
-});
 
 const grepSchema = Type.Object({
   pattern: Type.String({ description: "Search pattern (regex or literal string)" }),
@@ -89,18 +79,6 @@ type BashRewriteRoute = {
   originalCommand: string;
   detail?: string;
 };
-
-const IMAGE_EXTENSIONS = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".bmp",
-  ".svg",
-  ".ico",
-  ".avif",
-]);
 
 function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
@@ -154,10 +132,6 @@ function compactNoticeText(text: string, maxLength = RTK_NOTICE_MAX_LENGTH): str
   return `${compact.slice(0, maxLength - 1)}…`;
 }
 
-function isProbablyImagePath(path: string): boolean {
-  return IMAGE_EXTENSIONS.has(extname(path).toLowerCase());
-}
-
 function toolArgText(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
@@ -206,27 +180,6 @@ function buildRtkLsToolArgs(params: any): string[] {
   return ["ls", toolArgText(params?.path, ".")];
 }
 
-function chooseRtkReadLevelFromSize(size: number): "none" | "minimal" {
-  return size > RTK_READ_COMPACT_BYTE_THRESHOLD ? "minimal" : "none";
-}
-
-function chooseRtkReadLevelSync(cwd: string, filePath: string): "none" | "minimal" {
-  try {
-    const fileStat = statSync(resolvePath(cwd, filePath));
-    return fileStat.isFile() ? chooseRtkReadLevelFromSize(fileStat.size) : "none";
-  } catch {
-    return "none";
-  }
-}
-
-function buildRtkReadToolArgs(cwd: string, params: any): string[] {
-  const path = toolArgText(params?.path, "<path>");
-  const readLevel = chooseRtkReadLevelSync(cwd, path);
-  return readLevel === "minimal"
-    ? ["read", "--level", "minimal", "--max-lines", String(DEFAULT_MAX_LINES), path]
-    : ["read", "--level", "none", path];
-}
-
 function buildPiGrepDisplay(params: any): string {
   return `grep /${toolArgText(params?.pattern, "<pattern>")}/ in ${toolArgText(params?.path, ".")}`;
 }
@@ -237,14 +190,6 @@ function buildPiFindDisplay(params: any): string {
 
 function buildPiLsDisplay(params: any): string {
   return `ls ${toolArgText(params?.path, ".")}`;
-}
-
-function buildPiReadDisplay(params: any): string {
-  const path = toolArgText(params?.path, "<path>");
-  const range = params?.offset !== undefined || params?.limit !== undefined
-    ? `:${params?.offset ?? 1}${params?.limit !== undefined ? `-${(params?.offset ?? 1) + params.limit - 1}` : ""}`
-    : "";
-  return `read ${path}${range}`;
 }
 
 function buildBashDisplay(params: any, route?: BashRewriteRoute): string {
@@ -277,17 +222,6 @@ function renderRtkBashToolCall(
     `${theme.fg("toolTitle", theme.bold("bash"))}${routeLabel}${detail} ${theme.fg("toolOutput", commandDisplay)}${timeoutSuffix}`,
   );
   return text;
-}
-
-async function chooseRtkReadLevel(cwd: string, filePath: string): Promise<"none" | "minimal"> {
-  try {
-    const absolutePath = resolvePath(cwd, filePath);
-    const fileStat = await fsStat(absolutePath);
-    return fileStat.isFile() ? chooseRtkReadLevelFromSize(fileStat.size) : "none";
-  } catch {
-    // If probing fails, prefer exact RTK read and let the actual read command report errors.
-    return "none";
-  }
 }
 
 function limitOutputLines(text: string, limit: number | undefined, label: string): { text: string; limited: boolean } {
@@ -621,14 +555,12 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
     return { ...result, args };
   };
 
-  const getBuiltinToolDefinition = (toolName: "read" | "grep" | "find" | "ls", cwd: string) =>
-    toolName === "read"
-      ? createReadToolDefinition(cwd)
-      : toolName === "grep"
-        ? createGrepToolDefinition(cwd)
-        : toolName === "find"
-          ? createFindToolDefinition(cwd)
-          : createLsToolDefinition(cwd);
+  const getBuiltinToolDefinition = (toolName: "grep" | "find" | "ls", cwd: string) =>
+    toolName === "grep"
+      ? createGrepToolDefinition(cwd)
+      : toolName === "find"
+        ? createFindToolDefinition(cwd)
+        : createLsToolDefinition(cwd);
 
   const withPiRouteDetails = (result: any, piCommand: string) => ({
     ...result,
@@ -659,7 +591,7 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
   };
 
   const renderBuiltinResult = (
-    toolName: "read" | "grep" | "find" | "ls",
+    toolName: "grep" | "find" | "ls",
     result: any,
     options: any,
     theme: any,
@@ -671,7 +603,7 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
   };
 
   const executeBuiltin = async (
-    toolName: "read" | "grep" | "find" | "ls",
+    toolName: "grep" | "find" | "ls",
     toolCallId: string,
     params: any,
     signal: AbortSignal | undefined,
@@ -817,10 +749,8 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     ...bashToolMetadata,
     label: "bash (rtk)",
-    description:
-      `${bashToolMetadata.description} Eligible commands are preflighted through \`rtk rewrite\`; the tool row shows whether RTK rewrote the command or missed and fell back to plain bash.`,
     promptGuidelines: [
-      "Use bash normally; this Pi extension preflights eligible bash commands through RTK and shows RTK/Pi routing in the bash tool row.",
+      "Use bash to inspect PI_* environment variables for current model and session details.",
     ],
     renderCall(args, theme, context) {
       return renderRtkBashToolCall(theme, args, bashRewriteRoutes.get(context.toolCallId), context);
@@ -838,10 +768,8 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "grep",
     label: "grep (rtk)",
-    description:
-      "Search file contents for a pattern. Routed through `rtk grep` for token-optimized grouped output when RTK is available; falls back to Pi's built-in ripgrep tool otherwise.",
-    promptSnippet: "Search file contents for patterns using RTK-optimized output",
-    promptGuidelines: ["Use grep normally; this Pi extension automatically routes grep through RTK when available."],
+    description: "Search file contents for a pattern.",
+    promptSnippet: "Search file contents for patterns",
     parameters: grepSchema,
     renderCall(args, theme, context) {
       const rtkArgs = buildRtkGrepToolArgs(args);
@@ -882,10 +810,8 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "find",
     label: "find (rtk)",
-    description:
-      "Search for files by glob pattern. Simple basename globs are routed through `rtk find` for compact tree output; complex path globs route through `rtk rg --files` when available.",
-    promptSnippet: "Find files by glob pattern using RTK-optimized output when possible",
-    promptGuidelines: ["Use find normally; this Pi extension routes find queries through RTK when available."],
+    description: "Search for files by glob pattern.",
+    promptSnippet: "Find files by glob pattern",
     parameters: findSchema,
     renderCall(args, theme, context) {
       const pattern = toolArgText(args?.pattern, "<pattern>");
@@ -931,10 +857,8 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "ls",
     label: "ls (rtk)",
-    description:
-      "List directory contents. Routed through `rtk ls` for token-optimized output when RTK is available; falls back to Pi's built-in ls tool otherwise.",
-    promptSnippet: "List directory contents using RTK-optimized output",
-    promptGuidelines: ["Use ls normally; this Pi extension automatically routes ls through RTK when available."],
+    description: "List directory contents.",
+    promptSnippet: "List directory contents",
     parameters: lsSchema,
     renderCall(args, theme, context) {
       const rtkArgs = buildRtkLsToolArgs(args);
@@ -972,59 +896,6 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
       }
 
       return executeBuiltin("ls", toolCallId, params, signal, onUpdate, ctx, buildPiLsDisplay(params));
-    },
-  });
-
-  pi.registerTool({
-    name: "read",
-    label: "read (rtk)",
-    description:
-      "Read file contents. Whole-file text reads are routed through `rtk read` when RTK is available; large whole-file reads use RTK minimal filtering. Ranged reads and images fall back to Pi's exact built-in read tool.",
-    promptSnippet: "Read file contents using RTK for whole-file text reads when safe",
-    promptGuidelines: [
-      "Use read with offset/limit when exact edit anchors are needed; this RTK extension preserves Pi's built-in exact ranged reads.",
-      "Whole-file read output may be compacted by RTK for large files; re-read a focused range before editing exact text.",
-    ],
-    parameters: readSchema,
-    renderCall(args, theme, context) {
-      const path = toolArgText(args?.path, "<path>");
-      const needsExactPiRead = args?.offset !== undefined || args?.limit !== undefined || isProbablyImagePath(path);
-      const target = needsExactPiRead ? "pi" : commandSupported(status, "read") ? "rtk" : "pi";
-      return renderRtkToolCall(
-        theme,
-        "read",
-        target,
-        target === "rtk" ? formatRtkCommand(buildRtkReadToolArgs(context.cwd, args)) : buildPiReadDisplay(args),
-        context,
-      );
-    },
-    renderResult(result, options, theme, context) {
-      return renderBuiltinResult("read", result, options, theme, context);
-    },
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
-      const needsExactPiRead =
-        params.offset !== undefined || params.limit !== undefined || isProbablyImagePath(params.path);
-      const currentStatus = await ensureStatus(ctx);
-      if (needsExactPiRead || !commandSupported(currentStatus, "read")) {
-        return executeBuiltin("read", toolCallId, params, signal, onUpdate, ctx, buildPiReadDisplay(params));
-      }
-
-      const readLevel = await chooseRtkReadLevel(ctx.cwd, params.path);
-      const args =
-        readLevel === "minimal"
-          ? ["read", "--level", "minimal", "--max-lines", String(DEFAULT_MAX_LINES), params.path]
-          : ["read", "--level", "none", params.path];
-      try {
-        const result = await runRtk(ctx, args, { signal });
-        if (isSuccessLike(result)) {
-          recordRtkHit(ctx, readLevel === "minimal" ? "read compact" : "read", formatRtkCommand(args));
-          return buildTextResult(result.stdout || result.stderr, args, { exitCode: result.code, readLevel });
-        }
-      } catch {
-        // Fall through to built-in read.
-      }
-
-      return executeBuiltin("read", toolCallId, params, signal, onUpdate, ctx, buildPiReadDisplay(params));
     },
   });
 
