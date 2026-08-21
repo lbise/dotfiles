@@ -70,6 +70,7 @@ def create_loop_fixture(
     spawn_stubborn_child: bool = False,
     write_partial_before_sleep: bool = False,
     emit_wrong_session: bool = False,
+    emit_truncated_digest: bool = False,
 ) -> tuple[Path, Path, Path, Path]:
     root = base / 'repository'
     issues = root / '.scratch' / 'effort' / 'issues'
@@ -161,10 +162,11 @@ def create_loop_fixture(
             time.sleep(delay if delay is not None else {pi_delay!r})
             output.write_text(ticket + '\\n', encoding='utf-8')
             subprocess.run(['git', 'add', str(output)], check=True)
+            commit_digest = digest[:-1] if {emit_truncated_digest!r} else digest
             message = (
                 f'complete {{ticket}}\\n\\n'
                 f'Pi-Ticket: {{ticket}}\\n'
-                f'Pi-Ticket-SHA256: {{digest}}\\n'
+                f'Pi-Ticket-SHA256: {{commit_digest}}\\n'
                 'Pi-Ticket-Status: complete'
             )
             subprocess.run(['git', 'commit', '-qm', message], check=True)
@@ -270,6 +272,33 @@ class TicketHistoryTest(unittest.TestCase):
             status = run(str(RUNNER), 'status', str(issues), cwd=root)
             self.assertIn('01  COMPLETE', status.stdout)
             self.assertIn('frontier: none — all tickets are complete', status.stdout)
+
+
+class TicketParsingTest(unittest.TestCase):
+    def test_commas_inside_blocker_descriptions_are_not_separators(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            issues = root / '.scratch' / 'effort' / 'issues'
+            issues.mkdir(parents=True)
+            for number in (1, 2, 3):
+                (issues / f'{number:02d}-blocker.md').write_text(
+                    f'# {number:02d} — Blocker {number}\n\n'
+                    'Blocked by: None — can start immediately.\n\n'
+                    'Status: ready-for-agent\n',
+                    encoding='utf-8',
+                )
+            (issues / '04-target.md').write_text(
+                '# 04 — Target\n\n'
+                'Blocked by: 01 — Correct evidence; 02 — Add versioned results, search accounting, and progress; '
+                '03 — Start a protected-LAN workbench.\n\n'
+                'Status: ready-for-agent\n',
+                encoding='utf-8',
+            )
+
+            module = runpy.run_path(str(RUNNER), run_name='pi_ticket_loop_test')
+            tickets = module['load_tickets'](issues, root)
+
+            self.assertEqual((1, 2, 3), tickets[-1].blockers)
 
 
 class InterruptTest(unittest.TestCase):
@@ -405,6 +434,26 @@ class InterruptTest(unittest.TestCase):
             self.assertIn('Refusing to resume ticket 01', resumed_stderr)
             self.assertIn('worktree contents changed after the attempt was interrupted', resumed_stderr)
             self.assertEqual(1, len(marker.read_text(encoding='utf-8').splitlines()))
+
+    def test_truncated_digest_is_repaired_when_other_completion_checks_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory)
+            root, issues, skill, marker = create_loop_fixture(
+                base,
+                pi_delay=0,
+                emit_truncated_digest=True,
+            )
+            process = start_loop(root, issues, skill, base / 'fake-pi', all_tickets=False)
+            stdout, stderr = process.communicate(timeout=10)
+
+            self.assertEqual(0, process.returncode, stdout + stderr)
+            self.assertIn('accepted: 01', stdout)
+            expected_digest = hashlib.sha256(
+                (issues / '01-first.md').read_bytes()
+            ).hexdigest()
+            message = run('git', 'show', '-s', '--format=%B', 'HEAD', cwd=root).stdout
+            self.assertIn(f'Pi-Ticket-SHA256: {expected_digest}', message)
+            self.assertEqual('', stderr)
 
     def test_mismatched_pi_session_is_not_recorded_as_resumable(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

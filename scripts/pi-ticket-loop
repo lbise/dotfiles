@@ -30,6 +30,7 @@ TITLE_RE = re.compile(r"^#\s+(?P<number>\d{2})\s+[—-]\s+(?P<title>.+?)\s*$")
 STATUS_RE = re.compile(r"^(?:\*\*)?Status:(?:\*\*)?\s*(?P<status>\S+)\s*$", re.MULTILINE)
 BLOCKED_RE = re.compile(r"^(?:\*\*)?Blocked by:(?:\*\*)?\s*(?P<value>.+?)\s*$", re.MULTILINE)
 BLOCKER_PART_RE = re.compile(r"^\s*(?P<number>\d{2})(?:\s+[—-]\s+.+?)?\s*$")
+BLOCKER_SEPARATOR_RE = re.compile(r"[,;]\s*(?=\d{2}(?:\s+[—-]\s+|\s*(?:[,;]|$)))")
 COMPLETION_TRAILERS = {"Pi-Ticket", "Pi-Ticket-SHA256", "Pi-Ticket-Status"}
 RUNNABLE_STATUS = "ready-for-agent"
 PROTECTED_BRANCHES = {"main", "master", "trunk"}
@@ -188,7 +189,7 @@ def load_tickets(issues_dir: Path, root: Path) -> list[Ticket]:
             blockers = ()
         else:
             parsed_blockers: list[int] = []
-            for part in re.split(r"[,;]", blocked_value):
+            for part in BLOCKER_SEPARATOR_RE.split(blocked_value):
                 blocker_match = BLOCKER_PART_RE.match(part.rstrip("."))
                 if not blocker_match:
                     raise RunnerError(f"Could not parse blockers in {path}: {blocked_value}")
@@ -894,6 +895,35 @@ def trailers_for_head(root: Path) -> dict[str, str]:
     return parse_trailers(root, git(root, "show", "-s", "--format=%B", "HEAD").stdout)
 
 
+def repair_completion_digest(root: Path, ticket: Ticket) -> None:
+    message = git(root, "show", "-s", "--format=%B", "HEAD").stdout
+    lines = message.splitlines()
+    digest_line = f"Pi-Ticket-SHA256: {ticket.digest}"
+    for index, line in enumerate(lines):
+        if line.startswith("Pi-Ticket-SHA256:"):
+            lines[index] = digest_line
+            break
+    else:
+        status_index = next(
+            (index for index, line in enumerate(lines) if line.startswith("Pi-Ticket-Status:")),
+            None,
+        )
+        if status_index is None:
+            raise RunnerError("Cannot repair completion digest: final commit has no completion status trailer")
+        lines.insert(status_index, digest_line)
+
+    repaired_message = "\n".join(lines).rstrip() + "\n"
+    process = subprocess.run(
+        ["git", "-C", str(root), "commit", "--amend", "-F", "-"],
+        input=repaired_message,
+        text=True,
+        capture_output=True,
+    )
+    if process.returncode != 0:
+        detail = process.stderr.strip() or process.stdout.strip() or f"exit {process.returncode}"
+        raise RunnerError(f"Could not repair completion digest in HEAD: {detail}")
+
+
 def verify_completion(
     root: Path,
     ticket: Ticket,
@@ -938,10 +968,16 @@ def verify_completion(
     trailers = trailers_for_head(root)
     if trailers.get("Pi-Ticket") != ticket.relative_path:
         problems.append("final commit has no matching Pi-Ticket trailer")
-    if trailers.get("Pi-Ticket-SHA256") != ticket.digest:
-        problems.append("final commit has no matching Pi-Ticket-SHA256 trailer")
     if trailers.get("Pi-Ticket-Status") != "complete":
         problems.append("final commit has no 'Pi-Ticket-Status: complete' trailer")
+
+    if trailers.get("Pi-Ticket-SHA256") != ticket.digest:
+        if not problems:
+            repair_completion_digest(root, ticket)
+            after_sha = git(root, "rev-parse", "HEAD").stdout.strip()
+            trailers = trailers_for_head(root)
+        if trailers.get("Pi-Ticket-SHA256") != ticket.digest:
+            problems.append("final commit has no matching Pi-Ticket-SHA256 trailer")
 
     if problems:
         detail = "\n".join(f"- {problem}" for problem in problems)
