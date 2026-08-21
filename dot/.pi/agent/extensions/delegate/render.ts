@@ -115,6 +115,12 @@ function formatDuration(milliseconds: number): string {
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
+function delegateBoxWidth(availableWidth: number, title: string, lines: string[]): number {
+  const widest = Math.max(visibleWidth(title), ...lines.map(visibleWidth), 0);
+  const preferred = Math.max(40, widest + 4);
+  return Math.min(availableWidth, 96, preferred);
+}
+
 class DelegateToolRow implements Component {
   #args: Record<string, unknown>;
   #theme: Theme;
@@ -220,11 +226,12 @@ class DelegateToolRow implements Component {
     if (details?.taskId) lines.push(this.#theme.fg("dim", `󰆧 ${details.taskId}`));
 
     const shortcut = details?.shortcut ? ` · ${details.shortcut}` : "";
+    const boxTitle = `󰆍 delegate · ${agent} · ${mode}${shortcut}`;
     return new RoundedBox({
-      title: `󰆍 delegate · ${agent} · ${mode}${shortcut}`,
+      title: boxTitle,
       titleColor: "accent",
       lines,
-    }, this.#theme).render(width);
+    }, this.#theme).render(delegateBoxWidth(width, boxTitle, lines));
   }
 
   invalidate(): void {}
