@@ -2,13 +2,15 @@
 
 ## Recommendation
 
-Build a small `task` extension, not an orchestration framework.
+Build a small `delegate` extension, not an orchestration framework.
 
 OpenCode's useful idea is simple: the parent model gets one tool that starts a named agent in a fresh child session. Agent definitions supply the prompt, model, and allowed tools. The child streams a compact activity summary into the parent tool row, returns one final result, and remains available as a normal saved session.
 
 That is the part worth copying. Parallelism should come from Pi's existing parallel tool calls. Multi-step workflows should stay in prompts or skills. Do not add `parallel`, `chain`, missions, worktrees, schedulers, agent management, or review-loop policy to the first version.
 
 The best Pi implementation is an in-process child `AgentSession` created through Pi's SDK. Start with a short spike because Pi's canonical subagent example uses subprocesses instead. If the SDK path exposes lifecycle bugs, keep the same extension interface and replace the runner with the proven subprocess adapter.
+
+Implementation note: the current `delegate` extension has moved beyond the foreground-only first version described below. It supports explicit foreground and background modes, compact follow-up completion notices, `delegate_result` polling or waiting, and cancellation. Background jobs still stop on session shutdown and do not survive process restart.
 
 ## Source version
 
@@ -87,7 +89,7 @@ Ship two defaults as Markdown files inside the extension rather than hard-coding
 
 Use one format and three discovery locations:
 
-1. packaged defaults in `dot/.pi/agent/extensions/task/agents/**/*.md`
+1. packaged defaults in `dot/.pi/agent/extensions/delegate/agents/**/*.md`
 2. user agents in `~/.pi/agent/agents/**/*.md`
 3. project agents in `.pi/agents/**/*.md`
 
@@ -114,20 +116,21 @@ Discovery should return diagnostics for malformed files instead of silently drop
 
 ### Model-visible tool
 
-Register one tool named `task`:
+Register `delegate` with a human-facing title, a self-contained child prompt, an explicit execution mode, and a dynamically discovered agent name:
 
 ```ts
 {
-  description: string,
+  title: string,
   prompt: string,
   subagent_type: string,
+  mode: "foreground" | "background",
   task_id?: string
 }
 ```
 
-Build the tool description dynamically from visible, allowed agents. Keep denied or hidden agents out of the description. The result should include the child session id in a stable, easy-to-reuse form.
+Register `delegate_result` separately with `task_id`, `mode: "poll" | "wait"`, and an optional timeout. Build the delegation guidance dynamically from visible, allowed agents. Keep denied or hidden agents out of the list. Results should include the child session id in a stable, easy-to-reuse form.
 
-Do not add a parallel field. If the parent wants three agents, it should issue three `task` calls in one assistant response.
+Do not add a parallel field. If the parent wants three agents, it should issue three `delegate` calls in one assistant response.
 
 ### Context and model rules
 
@@ -198,10 +201,10 @@ Pi's `/resume` picker should also show the lineage automatically because it alre
 
 ## Module design
 
-Put the extension under `dot/.pi/agent/extensions/task/`.
+Put the extension under `dot/.pi/agent/extensions/delegate/`.
 
 ```text
-task/
+delegate/
   index.ts          extension registration only
   agents/
     general.md      broad default worker
@@ -234,14 +237,14 @@ Build a throwaway script outside the extension that:
 
 Success means the child contains no parent conversation, the parent file is unchanged, lineage appears in `SessionManager.list()`, and resume retains child history. Time-box this phase. If any invariant fails, use the canonical subprocess runner and add persistence through RPC mode rather than patching Pi internals.
 
-### Phase 1: minimal foreground task
+### Phase 1: minimal foreground delegation
 
 Implement the packaged `general` and `explore` definitions, layered Markdown discovery, dynamic tool description, one foreground child, model inheritance, tool intersection, bounded progress, final rendering, abort, and error handling.
 
 Acceptance checks:
 
 - an `explore` agent can inspect a repo but cannot edit
-- two ordinary `task` calls can run concurrently through Pi's parallel tool execution
+- two ordinary `delegate` calls can run concurrently through Pi's parallel tool execution
 - Ctrl+C aborts both parent tool execution and child
 - malformed agent files produce diagnostics without hiding valid agents
 - project agents require trusted-project handling
@@ -267,7 +270,7 @@ Treat this as a separate feature. It needs durable job state, completion deliver
 
 ## Tests
 
-Use unit tests for agent parsing, precedence, diagnostics, task-description filtering, tool intersection, session ownership checks, and bounded progress state. Use a fake model/provider for runner tests.
+Use unit tests for agent parsing, precedence, diagnostics, delegate-description filtering, tool intersection, session ownership checks, and bounded progress state. Use a fake model/provider for runner tests.
 
 Add integration tests for:
 
@@ -302,4 +305,4 @@ Keep one manual smoke script that launches Pi against a fixture repo and records
 - primary-agent mode switching
 - remote dashboards
 
-These features can live in separate extensions or skills. Putting them into `task` would recreate the opinionated systems this extension is meant to avoid.
+These features can live in separate extensions or skills. Putting them into `delegate` would recreate the opinionated systems this extension is meant to avoid.
