@@ -42,6 +42,18 @@ is_work() {
     [[ "$USER" == "13lbise" ]]
 }
 
+# Select the Pi profile from the machine name. Unknown machines default to home.
+# ch03wx* is a work remote; other ch03* machines are work hosts.
+pi_machine_role() {
+    local machine_name="${1:-$(hostname -s)}"
+    machine_name="${machine_name,,}"
+    case "$machine_name" in
+        ch03wx*) echo "remote" ;;
+        ch03*) echo "host" ;;
+        *) echo "home" ;;
+    esac
+}
+
 is_wsl() {
     [[ -f /proc/version ]] && grep -qi 'microsoft\|wsl' /proc/version
 }

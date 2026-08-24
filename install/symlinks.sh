@@ -25,7 +25,6 @@ COMMON_LINKS=(
     ".config/fcitx5"
     ".config/environment.d"
     ".config/shell/ssh-auth-sock.sh"
-    ".pi/agent/settings.json"
     ".pi/agent/prompts"
     # Includes pi-footer.json at ~/.pi/agent/extensions/pi-footer.json.
     ".pi/agent/extensions"
@@ -66,6 +65,15 @@ if [[ ! -d "$DOTFILES_DOT_ROOT" ]]; then
     exit 1
 fi
 
+PI_MACHINE_ROLE="$(pi_machine_role)"
+PI_SETTINGS_SOURCE="$DOTFILES_DOT_ROOT/.pi/agent/settings.${PI_MACHINE_ROLE}.json"
+if [[ ! -f "$PI_SETTINGS_SOURCE" ]]; then
+    echo "Missing Pi settings profile for machine role '$PI_MACHINE_ROLE': $PI_SETTINGS_SOURCE" >&2
+    exit 1
+fi
+
+echo "Pi machine role: $PI_MACHINE_ROLE"
+
 for REL in "${DOTFILES_LINKS[@]}"; do
     SRC_REL="${REL%%:*}"
     DST_REL="${REL#*:}"
@@ -77,6 +85,9 @@ for REL in "${DOTFILES_LINKS[@]}"; do
     DST="$DOTFILES_DST/$DST_REL"
     create_symlink "$SRC" "$DST"
 done
+
+# Select the tracked Pi profile for this machine.
+create_symlink "$PI_SETTINGS_SOURCE" "$DOTFILES_DST/.pi/agent/settings.json"
 
 # Symlink scripts folder
 SCRIPT_DST="$HOME/.scripts"
