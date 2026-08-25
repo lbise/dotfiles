@@ -23,7 +23,13 @@ import {
   type BackgroundTaskSnapshot,
 } from "./background.ts";
 import { childToolAllowlist } from "./policy.ts";
-import { renderDelegateCall, renderDelegateResult } from "./render.ts";
+import {
+  BackgroundTaskDetailOverlay,
+  renderBackgroundTasks,
+  renderDelegateCall,
+  renderDelegateCompletion,
+  renderDelegateResult,
+} from "./render.ts";
 import { runTask, type RunTaskRequest, type TaskProgress } from "./runner.ts";
 import { loadDelegateConfiguration } from "./settings.ts";
 import { childSessionLabel, childSessions, siblingPath } from "./sessions.ts";
@@ -32,6 +38,9 @@ const extensionDir = dirname(fileURLToPath(import.meta.url));
 const packagedDir = join(extensionDir, "agents");
 const projectConfirmations = new Map<string, Set<string>>();
 const MAX_BACKGROUND_TASKS = 8;
+let sharedBackgroundTasks: BackgroundTaskPool | undefined;
+let backgroundUi: ExtensionContext["ui"] | undefined;
+let backgroundDetailTui: { requestRender(): void } | undefined;
 const TASK_SHORTCUTS = ["ctrl+1", "ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5", "ctrl+6", "ctrl+7", "ctrl+8", "ctrl+9", "ctrl+0"] as const;
 type TaskShortcut = typeof TASK_SHORTCUTS[number];
 type TaskShortcutEntry = {
@@ -40,6 +49,7 @@ type TaskShortcutEntry = {
   taskId?: string;
   sessionPath?: string;
   title: string;
+  progress?: TaskProgress;
 };
 
 const DelegateMode = StringEnum(["foreground", "background"] as const, {
@@ -122,7 +132,15 @@ function settledTaskText(snapshot: BackgroundTaskSnapshot): string {
 
 function backgroundCompletionText(event: BackgroundTaskEvent): string {
   const state = event.result?.status ?? event.progress.status;
-  return `Background task ${event.progress.taskId} (${event.progress.agent}: ${event.progress.title}) ${state}. Use delegate_result with mode poll to retrieve its result.`;
+  const output = truncateTaskOutput(
+    event.result?.output || event.error?.message || "(no output)",
+    event.progress,
+  );
+  return [
+    `<task id="${event.progress.taskId}" state="${state}" background="true">`,
+    output,
+    "</task>",
+  ].join("\n");
 }
 
 function parentSessionPath(ctx: ExtensionContext): string | undefined {
@@ -148,6 +166,17 @@ async function confirmProjectAgent(agent: TaskAgent, ctx: ExtensionContext): Pro
 export default function delegateExtension(pi: ExtensionAPI) {
   const activeTaskIds = new Set<string>();
   const taskShortcuts = new Map<string, Map<TaskShortcut, TaskShortcutEntry>>();
+
+  function refreshBackgroundWidget(): void {
+    if (!backgroundUi) return;
+    const tasks = backgroundTasks.list();
+    backgroundUi.setWidget(
+      "delegate-background-tasks",
+      tasks.length ? renderBackgroundTasks(tasks, backgroundUi.theme) : undefined,
+      { placement: "aboveEditor" },
+    );
+    try { backgroundDetailTui?.requestRender(); } catch {}
+  }
 
   function shortcutsFor(parent: string, create = false): Map<TaskShortcut, TaskShortcutEntry> | undefined {
     let entries = taskShortcuts.get(parent);
@@ -178,6 +207,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
     if (!entry) return;
     entry.taskId = progress.taskId;
     entry.sessionPath = progress.sessionPath;
+    entry.progress = { ...progress, activity: [...progress.activity] };
   }
 
   function releaseTaskShortcut(parent: string | undefined, key: TaskShortcut | undefined): void {
@@ -210,22 +240,54 @@ export default function delegateExtension(pi: ExtensionAPI) {
     }
   }
 
+  async function inspectTaskShortcut(key: string, ctx: ExtensionContext): Promise<void> {
+    if (!(TASK_SHORTCUTS as readonly string[]).includes(key)) return;
+    if (ctx.mode !== "tui") {
+      ctx.ui.notify("Delegate detail overlays require the TUI.", "warning");
+      return;
+    }
+    const parent = parentSessionPath(ctx);
+    const entry = parent ? shortcutsFor(parent)?.get(key as TaskShortcut) : undefined;
+    if (!entry) {
+      ctx.ui.notify(`${key} is not assigned to a task in this session.`, "info");
+      return;
+    }
+    const snapshot = () => {
+      if (entry.taskId) {
+        const background = backgroundTasks.lookup(entry.taskId);
+        if (background) return background;
+      }
+      if (!entry.progress) return undefined;
+      return {
+        progress: entry.progress,
+        settled: !["queued", "running"].includes(entry.progress.status),
+      };
+    };
+    await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
+      backgroundDetailTui = tui;
+      return new BackgroundTaskDetailOverlay(key, theme, snapshot, done, () => {
+        if (backgroundDetailTui === tui) backgroundDetailTui = undefined;
+      });
+    }, {
+      overlay: true,
+      overlayOptions: { anchor: "center", width: "80%", maxHeight: "80%", minWidth: 60 },
+    });
+    backgroundDetailTui = undefined;
+  }
+
   pi.registerCommand("delegate-open", {
     description: "Open a delegated task session by shortcut",
     handler: (args, ctx) => {
       const key = args.trim();
-      // Let sendUserMessage finish command dispatch before replacing the session.
-      // Otherwise Pi reports the expected parent-operation abort as an error.
+      // Let command dispatch finish before replacing the session.
       setTimeout(() => void openTaskShortcut(key, ctx), 0);
     },
   });
 
   for (const key of TASK_SHORTCUTS) {
     pi.registerShortcut(key, {
-      description: `Open delegated task ${key}`,
-      handler: (ctx) => {
-        pi.sendUserMessage(`/delegate-open ${key}`, { expandPromptTemplates: true });
-      },
+      description: `Inspect delegated task ${key}`,
+      handler: (ctx) => inspectTaskShortcut(key, ctx),
     });
   }
 
@@ -238,10 +300,9 @@ export default function delegateExtension(pi: ExtensionAPI) {
     onProgress?.(progress);
   }, onStarted);
 
-  const backgroundTasks = new BackgroundTaskPool({
-    maxConcurrent: MAX_BACKGROUND_TASKS,
-    runTask: runTaskWithShortcuts,
-    onSettled(event) {
+  const backgroundCallbacks = {
+    onChange: refreshBackgroundWidget,
+    onSettled(event: BackgroundTaskEvent) {
       activeTaskIds.delete(event.progress.taskId);
       pi.sendMessage(
         {
@@ -251,13 +312,23 @@ export default function delegateExtension(pi: ExtensionAPI) {
           details: {
             ...event.progress,
             background: true,
+            output: event.result?.output,
             error: event.error?.message.slice(0, 500),
           },
         },
         { deliverAs: "followUp", triggerTurn: true },
       );
     },
+  };
+  const backgroundTasks = sharedBackgroundTasks ?? new BackgroundTaskPool({
+    maxConcurrent: MAX_BACKGROUND_TASKS,
+    runTask: runTaskWithShortcuts,
+    ...backgroundCallbacks,
   });
+  backgroundTasks.setCallbacks({ ...backgroundCallbacks, runTask: runTaskWithShortcuts });
+  sharedBackgroundTasks = backgroundTasks;
+
+  pi.registerMessageRenderer("delegate-completion", renderDelegateCompletion);
 
   pi.registerTool({
     name: "delegate",
@@ -310,8 +381,10 @@ export default function delegateExtension(pi: ExtensionAPI) {
       }
 
       if (params.mode === "background") {
+        if (ctx.mode === "tui") backgroundUi = ctx.ui;
         try {
-          const started = await backgroundTasks.start(request, signal);
+          // Background work is detached immediately. A parent-session abort must not cancel startup.
+          const started = await backgroundTasks.start(request);
           if (backgroundTasks.has(started.taskId)) activeTaskIds.add(started.taskId);
           return {
             content: [{
@@ -384,8 +457,25 @@ export default function delegateExtension(pi: ExtensionAPI) {
     return { systemPrompt: `${event.systemPrompt}\n\nSubagents available to delegate:\n${delegateDescription(found.agents)}${modeNote}` };
   });
 
-  pi.on("session_shutdown", async () => {
-    await backgroundTasks.shutdown();
+  pi.on("session_start", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    backgroundUi = ctx.ui;
+    refreshBackgroundWidget();
+  });
+
+  pi.on("session_shutdown", async (event) => {
+    backgroundUi?.setWidget("delegate-background-tasks", undefined);
+    backgroundUi = undefined;
+    backgroundDetailTui = undefined;
+
+    if (event.reason === "quit" || event.reason === "reload") {
+      await backgroundTasks.shutdown();
+      if (sharedBackgroundTasks === backgroundTasks) sharedBackgroundTasks = undefined;
+      return;
+    }
+
+    // Session replacement invalidates this extension instance, but detached background work continues.
+    backgroundTasks.setCallbacks({ onSettled: () => {}, onChange: undefined });
   });
 
   pi.registerCommand("agents", {

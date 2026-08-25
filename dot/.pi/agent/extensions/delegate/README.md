@@ -20,7 +20,7 @@ A `delegate` call has distinct human and agent fields:
 
 Use `mode: "foreground"` when the parent needs the result before continuing. The tool blocks until the child finishes and returns its final result.
 
-Use `mode: "background"` when the parent can continue independently. The tool returns a running `task_id` as soon as the child starts. When the child settles, the extension injects a compact completion notice and triggers another parent turn. The model then retrieves the result through `delegate_result`. Up to eight background tasks can run at once in a parent session.
+Use `mode: "background"` when the parent can continue independently. The tool returns a running `task_id` as soon as the child starts. When the child settles, the extension delivers the task result and triggers another parent turn. In the TUI, a widget above the command line lists every running background delegate and its current activity. Up to eight background tasks can run at once in a parent session.
 
 `delegate_result` can retrieve a background task explicitly:
 
@@ -79,7 +79,7 @@ Project agents load only in trusted projects. Pi asks before each project agent'
 
 ## Task shortcuts
 
-In a saved parent session, the first ten delegated tasks get shortcuts in order: `ctrl+1` through `ctrl+9`, then `ctrl+0`. The assigned shortcut appears in the delegate box header. Press it to switch directly to that task's child session. Slots remain available after completion so the child can still be opened later. Ephemeral parent sessions do not get shortcuts because their child sessions are not saved.
+In a saved parent session, the first ten delegated tasks get shortcuts in order: `ctrl+1` through `ctrl+9`, then `ctrl+0`. The assigned shortcut appears in the delegate box header. Press it to open a live detail overlay without replacing the current Pi session. Use `/tasks` to switch to a saved child session. Slots remain available after completion. Ephemeral parent sessions do not get shortcuts because their child sessions are not saved.
 
 Shortcuts are registered for the current parent session and reset after `/reload` or switching sessions.
 
@@ -96,7 +96,7 @@ Foreground delegation follows the parent tool's abort signal. Aborting the paren
 ## Limits
 
 - Background execution requires TUI or RPC mode.
-- Background jobs and `delegate_result` retention are process-local. Session shutdown, switching sessions, `/reload`, or exiting cancels running jobs and clears retained results. Shutdown waits up to five seconds for cancellation. Child sessions remain saved, but running jobs do not survive restart.
+- Background jobs and `delegate_result` retention are process-local. Session replacement keeps running jobs alive and rebinds the delegate UI; `/reload` and exiting cancel them and clear retained results. Shutdown waits up to five seconds for cancellation. Child sessions remain saved, but running jobs do not survive restart.
 - `delegate_result` retains the latest 100 settled background results per parent-session process.
 - No nested delegation.
 - No chain or workflow parameters. Pi can issue several `delegate` calls in one response for parallel work.

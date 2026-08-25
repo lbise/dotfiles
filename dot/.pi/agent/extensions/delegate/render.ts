@@ -1,6 +1,15 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
-import { Markdown, type Component, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import {
+  Markdown,
+  type Component,
+  type Focusable,
+  type KeyId,
+  matchesKey,
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
 
 import type { TaskProgress } from "./runner.ts";
 
@@ -11,7 +20,11 @@ type RenderResult = {
 };
 type RenderOptions = { expanded: boolean; isPartial: boolean };
 type HeaderColor = "accent" | "success" | "warning" | "error";
-type DelegateResultDetails = Partial<TaskProgress> & { output?: string; background?: boolean };
+type DelegateResultDetails = Partial<TaskProgress> & { output?: string; background?: boolean; error?: string };
+type DelegateCompletionMessage = {
+  content: string | Array<{ type: string; text?: string }>;
+  details?: unknown;
+};
 type DelegateRenderState = { row?: DelegateToolRow };
 
 type RoundedBoxOptions = {
@@ -44,14 +57,6 @@ class RoundedBox implements Component {
       return this.theme.fg("borderAccent", "│") + ` ${fitted}${padding} ` + this.theme.fg("borderAccent", "│");
     });
     return [top, ...body, bottom];
-  }
-
-  invalidate(): void {}
-}
-
-class EmptyComponent implements Component {
-  render(): string[] {
-    return [];
   }
 
   invalidate(): void {}
@@ -107,6 +112,104 @@ function toolAction(tool: string): string {
   }
 }
 
+export function renderDelegateCompletion(
+  message: DelegateCompletionMessage,
+  options: { expanded: boolean; outputPad: number },
+  theme: Theme,
+): Component {
+  const details = message.details as DelegateResultDetails | undefined;
+  const status = details?.status ?? "completed";
+  const agent = details?.agent ?? "delegate";
+  const title = details?.title ?? "Background task";
+  const content = typeof message.content === "string"
+    ? message.content
+    : message.content.filter((part) => part.type === "text" && typeof part.text === "string").map((part) => part.text).join("\n");
+  const output = details?.output || content.replace(/^<task[^>]*>\n?/, "").replace(/\n?<\/task>\s*$/, "");
+  const outputLines = output ? new Markdown(output, 0, 0, getMarkdownTheme()).render(96) : ["(no output)"];
+  const visibleOutput = options.expanded ? outputLines : outputLines.slice(0, 6);
+  const lines = [
+    theme.fg("dim", `${agentIcon(agent)} ${agent} · ${title}`),
+    theme.fg(statusColor(status), `${statusIcon(status)} ${status}`),
+    "",
+    ...visibleOutput,
+  ];
+  if (!options.expanded && outputLines.length > visibleOutput.length) {
+    lines.push(theme.fg("muted", "… expand to see the full result"));
+  }
+  if (details?.error) lines.push("", theme.fg("error", details.error));
+
+  return new RoundedBox({
+    title: "󰆍 delegate completed",
+    titleColor: status === "completed" ? "success" : "error",
+    lines,
+  }, theme);
+}
+
+export function renderBackgroundTasks(tasks: readonly TaskProgress[], theme: Theme): string[] {
+  if (tasks.length === 0) return [];
+
+  const count = `${tasks.length} background delegate${tasks.length === 1 ? "" : "s"} running`;
+  return [
+    theme.fg("accent", `󰆍 ${count}`),
+    ...tasks.map((task) => {
+      const action = task.currentTool
+        ? toolAction(task.currentTool)
+        : task.status === "queued" ? "starting" : "thinking";
+      const label = `${agentIcon(task.agent)} ${task.agent} · ${task.title}`;
+      return `  ${theme.fg("warning", statusIcon(task.status))} ${label} ${theme.fg("dim", `· ${action}`)}`;
+    }),
+  ];
+}
+
+type BackgroundTaskDetail = {
+  progress: TaskProgress;
+  settled: boolean;
+  error?: Error;
+};
+
+export class BackgroundTaskDetailOverlay implements Focusable {
+  focused = false;
+
+  constructor(
+    private readonly shortcut: string,
+    private readonly theme: Theme,
+    private readonly task: () => BackgroundTaskDetail | undefined,
+    private readonly done: (result: void) => void,
+    private readonly onDispose: () => void,
+  ) {}
+
+  handleInput(data: string): void {
+    if (
+      matchesKey(data, "escape") ||
+      matchesKey(data, "return") ||
+      matchesKey(data, this.shortcut as KeyId)
+    ) this.done();
+  }
+
+  render(width: number): string[] {
+    const snapshot = this.task();
+    if (!snapshot) return [this.theme.fg("warning", "Task details are no longer available.")];
+    const task = snapshot.progress;
+    const status = snapshot.settled ? task.status : task.currentTool ? toolAction(task.currentTool) : "thinking";
+    const lines = [
+      this.theme.fg("accent", `${agentIcon(task.agent)} ${task.agent} · ${task.title}`),
+      this.theme.fg(statusColor(task.status), `${statusIcon(task.status)} ${status}`),
+      "",
+      ...task.activity.slice(-8).map((activity) => this.theme.fg("muted", `${activityIcon(activity)} ${activity}`)),
+    ];
+    if (task.outputPreview) lines.push("", ...wrapTextWithAnsi(task.outputPreview, Math.max(1, width - 4)).slice(-6));
+    if (snapshot.error) lines.push("", this.theme.fg("error", snapshot.error.message));
+    lines.push("", this.theme.fg("dim", `${task.taskId} · Esc / ${this.shortcut} to close`));
+    return lines.flatMap((line) => wrapTextWithAnsi(line, Math.max(1, width)));
+  }
+
+  invalidate(): void {}
+
+  dispose(): void {
+    this.onDispose();
+  }
+}
+
 function formatDuration(milliseconds: number): string {
   if (milliseconds < 1_000) return `${Math.max(0, milliseconds)}ms`;
   if (milliseconds < 60_000) return `${(milliseconds / 1_000).toFixed(1)}s`;
@@ -144,6 +247,7 @@ class DelegateToolRow implements Component {
   }
 
   startSpinner(invalidate: () => void): void {
+    if (this.#result && !this.#result.options.isPartial) return;
     this.#invalidate = invalidate;
     if (this.#spinnerTimer) return;
     this.#spinnerTimer = setInterval(() => {
@@ -239,6 +343,14 @@ class DelegateToolRow implements Component {
   dispose(): void {
     this.stopSpinner();
   }
+}
+
+class EmptyComponent implements Component {
+  render(): string[] {
+    return [];
+  }
+
+  invalidate(): void {}
 }
 
 function state(value: unknown): DelegateRenderState {

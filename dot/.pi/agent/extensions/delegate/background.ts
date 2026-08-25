@@ -21,6 +21,7 @@ type BackgroundTaskPoolOptions = {
   shutdownTimeoutMs?: number;
   runTask: TaskRunner;
   onSettled: (event: BackgroundTaskEvent) => void;
+  onChange?: () => void;
 };
 
 type ActiveRun = {
@@ -42,6 +43,9 @@ function asError(error: unknown): Error {
 
 export class BackgroundTaskPool {
   readonly #options: BackgroundTaskPoolOptions;
+  #onSettled: (event: BackgroundTaskEvent) => void;
+  #onChange?: () => void;
+  #runTask: TaskRunner;
   readonly #runs = new Set<ActiveRun>();
   readonly #byTaskId = new Map<string, ActiveRun>();
   readonly #settled = new Map<string, BackgroundTaskEvent>();
@@ -49,6 +53,15 @@ export class BackgroundTaskPool {
 
   constructor(options: BackgroundTaskPoolOptions) {
     this.#options = options;
+    this.#onSettled = options.onSettled;
+    this.#onChange = options.onChange;
+    this.#runTask = options.runTask;
+  }
+
+  setCallbacks(callbacks: Pick<BackgroundTaskPoolOptions, "onSettled" | "onChange"> & { runTask?: TaskRunner }): void {
+    this.#onSettled = callbacks.onSettled;
+    this.#onChange = callbacks.onChange;
+    if (callbacks.runTask) this.#runTask = callbacks.runTask;
   }
 
   get size(): number {
@@ -118,6 +131,14 @@ export class BackgroundTaskPool {
     });
     const run: ActiveRun = {
       controller: new AbortController(),
+      progress: {
+        status: "queued",
+        taskId: request.taskId ?? "",
+        agent: request.agent.name,
+        title: request.title,
+        shortcut: request.shortcut,
+        activity: [],
+      },
       started: false,
       closed: false,
       settled,
@@ -126,6 +147,7 @@ export class BackgroundTaskPool {
       resolveSettled,
     };
     this.#runs.add(run);
+    this.#notifyChanged();
     if (request.taskId) {
       run.taskId = request.taskId;
       this.#byTaskId.set(request.taskId, run);
@@ -138,6 +160,7 @@ export class BackgroundTaskPool {
     const onProgress = (progress: TaskProgress) => {
       if (run.closed) return;
       run.progress = { ...progress, activity: [...progress.activity] };
+      this.#notifyChanged();
     };
     const onStarted = (progress: TaskProgress) => {
       if (run.started || run.closed || this.#shuttingDown) return;
@@ -145,11 +168,12 @@ export class BackgroundTaskPool {
       run.taskId = progress.taskId;
       run.progress = { ...progress, activity: [...progress.activity] };
       this.#byTaskId.set(progress.taskId, run);
+      this.#notifyChanged();
       run.resolveStarted(run.progress);
     };
 
     try {
-      run.completion = this.#options.runTask(
+      run.completion = this.#runTask(
         { ...request, signal: run.controller.signal },
         onProgress,
         onStarted,
@@ -193,10 +217,19 @@ export class BackgroundTaskPool {
     for (const run of runs) run.closed = true;
     this.#runs.clear();
     this.#byTaskId.clear();
+    this.#notifyChanged();
   }
 
   #copyProgress(progress: TaskProgress): TaskProgress {
     return { ...progress, activity: [...progress.activity] };
+  }
+
+  #notifyChanged(): void {
+    try {
+      this.#onChange?.();
+    } catch {
+      // UI refreshes must not affect task execution.
+    }
   }
 
   #remember(event: BackgroundTaskEvent): void {
@@ -213,6 +246,7 @@ export class BackgroundTaskPool {
     run.closed = true;
     this.#runs.delete(run);
     if (run.taskId) this.#byTaskId.delete(run.taskId);
+    this.#notifyChanged();
 
     if (!run.started) {
       run.rejectStarted(event.error ?? new Error("Background task finished before reporting its task_id"));
@@ -230,7 +264,7 @@ export class BackgroundTaskPool {
     if (this.#shuttingDown) return;
 
     try {
-      this.#options.onSettled(settledEvent);
+      this.#onSettled(settledEvent);
     } catch {
       // Completion delivery must not create an unhandled rejection.
     }

@@ -24,7 +24,10 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-const request = {} as RunTaskRequest;
+const request = {
+  agent: { name: "explore" },
+  title: "Inspect code",
+} as RunTaskRequest;
 
 test("background tasks return after startup and report completion later", async () => {
   const completion = deferred<TaskResult>();
@@ -52,6 +55,80 @@ test("background tasks return after startup and report completion later", async 
   assert.equal(events[0]?.result?.output, "done");
   assert.equal(pool.lookup("task-123")?.settled, true);
   assert.equal(pool.lookup("task-123")?.result?.output, "done");
+});
+
+test("background tasks are visible while child startup is pending", async () => {
+  const startup = deferred<void>();
+  const completion = deferred<TaskResult>();
+  const pendingRequest = {
+    agent: { name: "explore" },
+    title: "Inspect code",
+    shortcut: "ctrl+1",
+  } as RunTaskRequest;
+  const pool = new BackgroundTaskPool({
+    maxConcurrent: 1,
+    runTask: async (_request, _onProgress, onStarted) => {
+      await startup.promise;
+      onStarted?.(progress());
+      return completion.promise;
+    },
+    onSettled: () => {},
+  });
+
+  const starting = pool.start(pendingRequest);
+  assert.deepEqual(pool.list().map((task) => task.status), ["queued"]);
+  startup.resolve();
+  await starting;
+  completion.resolve({ ...progress("completed"), output: "done" });
+  await completion.promise;
+});
+
+test("background task changes notify the UI as progress changes", async () => {
+  const completion = deferred<TaskResult>();
+  let changes = 0;
+  const pool = new BackgroundTaskPool({
+    maxConcurrent: 1,
+    runTask: async (_request, onProgress, onStarted) => {
+      onStarted?.(progress());
+      onProgress?.({ ...progress(), currentTool: "grep" });
+      return completion.promise;
+    },
+    onSettled: () => {},
+    onChange: () => { changes += 1; },
+  });
+
+  await pool.start(request);
+  assert.ok(changes >= 3);
+  const changesBeforeFinish = changes;
+  completion.resolve({ ...progress("completed"), output: "done" });
+  await completion.promise;
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.ok(changes > changesBeforeFinish);
+  assert.equal(pool.size, 0);
+});
+
+test("background task callbacks can be rebound after session replacement", async () => {
+  const completion = deferred<TaskResult>();
+  const initialEvents: BackgroundTaskEvent[] = [];
+  const replacementEvents: BackgroundTaskEvent[] = [];
+  const pool = new BackgroundTaskPool({
+    maxConcurrent: 1,
+    runTask: async (_request, _onProgress, onStarted) => {
+      onStarted?.(progress());
+      return completion.promise;
+    },
+    onSettled: (event) => initialEvents.push(event),
+  });
+
+  await pool.start(request);
+  pool.setCallbacks({ onSettled: (event) => replacementEvents.push(event) });
+  completion.resolve({ ...progress("completed"), output: "done" });
+  await completion.promise;
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(initialEvents.length, 0);
+  assert.equal(replacementEvents.length, 1);
 });
 
 test("waitFor returns completion or current progress at timeout", async () => {
@@ -141,7 +218,7 @@ test("background tasks can be cancelled by task_id", async () => {
 test("a resumed task_id is reserved during asynchronous startup", async () => {
   const startup = deferred<void>();
   const completion = deferred<TaskResult>();
-  const resumedRequest = { taskId: "task-123" } as RunTaskRequest;
+  const resumedRequest = { ...request, taskId: "task-123" };
   const pool = new BackgroundTaskPool({
     maxConcurrent: 2,
     runTask: async (_request, _onProgress, onStarted) => {
