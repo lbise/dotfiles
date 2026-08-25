@@ -85,7 +85,7 @@ local settings = {
 			-- 	},
 			-- },
 			ty = {
-				init_options = { logLevel = "debug" },
+				init_options = { logLevel = "debug", logFile = vim.fn.expand("$HOME/ty.log") },
 				settings = {
 					ty = {
 						diagnosticMode = "openFilesOnly",
