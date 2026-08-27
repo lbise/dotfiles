@@ -3,6 +3,11 @@ onboarding = false
 [theme]
 name = "tokyo-night"
 
+# Windows Terminal applies extra opacity to ANSI dim text. Herdr uses DIM with
+# overlay0 for generated tab labels, so start from the normal text color.
+[theme.custom]
+overlay0 = "#c0caf5"
+
 # Override individual color tokens on top of the base theme.
 # Accepts: hex (#rrggbb), named colors, rgb(r,g,b), or panel_bg = "reset"
 # [theme.custom]
@@ -198,10 +203,14 @@ hide_tab_bar_when_single_tab = true
 # Expanded agent rows. Built-ins are state_icon, state_text, workspace, tab, pane, agent,
 # terminal_title, and terminal_title_stripped.
 # Custom values reported through pane metadata use a $name token.
-# [ui.sidebar.agents]
+[ui.sidebar.agents]
 # Blank rows between agent entries. Set to 1 to restore the previous spacing.
 # row_gap = 0
-# rows = [["state_icon", "workspace", "tab"], ["agent"]]
+# Windows Terminal makes Herdr's default DIM styling nearly invisible.
+rows = [
+  ["state_icon", "workspace", { token = "tab", fg = "#565f89", dim = false }],
+  [{ token = "agent", fg = "#565f89", dim = false }],
+]
 # Optional canonical agent IDs replace the default rows for matching agents.
 # [ui.sidebar.agents.rows_by_agent]
 # claude = [["state_icon", "workspace", "tab"], ["terminal_title_stripped"], ["agent"]]
