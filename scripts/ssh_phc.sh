@@ -191,6 +191,17 @@ function resolve_machine_arg {
     printf '%s' "$arg"
 }
 
+function restore_local_terminal {
+    local terminal=/dev/tty
+
+    [[ -r "$terminal" && -w "$terminal" ]] || return 0
+
+    # An abruptly disconnected remote TUI cannot disable the terminal modes it
+    # enabled. Return to the primary screen first, then clear those modes there.
+    printf '\033[?1049l\033[<1u\033[?1l\033[?25h\033[?1000l\033[?1002l\033[?1003l\033[?1004l\033[?1005l\033[?1006l\033[?1015l\033[?2004l' > "$terminal" || true
+    stty sane < "$terminal" > "$terminal" 2>/dev/null || true
+}
+
 function normalize_host {
     local host="$1"
     local configured_hostname=""
@@ -347,4 +358,7 @@ if [[ "$COPY_KEY" == 1 ]]; then
 fi
 
 echo "Connecting to $MACHINE with args ${OPTS[*]} ${POSITIONAL_ARGS[*]}"
-ssh "${OPTS[@]}" "$USER@$MACHINE" "${POSITIONAL_ARGS[@]}"
+SSH_STATUS=0
+ssh "${OPTS[@]}" "$USER@$MACHINE" "${POSITIONAL_ARGS[@]}" || SSH_STATUS=$?
+restore_local_terminal
+exit "$SSH_STATUS"
