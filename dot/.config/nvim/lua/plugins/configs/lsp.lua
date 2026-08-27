@@ -10,6 +10,17 @@ local function get_ruff_config()
 	return ""
 end
 
+local function get_ruff_command()
+	if vim.fn.expand("$USER") == "13lbise" then
+		local wrapper = vim.fn.expand("$ANDROMEDA_ROOT/ruff.py")
+		if vim.fn.executable(wrapper) == 1 then
+			return wrapper
+		end
+	end
+
+	return "ruff"
+end
+
 local function get_clang_format_config()
 	local user_path = vim.fn.expand("$HOME") .. "/.clang-format"
 
@@ -258,6 +269,7 @@ local config = {
 				},
 				formatters = {
 					ruff_format = {
+						command = get_ruff_command(),
 						prepend_args = function()
 							local config = get_ruff_config()
 							if config ~= "" then
@@ -267,6 +279,7 @@ local config = {
 						end,
 					},
 					ruff_organize_imports = {
+						command = get_ruff_command(),
 						prepend_args = function()
 							local config = get_ruff_config()
 							if config ~= "" then
