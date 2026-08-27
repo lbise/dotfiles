@@ -4,8 +4,8 @@ OpenCode-style subagents for Pi. The extension registers `delegate` and `delegat
 
 ## Default agents
 
-- `general` inherits the parent's active built-in tools.
-- `explore` is limited to `read`, `grep`, `find`, and `ls`.
+- `general` inherits the parent's active built-in tools. Use it for shell commands, git inspection, tests, and file changes.
+- `explore` is limited to `read`, `grep`, `find`, and `ls`. Use it only for file-content searches and code inspection. It cannot run shell commands, inspect git state, or execute tests.
 
 A fresh child receives normal project context files and its delegated prompt, but never the parent transcript. A resumed child also retains its own prior history, still without the parent transcript. Intermediate reasoning and tool output stay in the child context. Only final results enter the parent context.
 
@@ -20,7 +20,7 @@ A `delegate` call has distinct human and agent fields:
 
 Use `mode: "foreground"` when the parent needs the result before continuing. The tool blocks until the child finishes and returns its final result.
 
-Use `mode: "background"` when the parent can continue independently. The tool returns a running `task_id` as soon as the child starts. When the child settles, the extension delivers the task result and triggers another parent turn. In the TUI, a widget above the command line lists every running background delegate and its current activity. Up to eight background tasks can run at once in a parent session.
+Use `mode: "background"` when the parent can continue independently. The tool returns a running `task_id` as soon as the child starts. When the child settles, the extension delivers the task result and triggers another parent turn. In the TUI, a widget above the command line lists every running background delegate with an animated spinner and its current activity. Up to eight background tasks can run at once in a parent session.
 
 `delegate_result` can retrieve a background task explicitly:
 

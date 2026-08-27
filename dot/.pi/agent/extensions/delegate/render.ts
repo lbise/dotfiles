@@ -99,6 +99,48 @@ function usageText(details: DelegateResultDetails): string | undefined {
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+class BackgroundDelegateRenderState {
+  readonly #latest = new Map<string, { progress: TaskProgress; error?: string }>();
+  readonly #rows = new Map<string, Set<DelegateToolRow>>();
+
+  attach(row: DelegateToolRow, taskId: string): void {
+    const latest = this.#latest.get(taskId);
+    if (latest) {
+      row.updateBackground(latest.progress, latest.error, false);
+      if (latest.progress.status !== "queued" && latest.progress.status !== "running") return;
+    }
+    const rows = this.#rows.get(taskId) ?? new Set<DelegateToolRow>();
+    rows.add(row);
+    this.#rows.set(taskId, rows);
+  }
+
+  detach(row: DelegateToolRow, taskId: string | undefined): void {
+    if (!taskId) return;
+    const rows = this.#rows.get(taskId);
+    rows?.delete(row);
+    if (rows?.size === 0) this.#rows.delete(taskId);
+  }
+
+  update(progress: TaskProgress, error?: Error): void {
+    const normalized = error && (progress.status === "queued" || progress.status === "running")
+      ? { ...progress, status: "failed" as const, error: error.message, activity: [...progress.activity] }
+      : { ...progress, activity: [...progress.activity] };
+    const update = { progress: normalized, error: error?.message };
+    this.#latest.delete(normalized.taskId);
+    this.#latest.set(normalized.taskId, update);
+    if (this.#latest.size > 100) {
+      const oldest = this.#latest.keys().next().value;
+      if (oldest) this.#latest.delete(oldest);
+    }
+    for (const row of this.#rows.get(normalized.taskId) ?? []) {
+      row.updateBackground(normalized, error?.message, true);
+    }
+    if (normalized.status !== "queued" && normalized.status !== "running") {
+      this.#rows.delete(normalized.taskId);
+    }
+  }
+}
+
 function toolAction(tool: string): string {
   switch (tool) {
     case "read": return "reading";
@@ -145,20 +187,48 @@ export function renderDelegateCompletion(
   }, theme);
 }
 
-export function renderBackgroundTasks(tasks: readonly TaskProgress[], theme: Theme): string[] {
+export function renderBackgroundTasks(tasks: readonly TaskProgress[], theme: Theme, spinnerFrame = 0): string[] {
   if (tasks.length === 0) return [];
 
   const count = `${tasks.length} background delegate${tasks.length === 1 ? "" : "s"} running`;
   return [
     theme.fg("accent", `󰆍 ${count}`),
-    ...tasks.map((task) => {
+    ...tasks.map((task, index) => {
       const action = task.currentTool
         ? toolAction(task.currentTool)
         : task.status === "queued" ? "starting" : "thinking";
       const label = `${agentIcon(task.agent)} ${task.agent} · ${task.title}`;
-      return `  ${theme.fg("warning", statusIcon(task.status))} ${label} ${theme.fg("dim", `· ${action}`)}`;
+      const spinner = SPINNER_FRAMES[(spinnerFrame + index * 2) % SPINNER_FRAMES.length];
+      return `  ${theme.fg("warning", spinner)} ${label} ${theme.fg("dim", `· ${action}`)}`;
     }),
   ];
+}
+
+export class BackgroundTasksWidget implements Component {
+  #spinnerFrame = 0;
+  readonly #spinnerTimer: ReturnType<typeof setInterval>;
+
+  constructor(
+    private readonly tasks: readonly TaskProgress[],
+    private readonly theme: Theme,
+    requestRender: () => void,
+  ) {
+    this.#spinnerTimer = setInterval(() => {
+      this.#spinnerFrame = (this.#spinnerFrame + 1) % SPINNER_FRAMES.length;
+      requestRender();
+    }, 120);
+  }
+
+  render(width: number): string[] {
+    return renderBackgroundTasks(this.tasks, this.theme, this.#spinnerFrame)
+      .map((line) => truncateToWidth(line, Math.max(1, width)));
+  }
+
+  invalidate(): void {}
+
+  dispose(): void {
+    clearInterval(this.#spinnerTimer);
+  }
 }
 
 type BackgroundTaskDetail = {
@@ -234,8 +304,13 @@ class DelegateToolRow implements Component {
   #spinnerTimer?: ReturnType<typeof setInterval>;
   #invalidate?: () => void;
   #result?: { result: RenderResult; options: RenderOptions; isError: boolean };
+  #backgroundTaskId?: string;
 
-  constructor(args: Record<string, unknown>, theme: Theme) {
+  constructor(
+    args: Record<string, unknown>,
+    theme: Theme,
+    private readonly backgroundTasks: BackgroundDelegateRenderState,
+  ) {
     this.#args = args;
     this.#theme = theme;
   }
@@ -247,11 +322,11 @@ class DelegateToolRow implements Component {
   }
 
   startSpinner(invalidate: () => void): void {
-    if (this.#result && !this.#result.options.isPartial) return;
+    if (!this.#isRunning()) return;
     this.#invalidate = invalidate;
     if (this.#spinnerTimer) return;
     this.#spinnerTimer = setInterval(() => {
-      if (this.#result && !this.#result.options.isPartial) {
+      if (!this.#isRunning()) {
         this.stopSpinner();
         return;
       }
@@ -275,12 +350,53 @@ class DelegateToolRow implements Component {
   ): void {
     this.#result = { result, options, isError };
     this.#theme = theme;
-    if (options.isPartial) {
+    const details = result.details as DelegateResultDetails | undefined;
+    const taskId = details?.background && details.taskId ? details.taskId : undefined;
+    if (this.#backgroundTaskId !== taskId) {
+      this.backgroundTasks.detach(this, this.#backgroundTaskId);
+      this.#backgroundTaskId = taskId;
+    }
+    if (taskId) this.backgroundTasks.attach(this, taskId);
+    if (this.#isRunning()) {
       this.startSpinner(invalidate);
     } else {
       this.#finishedAt ??= Date.now();
       this.stopSpinner();
     }
+  }
+
+  updateBackground(progress: TaskProgress, error?: string, notify = true): void {
+    if (!this.#result) return;
+    this.#result = {
+      ...this.#result,
+      isError: this.#result.isError || progress.status === "failed",
+      result: {
+        ...this.#result.result,
+        details: {
+          ...(this.#result.result.details as DelegateResultDetails | undefined),
+          ...progress,
+          background: true,
+          currentTool: progress.status === "queued" || progress.status === "running" ? progress.currentTool : undefined,
+          error: error ?? progress.error,
+        },
+      },
+    };
+    if (this.#isRunning()) {
+      if (notify) this.#invalidate?.();
+      return;
+    }
+    const invalidate = this.#invalidate;
+    this.#finishedAt ??= Date.now();
+    this.stopSpinner();
+    invalidate?.();
+  }
+
+  #isRunning(): boolean {
+    if (this.#result?.isError) return false;
+    const details = this.#result?.result.details as DelegateResultDetails | undefined;
+    const status = details?.status;
+    if (status) return status === "queued" || status === "running";
+    return this.#result ? this.#result.options.isPartial : this.#executionStarted;
   }
 
   render(width: number): string[] {
@@ -341,6 +457,7 @@ class DelegateToolRow implements Component {
   invalidate(): void {}
 
   dispose(): void {
+    this.backgroundTasks.detach(this, this.#backgroundTaskId);
     this.stopSpinner();
   }
 }
@@ -357,26 +474,36 @@ function state(value: unknown): DelegateRenderState {
   return value as DelegateRenderState;
 }
 
-export function renderDelegateCall(args: Record<string, unknown>, theme: Theme, context: {
-  state: unknown;
-  executionStarted: boolean;
-  invalidate: () => void;
-}): Component {
-  const rendererState = state(context.state);
-  const row = rendererState.row ??= new DelegateToolRow(args, theme);
-  row.updateCall(args, theme, context.executionStarted);
-  row.startSpinner(context.invalidate);
-  return row;
-}
+export function createDelegateRenderer() {
+  const backgroundTasks = new BackgroundDelegateRenderState();
 
-export function renderDelegateResult(
-  result: RenderResult,
-  options: RenderOptions,
-  theme: Theme,
-  context: { args: Record<string, unknown>; state: unknown; isError: boolean; invalidate: () => void },
-): Component {
-  const rendererState = state(context.state);
-  const row = rendererState.row ??= new DelegateToolRow(context.args, theme);
-  row.updateResult(result, options, theme, context.isError, context.invalidate);
-  return new EmptyComponent();
+  return {
+    renderCall(args: Record<string, unknown>, theme: Theme, context: {
+      state: unknown;
+      executionStarted: boolean;
+      invalidate: () => void;
+    }): Component {
+      const rendererState = state(context.state);
+      const row = rendererState.row ??= new DelegateToolRow(args, theme, backgroundTasks);
+      row.updateCall(args, theme, context.executionStarted);
+      row.startSpinner(context.invalidate);
+      return row;
+    },
+
+    renderResult(
+      result: RenderResult,
+      options: RenderOptions,
+      theme: Theme,
+      context: { args: Record<string, unknown>; state: unknown; isError: boolean; invalidate: () => void },
+    ): Component {
+      const rendererState = state(context.state);
+      const row = rendererState.row ??= new DelegateToolRow(context.args, theme, backgroundTasks);
+      row.updateResult(result, options, theme, context.isError, context.invalidate);
+      return new EmptyComponent();
+    },
+
+    updateBackgroundTask(progress: TaskProgress, error?: Error): void {
+      backgroundTasks.update(progress, error);
+    },
+  };
 }

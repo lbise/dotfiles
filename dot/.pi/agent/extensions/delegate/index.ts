@@ -25,10 +25,9 @@ import {
 import { childToolAllowlist } from "./policy.ts";
 import {
   BackgroundTaskDetailOverlay,
-  renderBackgroundTasks,
-  renderDelegateCall,
+  BackgroundTasksWidget,
+  createDelegateRenderer,
   renderDelegateCompletion,
-  renderDelegateResult,
 } from "./render.ts";
 import { runTask, type RunTaskRequest, type TaskProgress } from "./runner.ts";
 import { loadDelegateConfiguration } from "./settings.ts";
@@ -166,15 +165,20 @@ async function confirmProjectAgent(agent: TaskAgent, ctx: ExtensionContext): Pro
 export default function delegateExtension(pi: ExtensionAPI) {
   const activeTaskIds = new Set<string>();
   const taskShortcuts = new Map<string, Map<TaskShortcut, TaskShortcutEntry>>();
+  const delegateRenderer = createDelegateRenderer();
 
   function refreshBackgroundWidget(): void {
-    if (!backgroundUi) return;
     const tasks = backgroundTasks.list();
-    backgroundUi.setWidget(
-      "delegate-background-tasks",
-      tasks.length ? renderBackgroundTasks(tasks, backgroundUi.theme) : undefined,
-      { placement: "aboveEditor" },
-    );
+    for (const task of tasks) delegateRenderer.updateBackgroundTask(task);
+    if (backgroundUi) {
+      backgroundUi.setWidget(
+        "delegate-background-tasks",
+        tasks.length
+          ? (tui, theme) => new BackgroundTasksWidget(tasks, theme, () => tui.requestRender())
+          : undefined,
+        { placement: "aboveEditor" },
+      );
+    }
     try { backgroundDetailTui?.requestRender(); } catch {}
   }
 
@@ -304,6 +308,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
     onChange: refreshBackgroundWidget,
     onSettled(event: BackgroundTaskEvent) {
       activeTaskIds.delete(event.progress.taskId);
+      delegateRenderer.updateBackgroundTask(event.progress, event.error);
       pi.sendMessage(
         {
           customType: "delegate-completion",
@@ -340,8 +345,8 @@ export default function delegateExtension(pi: ExtensionAPI) {
     ],
     renderShell: "self",
     parameters: DelegateParameters,
-    renderCall: renderDelegateCall,
-    renderResult: renderDelegateResult,
+    renderCall: delegateRenderer.renderCall,
+    renderResult: delegateRenderer.renderResult,
     async execute(_id, params, signal, onUpdate, ctx) {
       const found = discovery(ctx);
       const agent = found.agents.find((candidate) => candidate.name === params.subagent_type);
