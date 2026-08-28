@@ -18,14 +18,14 @@ A `delegate` call has distinct human and agent fields:
 
 ## Execution modes
 
-Use `mode: "foreground"` when the parent needs the result before continuing. The tool blocks until the child finishes and returns its final result.
+Use `mode: "foreground"` when the parent needs the result for its next action or final answer. The tool blocks until the child finishes and returns its final result.
 
-Use `mode: "background"` when the parent can continue independently. The tool returns a running `task_id` as soon as the child starts. When the child settles, the extension delivers the task result and triggers another parent turn. In the TUI, a widget above the command line lists every running background delegate with an animated spinner and its current activity. Up to eight background tasks can run at once in a parent session.
+Use `mode: "background"` only while the parent has work that does not depend on the child result. The tool initially returns a running `task_id`, not the result. When the child settles, the extension delivers a completion follow-up containing the result and triggers another parent turn. The parent must inspect and use or summarize that result before claiming the delegated work is complete. In the TUI, a widget above the command line lists every running background delegate with an animated spinner and its current activity. Up to eight background tasks can run at once in a parent session.
 
-`delegate_result` can retrieve a background task explicitly:
+`delegate_result` can retrieve a background task explicitly. Do not poll in a loop.
 
-- `mode: "poll"` returns its current status immediately.
-- `mode: "wait"` waits until it settles or `timeout_seconds` expires. Waiting does not cancel the background task on timeout.
+- `mode: "poll"` performs one immediate status check.
+- `mode: "wait"` acts as a barrier when the task now blocks progress and its completion follow-up has not arrived. It waits until the task settles or `timeout_seconds` expires. A timeout does not cancel the background task.
 
 ## Model settings
 

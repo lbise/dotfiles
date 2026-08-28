@@ -68,7 +68,7 @@ const DelegateParameters = Type.Object({
 });
 
 const DelegateResultMode = StringEnum(["poll", "wait"] as const, {
-  description: "poll returns current status immediately; wait blocks until completion or timeout",
+  description: "poll performs one immediate status check; wait blocks until completion or timeout",
 });
 
 const DelegateResultParameters = Type.Object({
@@ -101,7 +101,9 @@ function delegateDescription(agents: TaskAgent[]): string {
     "The title is human-facing. The prompt is the child's complete instruction and must include the goal, relevant context and constraints, and expected result.",
     "Choose subagent_type from the names below. User and trusted-project agent definitions may extend or override the packaged general and explore agents.",
     "Use separate delegate calls for independent work. Do not duplicate delegated work. The child cannot delegate further.",
-    "Foreground waits for the result. Background returns a task_id immediately, delivers a completion notice later, and exposes output through delegate_result.",
+    "Use foreground when the child result is needed for the next action or final answer. Use background only while independent work remains.",
+    "A background call returns only a task_id, not the child result. When its completion follow-up arrives, inspect the <task> body and use or summarize that result before claiming the delegated work is complete.",
+    "Do not poll background tasks in a loop. Use delegate_result wait only when a task now blocks progress and its completion follow-up has not arrived; use poll only for a one-off status check.",
     "Available subagents:", choices,
   ].join("\n");
 }
@@ -330,7 +332,6 @@ export default function delegateExtension(pi: ExtensionAPI) {
     runTask: runTaskWithShortcuts,
     ...backgroundCallbacks,
   });
-  backgroundTasks.setCallbacks({ ...backgroundCallbacks, runTask: runTaskWithShortcuts });
   sharedBackgroundTasks = backgroundTasks;
 
   pi.registerMessageRenderer("delegate-completion", renderDelegateCompletion);
@@ -338,10 +339,13 @@ export default function delegateExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "delegate",
     label: "Delegate",
-    description: "Run a named child agent in an isolated context window so subtask reasoning and tool output do not pollute the parent context. A fresh child receives its prompt plus normal project context; a resumed child also retains its own history. Neither receives the parent transcript.",
+    description: "Run a named child agent in an isolated context window so subtask reasoning and tool output do not pollute the parent context. A fresh child receives its prompt plus normal project context; a resumed child also retains its own history. Neither receives the parent transcript. Use foreground when the result gates the next action or final answer. Use background only while independent work remains, then consume the completion follow-up before claiming the task is complete.",
     promptSnippet: "Delegate bounded work to a named child agent with an isolated context window",
     promptGuidelines: [
       "After calling delegate, do not duplicate the child's assigned work in the parent.",
+      "Use delegate mode foreground when the child result is needed for the next action or final answer.",
+      "After starting a background delegate, continue only with work independent of that result.",
+      "When a delegate completion follow-up arrives, inspect its <task> body and use or summarize the child result before claiming the delegated work is complete.",
     ],
     renderShell: "self",
     parameters: DelegateParameters,
@@ -394,7 +398,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
           return {
             content: [{
               type: "text",
-              text: `<task id="${started.taskId}" state="running" background="true">\nBackground task started. A completion notice will be delivered automatically; use delegate_result to retrieve output.\n</task>`,
+              text: `<task id="${started.taskId}" state="running" background="true">\nBackground task started. This is only a task_id, not the child result. Continue with independent work. The completion follow-up will contain the result; use delegate_result with mode wait only if this task later blocks progress before that follow-up arrives.\n</task>`,
             }],
             details: { ...started, background: true },
           };
@@ -429,10 +433,12 @@ export default function delegateExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "delegate_result",
     label: "Delegate Result",
-    description: "Get the status or final result of a background delegate task in the current parent session. Poll returns immediately; wait blocks until the task settles or the timeout expires.",
+    description: "Get the status or final result of a background delegate task in the current parent session. Poll performs one immediate status check; wait blocks until the task settles or the timeout expires. Do not poll in a loop.",
     promptSnippet: "Poll or wait for a background delegated task result",
     promptGuidelines: [
-      "For delegate_result, use mode poll while other parent work remains. Use mode wait only when parent progress depends on that task's result.",
+      "Do not call delegate_result poll in a loop; use mode poll only for a one-off status check.",
+      "Use delegate_result mode wait as a barrier when a known background task now blocks the next action and its completion follow-up has not arrived.",
+      "Read and use the <task> result returned by delegate_result before continuing.",
     ],
     parameters: DelegateResultParameters,
     async execute(_id, params, signal) {
@@ -463,6 +469,9 @@ export default function delegateExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_start", (_event, ctx) => {
+    // Rebind after the replacement session is ready. setCallbacks replays any
+    // completion that settled while the previous extension instance was down.
+    backgroundTasks.setCallbacks({ ...backgroundCallbacks, runTask: runTaskWithShortcuts });
     if (ctx.mode !== "tui") return;
     backgroundUi = ctx.ui;
     refreshBackgroundWidget();
@@ -480,7 +489,8 @@ export default function delegateExtension(pi: ExtensionAPI) {
     }
 
     // Session replacement invalidates this extension instance, but detached background work continues.
-    backgroundTasks.setCallbacks({ onSettled: () => {}, onChange: undefined });
+    // Queue completions until the replacement instance binds fresh delivery callbacks.
+    backgroundTasks.suspendCallbacks();
   });
 
   pi.registerCommand("agents", {

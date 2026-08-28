@@ -43,9 +43,10 @@ function asError(error: unknown): Error {
 
 export class BackgroundTaskPool {
   readonly #options: BackgroundTaskPoolOptions;
-  #onSettled: (event: BackgroundTaskEvent) => void;
+  #onSettled?: (event: BackgroundTaskEvent) => void;
   #onChange?: () => void;
   #runTask: TaskRunner;
+  readonly #undelivered: BackgroundTaskEvent[] = [];
   readonly #runs = new Set<ActiveRun>();
   readonly #byTaskId = new Map<string, ActiveRun>();
   readonly #settled = new Map<string, BackgroundTaskEvent>();
@@ -62,6 +63,12 @@ export class BackgroundTaskPool {
     this.#onSettled = callbacks.onSettled;
     this.#onChange = callbacks.onChange;
     if (callbacks.runTask) this.#runTask = callbacks.runTask;
+    for (const event of this.#undelivered.splice(0)) this.#deliver(event);
+  }
+
+  suspendCallbacks(): void {
+    this.#onSettled = undefined;
+    this.#onChange = undefined;
   }
 
   get size(): number {
@@ -217,6 +224,7 @@ export class BackgroundTaskPool {
     for (const run of runs) run.closed = true;
     this.#runs.clear();
     this.#byTaskId.clear();
+    this.#undelivered.length = 0;
     this.#notifyChanged();
   }
 
@@ -262,11 +270,18 @@ export class BackgroundTaskPool {
     this.#remember(settledEvent);
     run.resolveSettled(settledEvent);
     if (this.#shuttingDown) return;
+    if (!this.#onSettled) {
+      this.#undelivered.push(settledEvent);
+      return;
+    }
+    this.#deliver(settledEvent);
+  }
 
+  #deliver(event: BackgroundTaskEvent): void {
     try {
-      this.#onSettled(settledEvent);
+      this.#onSettled?.(event);
     } catch {
-      // Completion delivery must not create an unhandled rejection.
+      // Completion delivery must not affect task execution.
     }
   }
 }

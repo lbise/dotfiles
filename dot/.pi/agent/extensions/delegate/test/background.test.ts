@@ -131,6 +131,31 @@ test("background task callbacks can be rebound after session replacement", async
   assert.equal(replacementEvents.length, 1);
 });
 
+test("settlements are replayed when callbacks rebind after session replacement", async () => {
+  const completion = deferred<TaskResult>();
+  const initialEvents: BackgroundTaskEvent[] = [];
+  const replacementEvents: BackgroundTaskEvent[] = [];
+  const pool = new BackgroundTaskPool({
+    maxConcurrent: 1,
+    runTask: async (_request, _onProgress, onStarted) => {
+      onStarted?.(progress());
+      return completion.promise;
+    },
+    onSettled: (event) => initialEvents.push(event),
+  });
+
+  await pool.start(request);
+  pool.suspendCallbacks();
+  completion.resolve({ ...progress("completed"), output: "done" });
+  await completion.promise;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(initialEvents.length, 0);
+
+  pool.setCallbacks({ onSettled: (event) => replacementEvents.push(event) });
+  assert.equal(replacementEvents.length, 1);
+  assert.equal(replacementEvents[0]?.result?.output, "done");
+});
+
 test("waitFor returns completion or current progress at timeout", async () => {
   const completion = deferred<TaskResult>();
   const pool = new BackgroundTaskPool({
