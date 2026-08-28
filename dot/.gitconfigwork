@@ -37,3 +37,9 @@
 	insteadOf = https://13lbise@ch03git.phonak.com/
 [url "git@git.sonova.com:"]
     insteadOf = https://git.sonova.com/
+
+[filter "lfs"]
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
