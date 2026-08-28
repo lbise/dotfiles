@@ -11,6 +11,39 @@
 	editor = nvim
 	filemode = false
     autocrlf = false
+    pager = delta
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true
+    dark = true
+    line-numbers = true
+
+    # Let syntax highlighting inherit Ghostty's Tokyo Night ANSI palette.
+    syntax-theme = ansi
+
+    # Tokyo Night "night" palette.
+    commit-style = bold "#bb9af7"
+    file-style = bold "#7aa2f7"
+    file-decoration-style = "#3d59a1" ul
+    hunk-header-style = syntax "#292e42"
+    hunk-header-file-style = bold "#7aa2f7"
+    hunk-header-line-number-style = "#e0af68"
+    hunk-header-decoration-style = "#3d59a1" box
+
+    minus-style = syntax "#37222c"
+    minus-emph-style = syntax "#713137"
+    plus-style = syntax "#20303b"
+    plus-emph-style = syntax "#385f0d"
+    zero-style = syntax
+
+    line-numbers-left-style = "#3b4261"
+    line-numbers-right-style = "#3b4261"
+    line-numbers-minus-style = "#f7768e"
+    line-numbers-plus-style = "#9ece6a"
+    line-numbers-zero-style = "#545c7e"
 
 [user]
     name = Léonard Bise
