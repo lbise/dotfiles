@@ -14,18 +14,18 @@ A `delegate` call has distinct human and agent fields:
 - `title` is a short human-facing label for the tool row and child session.
 - `prompt` is the child's instruction. For a fresh task, include the goal, relevant context and constraints, and expected result. A resumed task may refer to its child history, but never assume parent history.
 - `subagent_type` selects `general`, `explore`, or a discovered user or trusted-project agent.
-- `mode` is explicitly `foreground` or `background`.
+- `mode` is optional. It defaults to `foreground`; set it to `background` only for detached work.
 
 ## Execution modes
 
-Use `mode: "foreground"` when the parent needs the result for its next action or final answer. The tool blocks until the child finishes and returns its final result.
+Omitting `mode` uses foreground execution. The tool blocks until the child finishes and returns its final result. Set `mode: "foreground"` only when an explicit value is useful.
 
-Use `mode: "background"` only while the parent has work that does not depend on the child result. The tool initially returns a running `task_id`, not the result. When the child settles, the extension delivers a completion follow-up containing the result and triggers another parent turn. The parent must inspect and use or summarize that result before claiming the delegated work is complete. In the TUI, a widget above the command line lists every running background delegate with an animated spinner and its current activity. Up to eight background tasks can run at once in a parent session.
+Use `mode: "background"` only while the parent has work that does not depend on the child result. The tool initially returns a running `task_id`, not the result. When the child settles while the parent is still running, the extension steers the completion into the active run before its next model call. If the parent has already settled, the completion starts a follow-up turn. The parent must inspect and use or summarize that result before claiming the delegated work is complete. In the TUI, a widget above the command line lists every running background delegate with an animated spinner and its current activity. Up to eight background tasks can run at once in a parent session.
 
 `delegate_result` can retrieve a background task explicitly. Do not poll in a loop.
 
 - `mode: "poll"` performs one immediate status check.
-- `mode: "wait"` acts as a barrier when the task now blocks progress and its completion follow-up has not arrived. It waits until the task settles or `timeout_seconds` expires. A timeout does not cancel the background task.
+- `mode: "wait"` acts as a barrier when the task now blocks progress and its completion message has not arrived. It waits until the task settles or `timeout_seconds` expires. A timeout does not cancel the background task.
 
 ## Model settings
 

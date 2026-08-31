@@ -20,7 +20,12 @@ type RenderResult = {
 };
 type RenderOptions = { expanded: boolean; isPartial: boolean };
 type HeaderColor = "accent" | "success" | "warning" | "error";
-type DelegateResultDetails = Partial<TaskProgress> & { output?: string; background?: boolean; error?: string };
+type DelegateResultDetails = Partial<TaskProgress> & {
+  output?: string;
+  background?: boolean;
+  error?: string;
+  settled?: boolean;
+};
 type DelegateCompletionMessage = {
   content: string | Array<{ type: string; text?: string }>;
   details?: unknown;
@@ -31,6 +36,7 @@ type RoundedBoxOptions = {
   title: string;
   titleColor: HeaderColor;
   lines: string[];
+  fitContent?: boolean;
 };
 
 class RoundedBox implements Component {
@@ -39,7 +45,10 @@ class RoundedBox implements Component {
     private readonly theme: Theme,
   ) {}
 
-  render(width: number): string[] {
+  render(availableWidth: number): string[] {
+    const width = this.options.fitContent
+      ? delegateBoxWidth(availableWidth, this.options.title, this.options.lines)
+      : availableWidth;
     if (width < 8) return this.options.lines.flatMap((line) => wrapTextWithAnsi(line, Math.max(1, width)));
 
     const interiorWidth = width - 2;
@@ -86,6 +95,19 @@ function activityIcon(activity: string): string {
   if (activity.startsWith("failed")) return "󰅖";
   if (activity.startsWith("finished")) return "󰄬";
   return "󰑮";
+}
+
+function resultText(content: RenderResult["content"]): string {
+  return content
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\n");
+}
+
+function stripTaskEnvelope(content: string): string {
+  return content
+    .replace(/^<task[^>]*>\n?/, "")
+    .replace(/\n?<\/task>\s*$/, "");
 }
 
 function usageText(details: DelegateResultDetails): string | undefined {
@@ -165,8 +187,8 @@ export function renderDelegateCompletion(
   const title = details?.title ?? "Background task";
   const content = typeof message.content === "string"
     ? message.content
-    : message.content.filter((part) => part.type === "text" && typeof part.text === "string").map((part) => part.text).join("\n");
-  const output = details?.output || content.replace(/^<task[^>]*>\n?/, "").replace(/\n?<\/task>\s*$/, "");
+    : resultText(message.content);
+  const output = details?.output || stripTaskEnvelope(content);
   const outputLines = output ? new Markdown(output, 0, 0, getMarkdownTheme()).render(96) : ["(no output)"];
   const visibleOutput = options.expanded ? outputLines : outputLines.slice(0, 6);
   const lines = [
@@ -184,6 +206,7 @@ export function renderDelegateCompletion(
     title: "󰆍 delegate completed",
     titleColor: status === "completed" ? "success" : "error",
     lines,
+    fitContent: true,
   }, theme);
 }
 
@@ -462,6 +485,75 @@ class DelegateToolRow implements Component {
   }
 }
 
+type DelegateResultRenderState = { row?: DelegateResultToolRow };
+
+class DelegateResultToolRow implements Component {
+  #args: Record<string, unknown>;
+  #theme: Theme;
+  #executionStarted = false;
+  #result?: { result: RenderResult; options: RenderOptions; isError: boolean };
+
+  constructor(args: Record<string, unknown>, theme: Theme) {
+    this.#args = args;
+    this.#theme = theme;
+  }
+
+  updateCall(args: Record<string, unknown>, theme: Theme, executionStarted: boolean): void {
+    this.#args = args;
+    this.#theme = theme;
+    this.#executionStarted = executionStarted;
+  }
+
+  updateResult(result: RenderResult, options: RenderOptions, theme: Theme, isError: boolean): void {
+    this.#result = { result, options, isError };
+    this.#theme = theme;
+  }
+
+  render(width: number): string[] {
+    const mode = this.#args.mode === "wait" ? "wait" : "poll";
+    const details = this.#result?.result.details as DelegateResultDetails | undefined;
+    const taskId = details?.taskId ?? (typeof this.#args.task_id === "string" ? this.#args.task_id : "...");
+    const status = details?.status ?? (this.#result?.isError ? "failed" : this.#executionStarted ? "running" : "queued");
+    const agent = details?.agent;
+    const title = details?.title;
+    const lines: string[] = [];
+
+    if (agent || title) {
+      lines.push(this.#theme.fg("dim", `${agentIcon(agent ?? "delegate")} ${agent ?? "delegate"}${title ? ` · ${title}` : ""}`));
+    }
+
+    if (!this.#result) {
+      const action = mode === "wait" ? "waiting for task" : "checking task";
+      lines.push(this.#theme.fg("warning", `${statusIcon("running")} ${action}`));
+    } else {
+      lines.push(this.#theme.fg(statusColor(status), `${statusIcon(status)} ${status}`));
+      const output = details?.output || stripTaskEnvelope(resultText(this.#result.result.content));
+      if (output) {
+        const outputLines = new Markdown(output, 0, 0, getMarkdownTheme()).render(1_000);
+        const visibleOutput = this.#result.options.expanded ? outputLines : outputLines.slice(0, 6);
+        lines.push("", ...visibleOutput);
+        if (!this.#result.options.expanded && outputLines.length > visibleOutput.length) {
+          lines.push(this.#theme.fg("muted", "… expand to see the full result"));
+        }
+      }
+      if (details?.error) lines.push("", this.#theme.fg("error", details.error));
+      const usage = usageText(details ?? {});
+      if (usage) lines.push("", this.#theme.fg("dim", `󰍛 ${usage}`));
+    }
+
+    lines.push(this.#theme.fg("dim", `󰆧 ${taskId}`));
+    const boxTitle = `󰆍 delegate result · ${mode}`;
+    return new RoundedBox({
+      title: boxTitle,
+      titleColor: this.#result?.isError ? "error" : statusColor(status),
+      lines,
+      fitContent: true,
+    }, this.#theme).render(width);
+  }
+
+  invalidate(): void {}
+}
+
 class EmptyComponent implements Component {
   render(): string[] {
     return [];
@@ -472,6 +564,37 @@ class EmptyComponent implements Component {
 
 function state(value: unknown): DelegateRenderState {
   return value as DelegateRenderState;
+}
+
+function resultState(value: unknown): DelegateResultRenderState {
+  return value as DelegateResultRenderState;
+}
+
+export function createDelegateResultRenderer() {
+  return {
+    renderCall(args: Record<string, unknown>, theme: Theme, context: {
+      state: unknown;
+      executionStarted: boolean;
+      invalidate: () => void;
+    }): Component {
+      const rendererState = resultState(context.state);
+      const row = rendererState.row ??= new DelegateResultToolRow(args, theme);
+      row.updateCall(args, theme, context.executionStarted);
+      return row;
+    },
+
+    renderResult(
+      result: RenderResult,
+      options: RenderOptions,
+      theme: Theme,
+      context: { args: Record<string, unknown>; state: unknown; isError: boolean; invalidate: () => void },
+    ): Component {
+      const rendererState = resultState(context.state);
+      const row = rendererState.row ??= new DelegateResultToolRow(context.args, theme);
+      row.updateResult(result, options, theme, context.isError);
+      return new EmptyComponent();
+    },
+  };
 }
 
 export function createDelegateRenderer() {

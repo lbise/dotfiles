@@ -5,7 +5,9 @@ import { BackgroundTaskPool } from "../background.ts";
 import {
   BackgroundTasksWidget,
   createDelegateRenderer,
+  createDelegateResultRenderer,
   renderBackgroundTasks,
+  renderDelegateCompletion,
 } from "../render.ts";
 import type { RunTaskRequest, TaskProgress, TaskResult } from "../runner.ts";
 
@@ -63,6 +65,67 @@ function renderRow(renderer: ReturnType<typeof createDelegateRenderer>, state: o
     dispose: () => (row as { dispose?(): void }).dispose?.(),
   };
 }
+
+test("delegate_result renders a compact result without exposing the task envelope", () => {
+  const renderer = createDelegateResultRenderer();
+  const rendererState = {};
+  const args = { task_id: "task-123", mode: "wait" };
+  const row = renderer.renderCall(args, theme, {
+    state: rendererState,
+    executionStarted: true,
+    invalidate: () => {},
+  });
+  renderer.renderResult(
+    {
+      content: [{
+        type: "text",
+        text: '<task id="task-123" state="completed" background="true">\ndone\n</task>',
+      }],
+      details: {
+        status: "completed",
+        taskId: "task-123",
+        agent: "explore",
+        title: "Inspect code",
+        settled: true,
+      },
+    },
+    { expanded: false, isPartial: false },
+    theme,
+    {
+      args,
+      state: rendererState,
+      isError: false,
+      invalidate: () => {},
+    },
+  );
+
+  const lines = row.render(120);
+  const text = lines.join("\n");
+  assert.doesNotMatch(text, /<\/?task/);
+  assert.match(text, /done/);
+  assert.match(text, /completed/);
+  assert.ok(lines[0].length < 120, "short delegate_result content should not produce a full-width border");
+});
+
+test("a completed delegate message fits its border to short content", () => {
+  const component = renderDelegateCompletion(
+    {
+      content: '<task id="task-123" state="completed" background="true">\ndone\n</task>',
+      details: {
+        status: "completed",
+        taskId: "task-123",
+        agent: "explore",
+        title: "Inspect code",
+        output: "done",
+      },
+    },
+    { expanded: false, outputPad: 0 },
+    theme,
+  );
+
+  const lines = component.render(120);
+  assert.ok(lines[0].length < 120, "short completion content should not produce a full-width border");
+});
 
 test("a finalized background delegate row keeps animating while its task runs", async () => {
   const renderer = createDelegateRenderer();

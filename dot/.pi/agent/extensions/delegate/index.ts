@@ -12,21 +12,21 @@ import {
   SessionManager,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import { StringEnum } from "@earendil-works/pi-ai";
-import { Type } from "typebox";
-
 import { discoverAgents, type TaskAgent } from "./agents.ts";
 import { configureAgents } from "./config.ts";
+import { completionDeliveryOptions, type ParentActivity } from "./delivery.ts";
 import {
   BackgroundTaskPool,
   type BackgroundTaskEvent,
   type BackgroundTaskSnapshot,
 } from "./background.ts";
+import { DelegateParameters, DelegateResultParameters } from "./parameters.ts";
 import { childToolAllowlist } from "./policy.ts";
 import {
   BackgroundTaskDetailOverlay,
   BackgroundTasksWidget,
   createDelegateRenderer,
+  createDelegateResultRenderer,
   renderDelegateCompletion,
 } from "./render.ts";
 import { runTask, type RunTaskRequest, type TaskProgress } from "./runner.ts";
@@ -38,6 +38,7 @@ const packagedDir = join(extensionDir, "agents");
 const projectConfirmations = new Map<string, Set<string>>();
 const MAX_BACKGROUND_TASKS = 8;
 let sharedBackgroundTasks: BackgroundTaskPool | undefined;
+let backgroundParent: ParentActivity | undefined;
 let backgroundUi: ExtensionContext["ui"] | undefined;
 let backgroundDetailTui: { requestRender(): void } | undefined;
 const TASK_SHORTCUTS = ["ctrl+1", "ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5", "ctrl+6", "ctrl+7", "ctrl+8", "ctrl+9", "ctrl+0"] as const;
@@ -50,37 +51,6 @@ type TaskShortcutEntry = {
   title: string;
   progress?: TaskProgress;
 };
-
-const DelegateMode = StringEnum(["foreground", "background"] as const, {
-  description: "foreground waits for the child result; background returns after startup and delivers a completion notice later",
-});
-
-const DelegateParameters = Type.Object({
-  title: Type.String({ description: "Short human-facing title shown in the UI and child session list; not the child instruction" }),
-  prompt: Type.String({
-    description: "Instruction for the child. For a fresh task, include the goal, relevant context and constraints, and expected result. A resumed task may refer to its child history, never the parent transcript",
-  }),
-  subagent_type: Type.String({
-    description: "Named child-agent definition to use. Choose from the available subagents listed in the system prompt",
-  }),
-  mode: DelegateMode,
-  task_id: Type.Optional(Type.String({ description: "Existing delegated task id to resume" })),
-});
-
-const DelegateResultMode = StringEnum(["poll", "wait"] as const, {
-  description: "poll performs one immediate status check; wait blocks until completion or timeout",
-});
-
-const DelegateResultParameters = Type.Object({
-  task_id: Type.String({ description: "Background task id returned by delegate" }),
-  mode: DelegateResultMode,
-  timeout_seconds: Type.Optional(Type.Number({
-    description: "Maximum wait time in seconds when mode is wait. Default: 30",
-    minimum: 1,
-    maximum: 300,
-    default: 30,
-  })),
-});
 
 function userAgentsDir(): string {
   return join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.HOME ?? "", ".pi", "agent"), "agents");
@@ -101,9 +71,9 @@ function delegateDescription(agents: TaskAgent[]): string {
     "The title is human-facing. The prompt is the child's complete instruction and must include the goal, relevant context and constraints, and expected result.",
     "Choose subagent_type from the names below. User and trusted-project agent definitions may extend or override the packaged general and explore agents.",
     "Use separate delegate calls for independent work. Do not duplicate delegated work. The child cannot delegate further.",
-    "Use foreground when the child result is needed for the next action or final answer. Use background only while independent work remains.",
-    "A background call returns only a task_id, not the child result. When its completion follow-up arrives, inspect the <task> body and use or summarize that result before claiming the delegated work is complete.",
-    "Do not poll background tasks in a loop. Use delegate_result wait only when a task now blocks progress and its completion follow-up has not arrived; use poll only for a one-off status check.",
+    "Delegation defaults to foreground and waits for the child result. Omit mode for normal delegation. Set mode to background only when useful parent work can continue without the result.",
+    "A background call returns only a task_id, not the child result. If it finishes while the parent is running, its result is delivered before the next model call. If the parent has settled, the result starts a follow-up turn. Inspect the <task> body and use or summarize it before claiming the delegated work is complete.",
+    "Do not poll background tasks in a loop. Use delegate_result wait only when a task now blocks progress and its completion message has not arrived; use poll only for a one-off status check.",
     "Available subagents:", choices,
   ].join("\n");
 }
@@ -168,6 +138,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
   const activeTaskIds = new Set<string>();
   const taskShortcuts = new Map<string, Map<TaskShortcut, TaskShortcutEntry>>();
   const delegateRenderer = createDelegateRenderer();
+  const delegateResultRenderer = createDelegateResultRenderer();
 
   function refreshBackgroundWidget(): void {
     const tasks = backgroundTasks.list();
@@ -323,7 +294,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
             error: event.error?.message.slice(0, 500),
           },
         },
-        { deliverAs: "followUp", triggerTurn: true },
+        completionDeliveryOptions(backgroundParent),
       );
     },
   };
@@ -339,13 +310,13 @@ export default function delegateExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "delegate",
     label: "Delegate",
-    description: "Run a named child agent in an isolated context window so subtask reasoning and tool output do not pollute the parent context. A fresh child receives its prompt plus normal project context; a resumed child also retains its own history. Neither receives the parent transcript. Use foreground when the result gates the next action or final answer. Use background only while independent work remains, then consume the completion follow-up before claiming the task is complete.",
+    description: "Run a named child agent in an isolated context window so subtask reasoning and tool output do not pollute the parent context. A fresh child receives its prompt plus normal project context; a resumed child also retains its own history. Neither receives the parent transcript. Delegation waits for the child by default. Set mode to background only while independent work remains, then consume the delivered result before claiming the task is complete.",
     promptSnippet: "Delegate bounded work to a named child agent with an isolated context window",
     promptGuidelines: [
       "After calling delegate, do not duplicate the child's assigned work in the parent.",
-      "Use delegate mode foreground when the child result is needed for the next action or final answer.",
-      "After starting a background delegate, continue only with work independent of that result.",
-      "When a delegate completion follow-up arrives, inspect its <task> body and use or summarize the child result before claiming the delegated work is complete.",
+      "Omit delegate mode for normal delegation; it defaults to foreground and waits for the child result.",
+      "Set delegate mode background only when useful parent work can continue independently of the result.",
+      "When a delegate completion message arrives, inspect its <task> body and use or summarize the child result before claiming the delegated work is complete.",
     ],
     renderShell: "self",
     parameters: DelegateParameters,
@@ -390,6 +361,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
       }
 
       if (params.mode === "background") {
+        backgroundParent = ctx;
         if (ctx.mode === "tui") backgroundUi = ctx.ui;
         try {
           // Background work is detached immediately. A parent-session abort must not cancel startup.
@@ -398,7 +370,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
           return {
             content: [{
               type: "text",
-              text: `<task id="${started.taskId}" state="running" background="true">\nBackground task started. This is only a task_id, not the child result. Continue with independent work. The completion follow-up will contain the result; use delegate_result with mode wait only if this task later blocks progress before that follow-up arrives.\n</task>`,
+              text: `<task id="${started.taskId}" state="running" background="true">\nBackground task started. This is only a task_id, not the child result. Continue with independent work. A completion message will deliver the result; use delegate_result with mode wait only if this task later blocks progress before that message arrives.\n</task>`,
             }],
             details: { ...started, background: true },
           };
@@ -437,10 +409,13 @@ export default function delegateExtension(pi: ExtensionAPI) {
     promptSnippet: "Poll or wait for a background delegated task result",
     promptGuidelines: [
       "Do not call delegate_result poll in a loop; use mode poll only for a one-off status check.",
-      "Use delegate_result mode wait as a barrier when a known background task now blocks the next action and its completion follow-up has not arrived.",
+      "Use delegate_result mode wait as a barrier when a known background task now blocks the next action and its completion message has not arrived.",
       "Read and use the <task> result returned by delegate_result before continuing.",
     ],
+    renderShell: "self",
     parameters: DelegateResultParameters,
+    renderCall: delegateResultRenderer.renderCall,
+    renderResult: delegateResultRenderer.renderResult,
     async execute(_id, params, signal) {
       const snapshot = params.mode === "wait"
         ? await backgroundTasks.waitFor(params.task_id, (params.timeout_seconds ?? 30) * 1_000, signal)
@@ -464,13 +439,14 @@ export default function delegateExtension(pi: ExtensionAPI) {
     const found = discovery(ctx);
     const modeNote = ctx.mode === "tui" || ctx.mode === "rpc"
       ? ""
-      : "\nBackground delegation is unavailable in this mode; use mode foreground.";
+      : "\nBackground delegation is unavailable in this mode; omit mode to use foreground.";
     return { systemPrompt: `${event.systemPrompt}\n\nSubagents available to delegate:\n${delegateDescription(found.agents)}${modeNote}` };
   });
 
   pi.on("session_start", (_event, ctx) => {
     // Rebind after the replacement session is ready. setCallbacks replays any
     // completion that settled while the previous extension instance was down.
+    backgroundParent = ctx;
     backgroundTasks.setCallbacks({ ...backgroundCallbacks, runTask: runTaskWithShortcuts });
     if (ctx.mode !== "tui") return;
     backgroundUi = ctx.ui;
@@ -479,6 +455,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async (event) => {
     backgroundUi?.setWidget("delegate-background-tasks", undefined);
+    backgroundParent = undefined;
     backgroundUi = undefined;
     backgroundDetailTui = undefined;
 
