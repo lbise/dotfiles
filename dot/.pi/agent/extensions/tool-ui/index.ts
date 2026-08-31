@@ -13,7 +13,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Container, type Component } from "@earendil-works/pi-tui";
 
-import { cleanDeltaOutput, runDelta, type DeltaEditDetails } from "./delta.ts";
+import { cleanDeltaOutput, diffStats, runDelta, type DeltaEditDetails } from "./delta.ts";
 import {
   AnsiLine,
   COLLAPSED_DIFF_LINES,
@@ -271,14 +271,17 @@ function registerEdit(pi: ExtensionAPI): void {
         ? cleanDeltaOutput(details.deltaOutput)
         : details?.diff ? renderDiff(details.diff, { filePath: context.args.path }) : "";
       if (!output) return emptyResult(context);
-      const lines = splitOutput(output).map((line) =>
-        line.startsWith("Δ ") ? theme.fg("accent", line) : line
-      );
+      const stats = details?.patch ? diffStats(details.patch) : { additions: 0, removals: 0 };
+      const statsLine = [
+        theme.fg("toolDiffAdded", `+${stats.additions}`),
+        theme.fg("toolDiffRemoved", `-${stats.removals}`),
+      ].join(" ");
       return outputPreview(context, theme, {
-        lines,
+        lines: [statsLine, ...splitOutput(output)],
         expanded: options.expanded,
         collapsedLines: COLLAPSED_DIFF_LINES,
         expandedLines: EXPANDED_PREVIEW_LINES,
+        fillBackgroundLines: Boolean(details?.deltaOutput),
         footer: details?.deltaError ? "delta unavailable, using Pi's diff renderer" : undefined,
       });
     },

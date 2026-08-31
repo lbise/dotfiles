@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { cleanDeltaOutput, runDelta } from "../delta.ts";
+import { cleanDeltaOutput, diffStats, runDelta } from "../delta.ts";
 
 test("runDelta pipes the patch through the formatter", async () => {
   const directory = mkdtempSync(join(tmpdir(), "pi-tool-ui-"));
@@ -33,7 +33,7 @@ test("runDelta removes delta's full-width header separator", async () => {
 
   try {
     const result = await runDelta("patch", { executable: formatter });
-    assert.match(result.output ?? "", /Δ old\.ts/);
+    assert.doesNotMatch(result.output ?? "", /Δ old\.ts/);
     assert.doesNotMatch(result.output ?? "", /──/);
     assert.match(result.output ?? "", /\+changed/);
   } finally {
@@ -41,14 +41,29 @@ test("runDelta removes delta's full-width header separator", async () => {
   }
 });
 
-test("cleanDeltaOutput removes all embedded styling from the file title", () => {
+test("cleanDeltaOutput removes the redundant file title", () => {
   const output = cleanDeltaOutput(
     "\u001b[1;38;2;122;162;247mΔ old.ts ⟶ new.ts\u001b[0m\n+changed",
   );
-  const title = output.split("\n")[0] ?? "";
 
-  assert.equal(title, "Δ old.ts ⟶ new.ts");
-  assert.doesNotMatch(title, /\u001b\[/);
+  assert.equal(output, "+changed");
+  assert.doesNotMatch(output, /old\.ts|new\.ts/);
+});
+
+test("diffStats counts changed hunk lines without counting patch headers", () => {
+  const patch = [
+    "--- a/file.ts",
+    "+++ b/file.ts",
+    "@@ -1,4 +1,5 @@",
+    " context",
+    "-removed one",
+    "-removed two",
+    "+added one",
+    "+added two",
+    "+added three",
+  ].join("\n");
+
+  assert.deepEqual(diffStats(patch), { additions: 3, removals: 2 });
 });
 
 test("cleanDeltaOutput preserves delta's insert and delete backgrounds", () => {

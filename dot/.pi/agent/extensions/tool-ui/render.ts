@@ -29,6 +29,7 @@ export type PreviewContent = {
   collapsedLines?: number;
   expandedLines?: number;
   collapsedFrom?: "start" | "end";
+  fillBackgroundLines?: boolean;
   footer?: string;
 };
 
@@ -41,6 +42,22 @@ function normalizeLines(text: string): string[] {
   const lines = text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
   while (lines.at(-1) === "") lines.pop();
   return lines.map((line) => line.replaceAll("\t", "    "));
+}
+
+const ANSI_BACKGROUND_PATTERN = /\x1b\[(?:4[0-9]|10[0-7]|48)(?:;[^m]*)?m/;
+
+/** Extend an ANSI background through the remaining width without coloring plain lines. */
+export function fillAnsiBackground(line: string, width: number): string {
+  if (width <= 0 || !ANSI_BACKGROUND_PATTERN.test(line)) return line;
+  const missing = width - visibleWidth(line);
+  if (missing <= 0) return line;
+
+  const padding = " ".repeat(missing);
+  const resetIndex = line.lastIndexOf("\x1b[0m");
+  if (resetIndex >= 0) {
+    return `${line.slice(0, resetIndex)}${padding}${line.slice(resetIndex)}`;
+  }
+  return `${line}${padding}\x1b[0m`;
 }
 
 export function extractText(result: { content?: Array<{ type: string; text?: string }> }): string {
@@ -148,7 +165,10 @@ export class OutputPreview implements Component {
       }
       const wrapped = expanded ? wrapTextWithAnsi(line, innerWidth) : [truncateToWidth(line, innerWidth, "…")];
       for (const segment of wrapped.length > 0 ? wrapped : [""]) {
-        rendered.push(truncateToWidth(`${prefix}${segment}`, safeWidth, ""));
+        const filled = this.content.fillBackgroundLines
+          ? fillAnsiBackground(segment, innerWidth)
+          : segment;
+        rendered.push(truncateToWidth(`${prefix}${filled}`, safeWidth, ""));
       }
     }
 

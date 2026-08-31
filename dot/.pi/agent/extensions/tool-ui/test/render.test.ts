@@ -59,6 +59,20 @@ test("collapsed previews show the requested first lines and an expansion hint", 
   assert.match(rendered.at(-1) ?? "", /expand/);
 });
 
+test("delta backgrounds extend to the current render width", () => {
+  const colored = "\u001b[48;2;32;48;59m+added\u001b[0m";
+  const preview = new OutputPreview({
+    lines: [colored, "plain context"],
+    expanded: false,
+    fillBackgroundLines: true,
+  }, theme);
+
+  const [added = "", context = ""] = preview.render(24);
+  assert.equal(visibleWidth(added), 24);
+  assert.match(added, /\+added +\u001b\[0m$/);
+  assert.equal(visibleWidth(context), "│ plain context".length);
+});
+
 test("shell previews keep the tail when collapsed", () => {
   const preview = new OutputPreview({
     lines: ["old", "middle", "latest"],

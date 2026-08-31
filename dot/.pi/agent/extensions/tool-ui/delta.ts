@@ -15,6 +15,11 @@ export type DeltaRunResult = {
   error?: string;
 };
 
+export type DiffStats = {
+  additions: number;
+  removals: number;
+};
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -23,14 +28,30 @@ function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
-/** Keep delta's diff highlights while removing title styling and decorative rules. */
+export function diffStats(patch: string): DiffStats {
+  let additions = 0;
+  let removals = 0;
+  let inHunk = false;
+
+  for (const line of patch.replaceAll("\r\n", "\n").split("\n")) {
+    if (line.startsWith("@@")) {
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) continue;
+    if (line.startsWith("+")) additions += 1;
+    else if (line.startsWith("-")) removals += 1;
+  }
+
+  return { additions, removals };
+}
+
+/** Remove delta's redundant file title and decorative rule. */
 export function cleanDeltaOutput(output: string): string {
-  const lines = output.replaceAll("\r\n", "\n").split("\n").map((line) => {
+  const lines = output.replaceAll("\r\n", "\n").split("\n").filter((line) => {
     const visible = stripAnsi(line).trim();
-    return visible.startsWith("Δ ") && visible.includes(" ⟶ ") ? visible : line;
-  }).filter((line) => {
-    const visible = stripAnsi(line).trim();
-    return !/^─{3,}$/.test(visible);
+    const fileTitle = visible.startsWith("Δ ") && visible.includes(" ⟶ ");
+    return !fileTitle && !/^─{3,}$/.test(visible);
   });
   while (lines.length > 0 && stripAnsi(lines[0] ?? "").trim() === "") lines.shift();
   while (lines.length > 0 && stripAnsi(lines.at(-1) ?? "").trim() === "") lines.pop();
