@@ -2,6 +2,7 @@
 //
 // Goals:
 // - Keep Pi's normal tool names/schema so the model keeps using grep/find/ls/bash.
+// - Register RTK-owned definitions through tool-ui for shared rendering without duplicate tools.
 // - Route Pi tools with RTK equivalents through the `rtk` CLI when it is safe.
 // - Fall back to Pi's built-in implementations on missing RTK, unsupported RTK commands,
 //   unsupported argument shapes, or RTK execution failures.
@@ -22,8 +23,10 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { basename } from "node:path";
-import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+
+import { decorateToolUi, type ToolUiHeader } from "./tool-ui/consumer.ts";
+import { COLLAPSED_SHELL_LINES } from "./tool-ui/render.ts";
 
 const EXTENSION_NAME = "rtk";
 const RTK_TIMEOUT_MS = 15_000;
@@ -136,27 +139,25 @@ function toolArgText(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function renderRtkToolCall(
-  theme: any,
+function buildRtkToolHeader(
   toolName: string,
   plannedTarget: "rtk" | "pi",
   plannedCommandDisplay: string,
-  context?: { state?: Record<string, unknown> },
-): Text {
-  const actualTarget = context?.state?.rtkActualRoute === "rtk" || context?.state?.rtkActualRoute === "pi"
-    ? context.state.rtkActualRoute
+  context?: { state?: unknown },
+): ToolUiHeader {
+  const state = context?.state && typeof context.state === "object"
+    ? context.state as Record<string, unknown>
     : undefined;
-  const actualCommand = typeof context?.state?.rtkActualCommand === "string" ? context.state.rtkActualCommand : undefined;
+  const actualTarget = state?.rtkActualRoute === "rtk" || state?.rtkActualRoute === "pi"
+    ? state.rtkActualRoute
+    : undefined;
+  const actualCommand = typeof state?.rtkActualCommand === "string" ? state.rtkActualCommand : undefined;
   const target = actualTarget ?? plannedTarget;
-  const commandDisplay = actualCommand ?? plannedCommandDisplay;
-  const routeLabel = target === "rtk" ? theme.fg("accent", " ↪ RTK") : theme.fg("dim", " ↪ Pi");
-
-  const compactCommand = compactNoticeText(commandDisplay, 130);
-  return new Text(
-    `${theme.fg("toolTitle", theme.bold(toolName))}${routeLabel}${compactCommand ? ` ${theme.fg("toolOutput", compactCommand)}` : ""}`,
-    0,
-    0,
-  );
+  return {
+    label: toolName,
+    target: compactNoticeText(actualCommand ?? plannedCommandDisplay, 130),
+    metadata: target === "rtk" ? "via RTK" : "via Pi",
+  };
 }
 
 function normalizePositiveInteger(value: unknown, fallback: number, min = 1, max = Number.MAX_SAFE_INTEGER): number {
@@ -192,36 +193,18 @@ function buildPiLsDisplay(params: any): string {
   return `ls ${toolArgText(params?.path, ".")}`;
 }
 
-function buildBashDisplay(params: any, route?: BashRewriteRoute): string {
-  const command = route?.command ?? toolArgText(params?.command, "...");
-  return `$ ${command}`;
-}
-
-function renderRtkBashToolCall(
-  theme: any,
-  args: any,
-  route: BashRewriteRoute | undefined,
-  context: { state?: Record<string, unknown>; executionStarted?: boolean; lastComponent?: any },
-): Text {
-  const state = context.state ?? {};
-  if (context.executionStarted && state.startedAt === undefined) {
-    state.startedAt = Date.now();
-    state.endedAt = undefined;
-  }
-
-  const routeLabel = route?.route === "rtk"
-    ? theme.fg("accent", " ↪ RTK")
-    : theme.fg("dim", " ↪ Pi") + (route?.reason === "miss" ? theme.fg("muted", " (RTK miss)") : "");
-  const detail = route?.detail && route.reason !== "miss" ? theme.fg("muted", ` (${route.detail})`) : "";
-  const timeoutSuffix = typeof args?.timeout === "number" && args.timeout > 0
-    ? theme.fg("muted", ` (timeout ${args.timeout}s)`)
-    : "";
-  const commandDisplay = compactNoticeText(buildBashDisplay(args, route), 130);
-  const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
-  text.setText(
-    `${theme.fg("toolTitle", theme.bold("bash"))}${routeLabel}${detail} ${theme.fg("toolOutput", commandDisplay)}${timeoutSuffix}`,
-  );
-  return text;
+function buildRtkBashHeader(args: any, route: BashRewriteRoute | undefined): ToolUiHeader {
+  const metadata = [
+    route?.route === "rtk" ? "via RTK" : "via Pi",
+    route?.reason === "miss" ? "RTK miss" : "",
+    route?.detail && route.reason !== "miss" ? route.detail : "",
+    typeof args?.timeout === "number" && args.timeout > 0 ? `timeout ${args.timeout}s` : "",
+  ].filter(Boolean).join(" · ");
+  return {
+    label: "$",
+    target: compactNoticeText(route?.command ?? toolArgText(args?.command, "..."), 130),
+    metadata,
+  };
 }
 
 function limitOutputLines(text: string, limit: number | undefined, label: string): { text: string; limited: boolean } {
@@ -583,23 +566,8 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
       return;
     }
 
-    if (context.state.rtkActualRoute !== route || context.state.rtkActualCommand !== command) {
-      context.state.rtkActualRoute = route;
-      context.state.rtkActualCommand = command;
-      queueMicrotask(() => context.invalidate());
-    }
-  };
-
-  const renderBuiltinResult = (
-    toolName: "grep" | "find" | "ls",
-    result: any,
-    options: any,
-    theme: any,
-    context: any,
-  ) => {
-    rememberActualRouteFromResult(result, context);
-    const definition = getBuiltinToolDefinition(toolName, context.cwd);
-    return definition.renderResult?.(result, options, theme, context) ?? new Text("", 0, 0);
+    context.state.rtkActualRoute = route;
+    context.state.rtkActualCommand = command;
   };
 
   const executeBuiltin = async (
@@ -746,45 +714,32 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
   });
 
   const bashToolMetadata = createBashToolDefinition(process.cwd());
-  pi.registerTool({
+  pi.registerTool(decorateToolUi({
     ...bashToolMetadata,
     label: "bash (rtk)",
     promptGuidelines: [
       "Use bash to inspect PI_* environment variables for current model and session details.",
     ],
-    renderCall(args, theme, context) {
-      return renderRtkBashToolCall(theme, args, bashRewriteRoutes.get(context.toolCallId), context);
-    },
-    renderResult(result, options, theme, context) {
-      const definition = createBashToolDefinition(context.cwd);
-      return definition.renderResult?.(result, options, theme, context) ?? new Text("", 0, 0);
-    },
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const definition = createBashToolDefinition(ctx.cwd);
       return definition.execute(toolCallId, params, signal, onUpdate, ctx);
     },
-  });
+  }, {
+    header(args, context) {
+      return buildRtkBashHeader(args, bashRewriteRoutes.get(context.toolCallId));
+    },
+    output: {
+      collapsedLines: COLLAPSED_SHELL_LINES,
+      collapsedFrom: "end",
+    },
+  }));
 
-  pi.registerTool({
+  pi.registerTool(decorateToolUi({
     name: "grep",
     label: "grep (rtk)",
     description: "Search file contents for a pattern.",
     promptSnippet: "Search file contents for patterns",
     parameters: grepSchema,
-    renderCall(args, theme, context) {
-      const rtkArgs = buildRtkGrepToolArgs(args);
-      const target = commandSupported(status, "grep") ? "rtk" : "pi";
-      return renderRtkToolCall(
-        theme,
-        "grep",
-        target,
-        target === "rtk" ? formatRtkCommand(rtkArgs) : buildPiGrepDisplay(args),
-        context,
-      );
-    },
-    renderResult(result, options, theme, context) {
-      return renderBuiltinResult("grep", result, options, theme, context);
-    },
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const currentStatus = await ensureStatus(ctx);
       if (!commandSupported(currentStatus, "grep")) {
@@ -805,30 +760,28 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
 
       return executeBuiltin("grep", toolCallId, params, signal, onUpdate, ctx, buildPiGrepDisplay(params));
     },
-  });
+  }, {
+    header(args, context) {
+      const rtkArgs = buildRtkGrepToolArgs(args);
+      const target = commandSupported(status, "grep") ? "rtk" : "pi";
+      return buildRtkToolHeader(
+        "grep",
+        target,
+        target === "rtk" ? formatRtkCommand(rtkArgs) : buildPiGrepDisplay(args),
+        context,
+      );
+    },
+    onResult(result, context) {
+      rememberActualRouteFromResult(result, context);
+    },
+  }));
 
-  pi.registerTool({
+  pi.registerTool(decorateToolUi({
     name: "find",
     label: "find (rtk)",
     description: "Search for files by glob pattern.",
     promptSnippet: "Find files by glob pattern",
     parameters: findSchema,
-    renderCall(args, theme, context) {
-      const pattern = toolArgText(args?.pattern, "<pattern>");
-      const path = toolArgText(args?.path, ".");
-      const rtkArgs = buildRtkFindToolArgs(status, pattern, path);
-      const target = rtkArgs ? "rtk" : "pi";
-      return renderRtkToolCall(
-        theme,
-        "find",
-        target,
-        rtkArgs ? formatRtkCommand(rtkArgs) : buildPiFindDisplay(args),
-        context,
-      );
-    },
-    renderResult(result, options, theme, context) {
-      return renderBuiltinResult("find", result, options, theme, context);
-    },
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const currentStatus = await ensureStatus(ctx);
       const args = buildRtkFindToolArgs(currentStatus, params.pattern, params.path || ".");
@@ -852,28 +805,29 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
 
       return executeBuiltin("find", toolCallId, params, signal, onUpdate, ctx, buildPiFindDisplay(params));
     },
-  });
+  }, {
+    header(args, context) {
+      const pattern = toolArgText(args?.pattern, "<pattern>");
+      const path = toolArgText(args?.path, ".");
+      const rtkArgs = buildRtkFindToolArgs(status, pattern, path);
+      return buildRtkToolHeader(
+        "find",
+        rtkArgs ? "rtk" : "pi",
+        rtkArgs ? formatRtkCommand(rtkArgs) : buildPiFindDisplay(args),
+        context,
+      );
+    },
+    onResult(result, context) {
+      rememberActualRouteFromResult(result, context);
+    },
+  }));
 
-  pi.registerTool({
+  pi.registerTool(decorateToolUi({
     name: "ls",
     label: "ls (rtk)",
     description: "List directory contents.",
     promptSnippet: "List directory contents",
     parameters: lsSchema,
-    renderCall(args, theme, context) {
-      const rtkArgs = buildRtkLsToolArgs(args);
-      const target = commandSupported(status, "ls") ? "rtk" : "pi";
-      return renderRtkToolCall(
-        theme,
-        "ls",
-        target,
-        target === "rtk" ? formatRtkCommand(rtkArgs) : buildPiLsDisplay(args),
-        context,
-      );
-    },
-    renderResult(result, options, theme, context) {
-      return renderBuiltinResult("ls", result, options, theme, context);
-    },
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const currentStatus = await ensureStatus(ctx);
       if (!commandSupported(currentStatus, "ls")) {
@@ -897,7 +851,21 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
 
       return executeBuiltin("ls", toolCallId, params, signal, onUpdate, ctx, buildPiLsDisplay(params));
     },
-  });
+  }, {
+    header(args, context) {
+      const rtkArgs = buildRtkLsToolArgs(args);
+      const target = commandSupported(status, "ls") ? "rtk" : "pi";
+      return buildRtkToolHeader(
+        "ls",
+        target,
+        target === "rtk" ? formatRtkCommand(rtkArgs) : buildPiLsDisplay(args),
+        context,
+      );
+    },
+    onResult(result, context) {
+      rememberActualRouteFromResult(result, context);
+    },
+  }));
 
   pi.registerCommand("rtk", {
     description: "Run RTK commands exposed inside Pi (stats, clear-stats)",
