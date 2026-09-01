@@ -69,6 +69,8 @@ workspace_picker = "prefix+w"
 # rename_tab = "prefix+shift+t"
 # previous_tab = "prefix+p"
 # next_tab = "prefix+n"
+move_tab_previous = "ctrl+shift+left"
+move_tab_next = "ctrl+shift+right"
 # switch_tab = "prefix+1..9"
 # Only works with windows terminal 1.26+ (canary)
 switch_workspace = "prefix+shift+1..9"   # optional indexed binding, e.g. "prefix+shift+1..9"
