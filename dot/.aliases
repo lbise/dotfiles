@@ -1,4 +1,10 @@
 alias vim=nvim
+alias ls='eza --icons=auto --group-directories-first --long --all'
+alias ll='ls'
+alias l='ls'
+alias la='ls'
+alias lsa='ls'
+alias ff=fzf
 
 wt() {
   local force=0

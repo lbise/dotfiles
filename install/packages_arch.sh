@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock man-db man-pages waybar iwd impala fcitx5 fcitx5-configtool fcitx5-gtk brightnessctl jq grim slurp satty"
-YAY_PKGS="neovim ghostty zen-browser-bin fd fzf ripgrep xdg-terminal-exec elephant-all-bin walker dropbox"
+YAY_PKGS="neovim ghostty zen-browser-bin eza fd fzf ripgrep xdg-terminal-exec elephant-all-bin walker dropbox"
 
 migrate_legacy_tree_sitter_cli() {
     local tree_sitter_bin="${TREE_SITTER_SYSTEM_BIN:-/usr/bin/tree-sitter}"

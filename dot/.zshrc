@@ -1,5 +1,4 @@
-# Setup aliases and env
-source $HOME/.aliases
+# Setup environment
 source $HOME/.exports
 if [ -f "$HOME/.keys" ]; then
     source "$HOME/.keys"
@@ -72,6 +71,10 @@ add-zsh-hook precmd update_tmux_env
 add-zsh-hook preexec update_tmux_env
 
 source $ZSH/oh-my-zsh.sh
+
+# Load personal aliases after Oh My Zsh so they take precedence.
+source $HOME/.aliases
+
 if [[ -f "$HOME/.config/shell/ssh-auth-sock.sh" ]]; then
     source "$HOME/.config/shell/ssh-auth-sock.sh"
 fi
