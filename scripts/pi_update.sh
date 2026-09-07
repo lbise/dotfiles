@@ -2,10 +2,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
-DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
-SETTINGS_PATH="${PI_SETTINGS_PATH:-$DOTFILES_DIR/dot/.pi/agent/settings.json}"
+SETTINGS_PATH="${PI_SETTINGS_PATH:-$HOME/.pi/agent/settings.json}"
 DEFAULT_ARCHIVES_DIR="/mnt/ch03pool/murten_mirror/shannon/linux/tools/pi"
 ARCHIVES_DIR="${PI_ARCHIVES_DIR:-$DEFAULT_ARCHIVES_DIR}"
 FORCE_INSTALL=false

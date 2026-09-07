@@ -2,10 +2,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
-DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
-SETTINGS_PATH="${PI_SETTINGS_PATH:-$DOTFILES_DIR/dot/.pi/agent/settings.json}"
+SETTINGS_PATH="${PI_SETTINGS_PATH:-$HOME/.pi/agent/settings.json}"
 MANIFEST_PATH="${PI_OFFLINE_MANIFEST:-}"
 PACKAGE_SOURCE_MODE="${PI_OFFLINE_MANIFEST:+manifest}"
 if [[ -z "$PACKAGE_SOURCE_MODE" ]]; then
