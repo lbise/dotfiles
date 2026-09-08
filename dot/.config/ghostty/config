@@ -71,6 +71,9 @@ copy-on-select = clipboard
 # Slowdown mouse scrolling
 mouse-scroll-multiplier = 0.95
 
+# Fix general slowness on Hyprland
+async-backend = epoll
+
 # Keyboard bindings
 keybind = shift+insert=paste_from_clipboard
 keybind = control+insert=copy_to_clipboard
