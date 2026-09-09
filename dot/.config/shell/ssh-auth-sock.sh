@@ -8,7 +8,7 @@ _herdr_socklink="$HOME/.scripts/herdr-socklink.sh"
 if [[ $- == *i* ]] && [[ -x "$_socklink" ]]; then
     if [[ -n "${HERDR_ENV:-}" ]] && [[ -x "$_herdr_socklink" ]]; then
         _herdr_auth_sock=$("$_herdr_socklink" show)
-        if [[ ! -L "$_herdr_auth_sock" ]]; then
+        if [[ ! -S "$_herdr_auth_sock" ]]; then
             "$_socklink" -c herdr-shell-init set-tty-link
             "$_herdr_socklink" set-current-tty
         fi
