@@ -8,6 +8,7 @@ ARCHIVES_DIR="${PI_ARCHIVES_DIR:-$DEFAULT_ARCHIVES_DIR}"
 FORCE_INSTALL=false
 ARCHIVE_PATH=""
 TARGET_RUNTIME_DIR="$HOME/.local/share/pi-runtime"
+TARGET_EXTENSIONS_DIR="$HOME/.pi/agent/extensions"
 TARGET_BIN_DIR="$HOME/.local/bin"
 TARGET_RTK_BIN="$TARGET_RUNTIME_DIR/node/bin/rtk"
 TARGET_RTK_WRAPPER="$TARGET_BIN_DIR/rtk"
@@ -59,7 +60,7 @@ ensure_command() {
 
 check_dependencies() {
     log "Checking update dependencies..."
-    for cmd in tar mktemp; do
+    for cmd in tar mktemp find cmp; do
         ensure_command "$cmd"
     done
     log "✓ Dependencies available"
@@ -141,6 +142,19 @@ archive_requires_rtk() {
     archive_bundles_rtk && return 0
     [[ -f "$TEMP_DIR/pi-runtime/offline-packages.json" ]] || return 1
     grep -q 'pi-rtk-optimizer' "$TEMP_DIR/pi-runtime/offline-packages.json"
+}
+
+archive_extensions_match_installed() {
+    local archive_extensions_dir="$TEMP_DIR/pi-extensions"
+    [[ -d "$archive_extensions_dir" ]] || return 0
+
+    local archive_file relative target_file
+    while IFS= read -r -d '' archive_file; do
+        [[ -d "$TARGET_EXTENSIONS_DIR" ]] || return 1
+        relative="${archive_file#"$archive_extensions_dir"/}"
+        target_file="$TARGET_EXTENSIONS_DIR/$relative"
+        [[ -f "$target_file" ]] && cmp -s "$archive_file" "$target_file" || return 1
+    done < <(find "$archive_extensions_dir" -type f -print0)
 }
 
 remove_stale_rtk_wrapper() {
@@ -355,7 +369,8 @@ main() {
     local installed_rtk_version=""
     IFS=$'\t' read -r installed_pi_version installed_node_version installed_manifest_hash installed_rtk_version <<< "$installed_info"
 
-    if [[ "$FORCE_INSTALL" != true && -n "$archive_pi_version" && -n "$installed_pi_version" && "$archive_pi_version" == "$installed_pi_version" && "$archive_node_version" == "$installed_node_version" && "$archive_manifest_hash" == "$installed_manifest_hash" && "$archive_rtk_version" == "$installed_rtk_version" ]]; then
+    if [[ "$FORCE_INSTALL" != true && -n "$archive_pi_version" && -n "$installed_pi_version" && "$archive_pi_version" == "$installed_pi_version" && "$archive_node_version" == "$installed_node_version" && "$archive_manifest_hash" == "$installed_manifest_hash" && "$archive_rtk_version" == "$installed_rtk_version" ]] \
+        && archive_extensions_match_installed; then
         ensure_rtk_installed
         log "✓ pi ${installed_pi_version} with Node ${installed_node_version} is already installed (package set unchanged)"
         exit 0
@@ -363,6 +378,7 @@ main() {
 
     log "Installing archive: $(basename "$ARCHIVE_PATH")"
     install_archive
+    archive_extensions_match_installed || error "Bundled Pi extensions were not installed correctly"
     verify_installation
 
     log "✅ pi offline update completed"

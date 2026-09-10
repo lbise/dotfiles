@@ -25,7 +25,9 @@ RTK_ARCHIVE_NAME="${PI_RTK_ARCHIVE_NAME:-rtk-${RTK_TARGET}.tar.gz}"
 RTK_DOWNLOAD_URL="${PI_RTK_DOWNLOAD_URL:-https://github.com/rtk-ai/rtk/releases/download/v${RTK_VERSION}/${RTK_ARCHIVE_NAME}}"
 TEMP_DIR=""
 STAGE_DIR=""
+EXTENSIONS_STAGE_DIR=""
 PACKAGE_SPECS=()
+EXTENSION_SPECS=()
 NPM_BIN=""
 NODE_BIN=""
 PI_PACKAGE_DIR=""
@@ -56,6 +58,7 @@ Create an offline pi bundle containing:
 - a bundled Node runtime compatible with the installed pi CLI
 - the pi CLI package and its dependencies
 - packages from Pi settings.json pre-installed into bundled global npm
+- local extensions from Pi settings.json copied to the target Pi extensions directory
 - a bundled RTK tool so Pi's RTK-accelerated tools work offline
 - an install.sh helper for target machines without npm access
 
@@ -138,6 +141,7 @@ load_package_specs() {
     PACKAGE_SOURCE_KIND="$source_kind"
     PACKAGE_SOURCE_PATH="$source_path"
     PACKAGE_SPECS=()
+    EXTENSION_SPECS=()
 
     local package_info
     package_info=$(node - "$source_kind" "$source_path" <<'NODE'
@@ -146,6 +150,7 @@ const crypto = require("crypto");
 const [kind, sourcePath] = process.argv.slice(2);
 const data = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
 const rawPackages = Array.isArray(data.packages) ? data.packages : [];
+const rawExtensions = Array.isArray(data.extensions) ? data.extensions : [];
 const packages = rawPackages.map((item, index) => {
   if (typeof item === "string") return { source: item, name: "" };
   if (item && typeof item === "object" && item.source) {
@@ -168,6 +173,12 @@ console.log(`MANIFEST_HASH=${packageHash}`);
 for (const pkg of packages) {
   console.log(`PACKAGE=${pkg.source}\t${pkg.name}`);
 }
+for (const extension of rawExtensions) {
+  if (typeof extension !== "string") {
+    throw new Error(`Invalid extension entry in ${sourcePath}; expected a path string`);
+  }
+  console.log(`EXTENSION=${extension}`);
+}
 NODE
 )
 
@@ -180,6 +191,8 @@ NODE
             MANIFEST_HASH="${line#MANIFEST_HASH=}"
         elif [[ "$line" == PACKAGE=* ]]; then
             PACKAGE_SPECS+=("${line#PACKAGE=}")
+        elif [[ "$line" == EXTENSION=* ]]; then
+            EXTENSION_SPECS+=("${line#EXTENSION=}")
         fi
     done <<< "$package_info"
 
@@ -195,6 +208,14 @@ NODE
         local spec
         for spec in "${PACKAGE_SPECS[@]}"; do
             log "  - ${spec%%$'\t'*}"
+        done
+    fi
+
+    if ((${#EXTENSION_SPECS[@]} > 0)); then
+        log "Configured local Pi extensions (${#EXTENSION_SPECS[@]}):"
+        local extension
+        for extension in "${EXTENSION_SPECS[@]}"; do
+            log "  - $extension"
         done
     fi
 }
@@ -367,8 +388,8 @@ expand_local_source_path() {
     local source_dir
     source_dir="$(dirname "$PACKAGE_SOURCE_PATH")"
 
-    if [[ "$source" == ~/* ]]; then
-        printf '%s\n' "$HOME/${source#~/}"
+    if [[ "$source" == "~/"* ]]; then
+        printf '%s\n' "$HOME/${source#\~/}"
     elif [[ "$source" == /* ]]; then
         printf '%s\n' "$source"
     else
@@ -566,6 +587,26 @@ copy_pi_runtime() {
     log "Copying pi package from $PI_PACKAGE_DIR"
     mkdir -p "$STAGE_DIR/pi"
     cp -a "$PI_PACKAGE_DIR"/. "$STAGE_DIR/pi"/
+}
+
+copy_configured_extensions() {
+    mkdir -p "$EXTENSIONS_STAGE_DIR"
+
+    local extension_source extension_path
+    for extension_source in "${EXTENSION_SPECS[@]}"; do
+        extension_path="$(expand_local_source_path "$extension_source")"
+        [[ -e "$extension_path" ]] || error "Configured Pi extension path not found: $extension_source ($extension_path)"
+
+        if [[ -d "$extension_path" ]]; then
+            cp -a "$extension_path"/. "$EXTENSIONS_STAGE_DIR"/
+        else
+            cp -a "$extension_path" "$EXTENSIONS_STAGE_DIR/$(basename "$extension_path")"
+        fi
+    done
+
+    if ((${#EXTENSION_SPECS[@]} > 0)); then
+        log "✓ Copied configured local Pi extensions"
+    fi
 }
 
 expose_pi_peer_packages() {
@@ -793,6 +834,7 @@ const manifest = {
   // Keep the exact settings entries so filters/autoload metadata are visible
   // when diagnosing an offline archive.
   packages: Array.isArray(sourceData.packages) ? sourceData.packages : [],
+  extensions: Array.isArray(sourceData.extensions) ? sourceData.extensions : [],
 };
 fs.writeFileSync(outPath, `${JSON.stringify(manifest, null, 2)}\n`);
 NODE
@@ -806,7 +848,9 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_RUNTIME_DIR="$SCRIPT_DIR/pi-runtime"
+SOURCE_EXTENSIONS_DIR="$SCRIPT_DIR/pi-extensions"
 TARGET_RUNTIME_DIR="$HOME/.local/share/pi-runtime"
+TARGET_EXTENSIONS_DIR="$HOME/.pi/agent/extensions"
 TARGET_BIN_DIR="$HOME/.local/bin"
 STAGING_DIR="${TARGET_RUNTIME_DIR}.tmp.$$"
 
@@ -821,6 +865,11 @@ cp -a "$SOURCE_RUNTIME_DIR"/. "$STAGING_DIR"/
 rm -rf "$TARGET_RUNTIME_DIR"
 mkdir -p "$(dirname "$TARGET_RUNTIME_DIR")"
 mv "$STAGING_DIR" "$TARGET_RUNTIME_DIR"
+
+if [[ -d "$SOURCE_EXTENSIONS_DIR" ]]; then
+    mkdir -p "$TARGET_EXTENSIONS_DIR"
+    cp -a "$SOURCE_EXTENSIONS_DIR"/. "$TARGET_EXTENSIONS_DIR"/
+fi
 
 cat > "$TARGET_BIN_DIR/pi" <<'WRAPPER'
 #!/usr/bin/env bash
@@ -884,6 +933,7 @@ This archive contains an offline pi runtime bundle.
 - the pi CLI package and its dependencies under \`pi-runtime/pi/\`
 - a bundled Node ${NODE_VERSION} runtime under \`pi-runtime/node/\`
 - configured Pi packages pre-installed into bundled global npm under \`pi-runtime/node/lib/node_modules/\`
+- local extensions from Pi settings installed under \`~/.pi/agent/extensions/\`
 - a bundled RTK binary under \`pi-runtime/node/bin/rtk\` so Pi can use RTK offline
 - \`install.sh\` to install the bundle on a machine without npm access
 
@@ -1015,6 +1065,7 @@ main() {
     TEMP_DIR="$(mktemp -d)"
     trap cleanup EXIT
     STAGE_DIR="$TEMP_DIR/pi-runtime"
+    EXTENSIONS_STAGE_DIR="$TEMP_DIR/pi-extensions"
 
     log "Preparing offline pi bundle"
     log "Package source: $PACKAGE_SOURCE_KIND ($PACKAGE_SOURCE_PATH)"
@@ -1029,6 +1080,7 @@ main() {
 
     setup_bundled_node
     copy_pi_runtime
+    copy_configured_extensions
     verify_bundled_pi_runtime
     expose_pi_peer_packages
     install_manifest_packages
@@ -1043,7 +1095,7 @@ main() {
     log "Creating tarball: $PACKAGE_NAME"
     (
         cd "$TEMP_DIR"
-        tar -czf "$PACKAGE_OUTPUT_PATH" pi-runtime install.sh README.md manifest.env
+        tar -czf "$PACKAGE_OUTPUT_PATH" pi-runtime pi-extensions install.sh README.md manifest.env
     )
 
     publish_archive
