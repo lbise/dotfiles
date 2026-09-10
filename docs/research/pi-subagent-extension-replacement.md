@@ -1,0 +1,87 @@
+# Replacing the local `delegate` extension
+
+Assessed 2026-08-31. This compares [`@arhen/pi-core-subagent` 1.3.51 at `21d3e647`](https://github.com/arhen/pi-extensions/tree/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent) and [`pi-subagents-lite` 1.13.0 at `e35a49d`](https://github.com/AlexParamonov/pi-subagents-lite/tree/e35a49d169b7815b30dd890aa17c1e80e853c126) against this checkout's [`delegate`](../../dot/.pi/agent/extensions/delegate/README.md). Pi installed here is `@earendil-works/pi-coding-agent` 0.84.3.
+
+## Decision
+
+**Choose `pi-subagents-lite` if the local extension must be replaced. Do not install `pi-core-subagent` as a drop-in replacement.**
+
+Lite is the better engineering bet. It has a conventional foreground/background API, explicit named agent types, model-scoped queuing, a far more substantial automated suite, and a release workflow that runs tests and typechecking. Its `Agent` API and configuration still need a migration, and its default extension loading needs tightening.
+
+There is one non-negotiable regression with either candidate. The local extension keeps process-local background jobs through a Pi session switch, rebinding its UI and completion delivery. Lite disposes its manager on every `session_shutdown`; core clears and aborts live children on the same event. Neither is a replacement if that behavior is required. Keep `delegate`, or add that lifecycle behavior upstream, instead of pretending the change is transparent.
+
+## What the local extension establishes
+
+The local extension has two tools, `delegate` and `delegate_result`, named Markdown agents, a persisted child session per saved parent, no child extensions, a parent-tool allowlist ceiling, project-agent confirmation, and separate foreground and background modes. A child gets project context and its own prompt, never the parent transcript. Background jobs are capped at eight and report a result through a follow-up or `delegate_result`. [Local README](../../dot/.pi/agent/extensions/delegate/README.md) and [tool/lifecycle implementation](../../dot/.pi/agent/extensions/delegate/index.ts) are the baseline.
+
+That is deliberately a small delegation facility. It has no graph planner, automatic worktree manager, child mailbox, or custom provider policy.
+
+## Compatibility and installation
+
+| Fact | `pi-core-subagent` | `pi-subagents-lite` |
+| --- | --- | --- |
+| Installation | `pi install npm:@arhen/pi-core-subagent`. [README](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/README.md#L9-L17) | `pi install npm:pi-subagents-lite`, with documented local and ephemeral forms. [README](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/README.md#L13-L21) |
+| Pi metadata | Peers pin all Pi packages to `^0.84.2` and also require `typebox ^1.3.14`. [package.json](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/package.json#L28-L40) | Peers require Pi packages `>=0.82.0`; it has one runtime dependency, `@sinclair/typebox ^0.34.52`. [package.json](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/package.json#L20-L34) |
+| Current local Pi | Pi 0.84.3 satisfies each Pi peer range. Pi itself bundles `typebox` 1.3.7, below core's peer range. | Pi 0.84.3 satisfies the declared range. Lite's development dependency targets Pi `^0.84.2`. |
+
+**Assessment.** Lite has the cleaner compatibility story. Core may receive a separately resolved `typebox` peer during npm installation, but that is an avoidable split from the host's `typebox` 1.3.7 and should be tested with the actual `pi install` result before adoption. Neither package constrains Node to the host's current Node 24, although Lite's README says Node 18 or newer.
+
+## Runtime architecture and tool semantics
+
+### Core
+
+Core registers `subagent`, `subagent_status`, `subagent_result`, `await_subagent`, `reply_subagent`, `steer_subagent`, and `subagent_cancel`. The main call supports one task, a `tasks` fan-out, or `chain`; `needs` makes a DAG whose upstream final text is added to each dependent's task prompt. [`index.ts`](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/index.ts#L126-L256) and [schemas](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/schemas.ts#L6-L84) establish that contract.
+
+Every normal call starts detached work and returns a run id. `autoAwait` parks the call for an inline result. Children can ask and notify the leader, receive a steering prompt, and exchange bounded mailbox messages with siblings. [Child tools](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/child.ts#L13-L94) and [background startup](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/manager.ts#L1271-L1294) implement this.
+
+Each child is an in-process `AgentSession`, with a persisted `SessionManager.create(..., { parentSession })`, a fresh resource loader, and `noExtensions: true`. Core adds its four intercom tools to the child set. [Session creation](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/manager.ts#L815-L886). The parent transcript is not copied.
+
+Core defaults to read-only `read`, `grep`, `find`, and `ls`. Write-capable toolsets create a git worktree and branch where possible, commit results, and otherwise explicitly report in-place fallback. [Tool and worktree selection](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/manager.ts#L724-L786). It caps a run at eight tasks concurrently and has a one-hour or six-hour wall-clock cap, depending on its `auto-limit` setting. [Limits](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/manager.ts#L57-L60) and [scheduler setup](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/manager.ts#L1115-L1186).
+
+### Lite
+
+Lite registers only `Agent`, `StopAgent`, and `AgentStatus`, intentionally omitting tool descriptions and prompt guidelines to reduce parent-context tokens. Its agent enum is rebuilt after agent discovery. [Registration](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/registration.ts#L19-L143).
+
+`Agent` takes `prompt`, optional `description` and `agent`, `run_in_background`, and `worktree_path`. Model, thinking, turn, and output-token policy are injected from agent and config policy rather than trusted from the LLM's call. [Execution](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/tool-execution.ts#L104-L195). A foreground child receives the parent tool abort signal; a background child deliberately does not. [Background decision](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/tool-execution.ts#L177-L215).
+
+Lite uses an in-memory `SessionManager`, not a Pi child session file. It builds a new `DefaultResourceLoader`, can load filtered child extensions and skills, then creates an `AgentSession`; nested `Agent` is excluded from child tools. [Runner](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-runner.ts#L479-L540) and [nested-agent exclusion](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-types.ts#L173-L173).
+
+Concurrency is queued per model, with per-model limits winning over provider limits, then the default. Its default is four. [Manager](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-manager.ts#L55-L193). It also has a configurable tool-idle watchdog and turn-limit grace policy. [Watchdog construction and disposal](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-manager.ts#L87-L97) and [watchdog checks](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-manager.ts#L680-L701).
+
+**Assessment.** Lite matches the local extension's unit of work: one named agent on one prompt, foreground when gated and background otherwise. Core asks the parent to think in runs, graphs, task ids, intercom, branches, and merge instructions. Those are useful features, but they change the parent contract and conflict with the local extension's decision to let normal Pi parallel tool calls express fan-out.
+
+## Isolation, configuration, and context
+
+| Topic | Core fact | Lite fact | Assessment |
+| --- | --- | --- | --- |
+| Agent definitions | Core fuzzy-matches task goals against `description` in `.agents`, `.claude`, and `.pi` files. A match replaces inline prompt and model policy. [Resolver](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/agentfile.ts) | Lite explicitly chooses a named built-in or Markdown agent. Discovery precedence is default, user, shared, project. [Discovery](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-types.ts#L26-L62) | Lite is safer and easier to migrate from local `general`, `explore`, and named custom agents. Core's semantic matching remains surprising even after fixes. |
+| Model policy | Explicit model, agent-file model, parent model, then setting. It validates thinking and probes an alternate model, falling back to parent if the probe fails. [Resolution](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/manager.ts#L510-L595) | Session override, global default, config per-type, frontmatter, then parent. [README](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/README.md#L133-L141) | Lite has the better operator interface. Core's automatic fallback can conceal a requested-model failure, although it records a note. |
+| Child extensions and skills | Disabled. | Enabled implicitly by default unless configuration or frontmatter turns them off. [Policy](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-types.ts#L381-L417) | Configure Lite with `extensions: false`, `skills: false`, and restrictive tools for default agents. This restores the local extension's safer isolation and avoids prompt bloat. |
+| Prompt and tokens | Separate child context and a compact completion notice. Core's 1.3.51 commit says its prompt diet reduced its tool payload from about 2.5k to 1.9k tokens. [commit](https://github.com/arhen/pi-extensions/commit/76da2ad6c19857e9345aeb1cdb6d59351ae1aceb) | Separate child context, default `replace` system prompt, and three minimally described parent schemas. It can opt into parent system prompt, context files, skills, and extensions. [Prompt modes](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/README.md#L154-L165) | Lite starts cheaper for the parent. Its optional inherited resources can make a child far less isolated than local `delegate`, so keep them off unless a role needs them. |
+
+## Lifecycle, observability, errors, and cancellation
+
+Both candidates show live status and usage. Core has an above-editor widget, a read-only peek pane with transcript tail, task status paths, and run-result tools. [Widget and peek registration](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/index.ts#L17-L125). Lite has a navigable widget, streaming conversation viewer, `/agents` menu, optional append-only output transcript, usage and context-percentage accounting. [README](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/README.md#L24-L58).
+
+Core can cancel a run or task, marks failed upstream dependencies as skipped, salvages partial final text, and persists recent run state beside the parent session. [Failure and cancellation path](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/manager.ts#L1325-L1449). Lite can stop queued or running agents, forwards a foreground parent interrupt to `session.abort()`, reports provider errors, and supports steering or continuing a settled in-memory session. [Manager lifecycle](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/agents/agent-manager.ts#L190-L352).
+
+The decisive lifecycle difference is not favorable to either external package. Core's `session_shutdown` calls `clearRuns`, aborting and disposing live children. [Core shutdown](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/src/index.ts#L108-L124). Lite disposes the coordinator, widget, store, and manager at shutdown. [Lite shutdown](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/src/events.ts#L226-L248). Lite's saved output logs can survive, but its conversation and continuation do not. Core saves a child transcript and sidecar, but restores interrupted work as aborted rather than resuming execution.
+
+## Quality, activity, and supply-chain risk
+
+**Source-backed facts.** Core has seven test files and a path-scoped CI workflow that runs typecheck, Biome, and Bun tests. [Workflow](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/.github/workflows/pi-core-subagent.yml). On this assessment, `bun run check` passed 129 tests. Its package received 51 npm versions between 2026-08-16 and 2026-08-30. [npm registry metadata](https://registry.npmjs.org/@arhen/pi-core-subagent/1.3.51). The repository has no open issues and three closed issues, including tool-precedence and watchdog defects. [issues](https://github.com/arhen/pi-extensions/issues?q=is%3Aissue).
+
+Lite has 75 test files. Here, `npm ci`, `npm test`, and `npm run typecheck` passed 1,688 tests. Its tag release workflow runs typecheck, tests, formatting, and creates a GitHub release. [workflow](https://github.com/AlexParamonov/pi-subagents-lite/blob/e35a49d169b7815b30dd890aa17c1e80e853c126/.github/workflows/release.yml). It has twelve closed non-PR issues and one open non-PR defect: malformed `agent.default` configuration can crash Pi when the model-settings menu reads it. [issue #19](https://github.com/AlexParamonov/pi-subagents-lite/issues/19). Its latest npm release was 2026-08-20. [release](https://github.com/AlexParamonov/pi-subagents-lite/releases/tag/v1.13.0).
+
+**Assessment.** Both are young, single-maintainer extension code that executes with the user's full Pi permissions. Pin an exact npm version, review diffs before upgrades, and use project-local installation. Lite's direct production dependency is small and its locked dependency audit reported no production vulnerabilities in this assessment. Core has no direct production dependency but a larger peer boundary and no npm lockfile. Core's extraordinary release churn, repeated critical worktree/intercom regressions documented in its own [changelog](https://github.com/arhen/pi-extensions/blob/21d3e6476f076a889f659d7201e680099165d902/packages/core/pi-core-subagent/CHANGELOG.md), and automatic git worktree/commit behavior make it the riskier choice despite its useful isolation work.
+
+## Migration plan for Lite
+
+1. Install project-locally and pin `pi-subagents-lite@1.13.0`. Do not leave both extensions active because the parent will see two delegation systems.
+2. Translate `general.md` and `explore.md` to Lite agent files. Use explicit names, `extensions: false`, `skills: false`, and a strict `tools` list. For `Explore`, remove `bash` if the local read-only guarantee matters.
+3. Translate calls: `delegate({ title, prompt, subagent_type, mode })` becomes `Agent({ prompt, description: title, agent: subagent_type, run_in_background: mode === "background" })`. Replace `delegate_result` polling with completion notifications, `AgentStatus`, and the `/agents` viewer. Use `StopAgent` for cancellation.
+4. Set per-model or provider concurrency to eight only after checking provider limits. Start with Lite's default four.
+5. Decide whether background work may die on `/new`, `/resume`, and `/reload`. If not, do not migrate yet. This is the hard blocker.
+6. Smoke-test foreground abort, background completion while the parent is busy, failed model reporting, custom agent precedence, a project agent in an untrusted target, and a session switch during a live background task.
+
+The pragmatic result is simple. Lite can replace the everyday delegation interface after a controlled migration. Core is a separate orchestration product, not a smaller or safer implementation of this repository's `delegate` contract.
