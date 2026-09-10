@@ -148,12 +148,13 @@ install_github_release() {
     # Check if already installed and up to date
     if [[ -x "$install_dir/$tool_name" && "$force_reinstall" != "1" ]]; then
         local current_version_raw current_version
-        # Try --version first, then -V, then -v
-        current_version_raw=$("$install_dir/$tool_name" --version 2>/dev/null | head -n1) ||
-            current_version_raw=$("$install_dir/$tool_name" -V 2>/dev/null | head -n1) ||
-            current_version_raw=$("$install_dir/$tool_name" -v 2>/dev/null | head -n1) ||
+        # Keep the complete response because some tools, including eza, print
+        # their version after a descriptive first line.
+        current_version_raw=$("$install_dir/$tool_name" --version 2>/dev/null) ||
+            current_version_raw=$("$install_dir/$tool_name" -V 2>/dev/null) ||
+            current_version_raw=$("$install_dir/$tool_name" -v 2>/dev/null) ||
             current_version_raw=""
-        current_version=$(normalize_version "$current_version_raw")
+        current_version=$(normalize_version "$current_version_raw" || true)
 
         if [[ -z "$current_version" ]]; then
             echo "ERROR: $tool_name is installed but could not determine version" >&2
