@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Refresh the remote Herdr agent link before starting its non-interactive bridge.
+set -Eeuo pipefail
+
+real_ssh=${HERDR_REAL_SSH:-}
+if [[ -z $real_ssh ]]; then
+    for candidate in /usr/bin/ssh /bin/ssh; do
+        if [[ -x $candidate ]]; then
+            real_ssh=$candidate
+            break
+        fi
+    done
+fi
+if [[ -z $real_ssh || ! -x $real_ssh ]]; then
+    echo "herdr ssh wrapper: OpenSSH client not found" >&2
+    exit 127
+fi
+
+args=("$@")
+if (( ${#args[@]} > 0 )); then
+    last=$((${#args[@]} - 1))
+    remote_command=${args[$last]}
+    if [[ $remote_command == *" remote-client-bridge" ]]; then
+        args[$last]='if [ -S "${SSH_AUTH_SOCK:-}" ] && [ -x "$HOME/.scripts/herdr-socklink.sh" ]; then "$HOME/.scripts/herdr-socklink.sh" set-current-socket || echo "herdr ssh wrapper: could not refresh SSH_AUTH_SOCK" >&2; fi; '"$remote_command"
+    fi
+fi
+
+exec "$real_ssh" "${args[@]}"
