@@ -224,7 +224,17 @@ local config = {
 			picker = {
 				enabled = true,
 				sources = {
+					files = {
+						hidden = true,
+					},
+					grep = {
+						hidden = true,
+					},
+					grep_word = {
+						hidden = true,
+					},
 					explorer = {
+						hidden = true,
 						auto_close = true,
 						layout = { preset = "select", preview = false },
 					},
