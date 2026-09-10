@@ -75,9 +75,9 @@ echo ">> Cloning dotfiles repository..."
 git clone https://github.com/lbise/dotfiles.git "$DOTFILES_DIR"
 
 echo "********************************************************************************"
-echo "Bootstrap completed! Running install.sh..."
+echo "Bootstrap completed! Running the dotfiles bootstrap command..."
 echo "********************************************************************************"
 
 # Run the installation script
 cd "$DOTFILES_DIR"
-./install.sh
+./scripts/dotfiles bootstrap

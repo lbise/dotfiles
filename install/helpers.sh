@@ -10,8 +10,13 @@ create_symlink() {
         exit 1
     fi
 
+    if [[ -L "$DST" ]] && [[ "$(readlink -f -- "$DST" 2>/dev/null || true)" == "$(readlink -f -- "$SRC")" ]]; then
+        echo "$DST already points to $SRC"
+        return 0
+    fi
+
     if [[ -e "$DST" || -L "$DST" ]]; then
-        echo "$DST already exist, removing it"
+        echo "$DST already exists, removing it"
         rm -rf "$DST"
     fi
 

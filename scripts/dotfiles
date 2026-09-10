@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SCRIPT_DIR=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+DOTFILES_DIR=${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}
+STATE_DIR=${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}
+APPLIED_HEAD_FILE="$STATE_DIR/applied-head"
+
+error() {
+    echo "dotfiles: $*" >&2
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: dotfiles COMMAND [ARGUMENTS]
+
+Commands:
+  sync        Pull dotfiles and apply a commit that has not been applied yet
+  apps [NAME ...]
+              Update the default version-aware apps or only the named apps
+  update      Run sync followed by apps
+  system      Upgrade system packages and install declared packages
+  bootstrap   Run the complete installer for a new machine
+  help        Show this help
+EOF
+}
+
+require_repo() {
+    git -C "$DOTFILES_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+        error "$DOTFILES_DIR is not a Git work tree"
+}
+
+apply_current_commit() {
+    local head applied_head="" hook tmp_file
+    head=$(git -C "$DOTFILES_DIR" rev-parse HEAD)
+    if [[ -f "$APPLIED_HEAD_FILE" ]]; then
+        applied_head=$(<"$APPLIED_HEAD_FILE")
+    fi
+
+    if [[ "$head" == "$applied_head" ]]; then
+        echo "Dotfiles commit already applied: $head"
+        return 0
+    fi
+
+    echo "Applying dotfiles commit: $head"
+    if [[ -d "$DOTFILES_DIR/install/apply.d" ]]; then
+        shopt -s nullglob
+        local hooks=("$DOTFILES_DIR"/install/apply.d/*.sh)
+        shopt -u nullglob
+        for hook in "${hooks[@]}"; do
+            [[ -x "$hook" ]] || error "apply hook is not executable: $hook"
+            echo ">> $(basename "$hook")"
+            (cd "$DOTFILES_DIR" && "$hook")
+        done
+    fi
+
+    mkdir -p "$STATE_DIR"
+    tmp_file=$(mktemp "$STATE_DIR/applied-head.XXXXXX")
+    printf '%s\n' "$head" > "$tmp_file"
+    mv "$tmp_file" "$APPLIED_HEAD_FILE"
+}
+
+sync_dotfiles() {
+    require_repo
+    if [[ -n "$(git -C "$DOTFILES_DIR" status --porcelain)" ]]; then
+        error "working tree has local changes; commit, stash, or remove them before syncing"
+    fi
+
+    git -C "$DOTFILES_DIR" pull --ff-only
+    apply_current_commit
+}
+
+platform_id() {
+    if [[ -n "${DOTFILES_OS_ID:-}" ]]; then
+        printf '%s\n' "$DOTFILES_OS_ID"
+        return 0
+    fi
+
+    if [[ $(uname -s) == Darwin ]]; then
+        echo macos
+        return 0
+    fi
+
+    if [[ -r /etc/os-release ]]; then
+        (
+            # shellcheck disable=SC1091
+            source /etc/os-release
+            printf '%s\n' "$ID"
+        )
+        return 0
+    fi
+
+    error "cannot determine the operating system"
+}
+
+run_as_root() {
+    if (( EUID == 0 )); then
+        "$@"
+    else
+        command -v sudo >/dev/null 2>&1 || error "sudo is required for system updates"
+        sudo "$@"
+    fi
+}
+
+update_system() {
+    local platform
+    platform=$(platform_id)
+
+    case "$platform" in
+        ubuntu)
+            run_as_root apt-get update
+            run_as_root apt-get upgrade -y
+            "$DOTFILES_DIR/install/packages_ubuntu.sh"
+            ;;
+        arch)
+            command -v yay >/dev/null 2>&1 || error "yay is required for Arch system updates"
+            yay -Syu --noconfirm
+            "$DOTFILES_DIR/install/packages_arch.sh"
+            ;;
+        macos)
+            command -v brew >/dev/null 2>&1 || error "Homebrew is required for macOS system updates"
+            brew update
+            brew upgrade
+            ;;
+        *)
+            error "unsupported operating system for system updates: $platform"
+            ;;
+    esac
+}
+
+main() {
+    local command=${1:-help}
+    shift || true
+
+    case "$command" in
+        sync)
+            [[ $# -eq 0 ]] || error "sync does not accept arguments"
+            sync_dotfiles
+            ;;
+        apps)
+            "$DOTFILES_DIR/install/apps/update_apps.sh" "$@"
+            ;;
+        update)
+            [[ $# -eq 0 ]] || error "update does not accept arguments"
+            sync_dotfiles
+            "$DOTFILES_DIR/install/apps/update_apps.sh"
+            ;;
+        system)
+            [[ $# -eq 0 ]] || error "system does not accept arguments"
+            update_system
+            ;;
+        bootstrap)
+            [[ $# -eq 0 ]] || error "bootstrap does not accept arguments"
+            "$DOTFILES_DIR/install.sh"
+            ;;
+        help|--help|-h)
+            usage
+            ;;
+        *)
+            error "unknown command: $command"
+            ;;
+    esac
+}
+
+main "$@"

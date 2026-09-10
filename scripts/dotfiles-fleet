@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+HOSTS_FILE=${DOTFILES_HOSTS:-$HOME/.config/dotfiles/hosts}
+
+error() {
+    echo "dotfiles-fleet: $*" >&2
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: dotfiles-fleet [sync|apps|update|system]
+
+Runs the selected dotfiles command sequentially on each SSH destination in
+$DOTFILES_HOSTS or ~/.config/dotfiles/hosts. Blank lines and comments are
+ignored. The default command is update.
+EOF
+}
+
+main() {
+    local action=${1:-update}
+    local host
+    [[ $# -le 1 ]] || error "only one command may be specified"
+
+    case "$action" in
+        sync|apps|update|system) ;;
+        help|--help|-h)
+            usage
+            return 0
+            ;;
+        *) error "unsupported remote command: $action" ;;
+    esac
+
+    [[ -r "$HOSTS_FILE" ]] || error "hosts file is not readable: $HOSTS_FILE"
+
+    shopt -s extglob
+    while IFS= read -r host || [[ -n "$host" ]]; do
+        host=${host##+([[:space:]])}
+        host=${host%%+([[:space:]])}
+        [[ -z "$host" || "$host" == \#* ]] && continue
+        [[ "$host" != *[[:space:]]* ]] || error "invalid SSH destination in $HOSTS_FILE: $host"
+
+        echo "===== $host ====="
+        if [[ "$action" == system ]]; then
+            ssh -t "$host" "~/.scripts/dotfiles $action"
+        else
+            ssh "$host" "~/.scripts/dotfiles $action"
+        fi
+    done < "$HOSTS_FILE"
+}
+
+main "$@"
