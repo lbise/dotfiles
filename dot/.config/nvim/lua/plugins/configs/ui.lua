@@ -202,7 +202,7 @@ local config = {
 		---@type snacks.Config
 		opts = {
 			bigfile = { enabled = true },
-			dashboard = { enabled = true },
+			dashboard = { enabled = false },
 			indent = {
 				enabled = true,
 				-- Keep scope line but do not highlight as it seem to be heavy to handle over ssh?
