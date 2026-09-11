@@ -26,7 +26,8 @@ import { basename } from "node:path";
 import { Type } from "typebox";
 
 import { decorateToolUi, type ToolUiHeader } from "./tool-ui/consumer.ts";
-import { COLLAPSED_SHELL_LINES } from "./tool-ui/render.ts";
+import { COLLAPSED_SHELL_LINES, extractText } from "./tool-ui/render.ts";
+import { summarizeFindResult, summarizeGrepResult } from "./tool-ui/search-summary.ts";
 
 const EXTENSION_NAME = "rtk";
 const RTK_TIMEOUT_MS = 15_000;
@@ -771,6 +772,16 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
         context,
       );
     },
+    summary: {
+      partial: "↳ searching…",
+      render(result, context) {
+        return summarizeGrepResult({
+          text: extractText(result),
+          details: result.details,
+          isError: context.isError,
+        });
+      },
+    },
     onResult(result, context) {
       rememberActualRouteFromResult(result, context);
     },
@@ -816,6 +827,16 @@ export default function rtkPiExtension(pi: ExtensionAPI): void {
         rtkArgs ? formatRtkCommand(rtkArgs) : buildPiFindDisplay(args),
         context,
       );
+    },
+    summary: {
+      partial: "↳ searching…",
+      render(result, context) {
+        return summarizeFindResult({
+          text: extractText(result),
+          details: result.details,
+          isError: context.isError,
+        });
+      },
     },
     onResult(result, context) {
       rememberActualRouteFromResult(result, context);

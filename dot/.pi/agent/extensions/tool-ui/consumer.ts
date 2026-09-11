@@ -6,6 +6,7 @@ import type {
 import type { Static, TSchema } from "typebox";
 
 import {
+  AnsiLine,
   COLLAPSED_PREVIEW_LINES,
   EXPANDED_PREVIEW_LINES,
   OutputPreview,
@@ -31,12 +32,22 @@ export type ToolUiOutput = {
   collapsedFrom?: "start" | "end";
 };
 
+/** Render a result as one status line, regardless of the transcript expansion state. */
+export type ToolUiSummary<TParams extends TSchema, TDetails, TState> = {
+  partial?: string;
+  render(
+    result: AgentToolResult<TDetails>,
+    context: DefinitionRenderContext<TParams, TDetails, TState>,
+  ): string;
+};
+
 export type ToolUiRegistration<TParams extends TSchema, TDetails, TState> = {
   header(
     args: Static<TParams>,
     context: DefinitionRenderContext<TParams, TDetails, TState>,
   ): ToolUiHeader;
   output?: ToolUiOutput;
+  summary?: ToolUiSummary<TParams, TDetails, TState>;
   onResult?(
     result: AgentToolResult<TDetails>,
     context: DefinitionRenderContext<TParams, TDetails, TState>,
@@ -111,6 +122,18 @@ export function decorateToolUi<TParams extends TSchema, TDetails, TState>(
       registration.onResult?.(result, context);
       const call = getCall(context.state);
       if (call) updateCall(call, registration, context.args, theme, context);
+
+      if (registration.summary) {
+        const text = context.isPartial
+          ? registration.summary.partial ?? "working…"
+          : registration.summary.render(result, context);
+        const color = context.isError ? "error" : context.isPartial ? "muted" : "toolOutput";
+        const summary = context.lastComponent instanceof AnsiLine
+          ? context.lastComponent
+          : new AnsiLine();
+        summary.setText(theme.fg(color, text.replace(/\s+/g, " ").trim()));
+        return summary;
+      }
 
       const output = registration.output;
       const lines = splitOutput(extractText(result)).map((line) =>

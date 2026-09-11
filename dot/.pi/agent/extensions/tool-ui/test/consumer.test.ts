@@ -74,3 +74,62 @@ test("decorateToolUi adds rendering without replacing tool execution", async () 
   assert.match(call?.render(80).join("\n") ?? "", /│ owned target via owner/);
   assert.match(output?.render(80).join("\n") ?? "", /result: target/);
 });
+
+test("summary rendering stays one line when expanded, partial, or failed", () => {
+  const definition: ToolDefinition<typeof schema, Details, State> = {
+    name: "search",
+    label: "search",
+    description: "Test search tool",
+    parameters: schema,
+    async execute() {
+      return { content: [{ type: "text", text: "unused" }], details: { routedBy: "owner" } };
+    },
+  };
+  const decorated = decorateToolUi(definition, {
+    header() {
+      return { label: "search" };
+    },
+    summary: {
+      partial: "↳ searching…",
+      render(result, context) {
+        const first = result.content[0];
+        const error = first?.type === "text" ? first.text : "unknown error";
+        return context.isError ? `↳ error: ${error}` : "↳ 2 matches in 1 file";
+      },
+    },
+  });
+  const result = { content: [{ type: "text" as const, text: "failed\nwith details" }], details: { routedBy: "owner" } };
+  const context = {
+    args: { value: "target" },
+    toolCallId: "call-2",
+    invalidate() {},
+    state: {} as State,
+    cwd: "/tmp",
+    executionStarted: true,
+    argsComplete: true,
+    expanded: true,
+    showImages: true,
+    lastComponent: undefined,
+  };
+
+  const expanded = decorated.renderResult?.(result, { expanded: true, isPartial: false }, theme, {
+    ...context,
+    isError: false,
+    isPartial: false,
+  });
+  assert.deepEqual(expanded?.render(80), ["↳ 2 matches in 1 file"]);
+
+  const partial = decorated.renderResult?.(result, { expanded: true, isPartial: true }, theme, {
+    ...context,
+    isError: false,
+    isPartial: true,
+  });
+  assert.deepEqual(partial?.render(80), ["↳ searching…"]);
+
+  const failed = decorated.renderResult?.(result, { expanded: true, isPartial: false }, theme, {
+    ...context,
+    isError: true,
+    isPartial: false,
+  });
+  assert.deepEqual(failed?.render(80), ["↳ error: failed with details"]);
+});

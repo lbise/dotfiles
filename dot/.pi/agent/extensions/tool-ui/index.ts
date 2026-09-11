@@ -4,7 +4,6 @@ import {
   createWriteToolDefinition,
   getLanguageFromPath,
   highlightCode,
-  keyHint,
   renderDiff,
   SettingsManager,
   type ExtensionAPI,
@@ -45,8 +44,7 @@ type RenderContext = RenderLifecycle & {
 type TextResult = {
   content?: Array<{ type: string; text?: string }>;
   details?: {
-    truncation?: { truncated?: boolean };
-    fullOutputPath?: string;
+    truncation?: { truncated?: boolean; outputLines?: number };
   };
 };
 
@@ -92,20 +90,19 @@ function styleLines(lines: string[], theme: Theme, error = false): string[] {
   return lines.map((line) => theme.fg(color, line));
 }
 
-function highlightedLines(text: string, path: unknown, theme: Theme): string[] {
-  const lines = splitOutput(text);
-  const language = typeof path === "string" ? getLanguageFromPath(path) : undefined;
-  if (!language) return styleLines(lines, theme);
-  return highlightCode(lines.join("\n"), language);
-}
+function readSummary(result: TextResult): string {
+  if (result.content?.some((item) => item.type === "image")) return "loaded image";
 
-function resultFooter(details: unknown): string | undefined {
-  if (!details || typeof details !== "object") return undefined;
-  const value = details as TextResult["details"];
-  const notes: string[] = [];
-  if (value?.truncation?.truncated) notes.push("backend output truncated");
-  if (value?.fullOutputPath) notes.push(`full output: ${value.fullOutputPath}`);
-  return notes.length > 0 ? notes.join(" · ") : undefined;
+  const truncation = result.details?.truncation;
+  // Pi appends continuation notices to the text sent to the model. Don't count
+  // those notices as file content, or discard blank lines within the file.
+  const output = extractText(result);
+  const text = output.replace(/\n\n\[\d+ more lines in file\. Use offset=\d+ to continue\.\]$/, "");
+  const hasContinuation = output !== text;
+  const normalized = text.replace(/\r\n/g, "\n");
+  const content = hasContinuation ? normalized : normalized.replace(/\n$/, "");
+  const count = truncation?.outputLines ?? (text === "" && !hasContinuation ? 0 : content.split("\n").length);
+  return `loaded ${countLabel(count, "line")}${truncation?.truncated ? " · truncated" : ""}`;
 }
 
 function lineRange(offset: unknown, limit: unknown): string {
@@ -142,23 +139,10 @@ function registerRead(pi: ExtensionAPI): void {
     },
     renderResult(result, options, theme, context) {
       settleCall(context, theme);
-      const text = extractText(result);
-      const lines = highlightedLines(text, context.args.path, theme);
-      const footer = resultFooter(result.details);
-
-      if (!options.expanded && !context.isError) {
-        const summary = `↳ loaded ${countLabel(lines.length, "line")}`;
-        const notes = [footer, keyHint("app.tools.expand", "to expand")].filter(Boolean).join(" · ");
-        return oneLineResult(context, theme.fg("muted", `${summary} · ${notes}`));
-      }
-
-      return outputPreview(context, theme, {
-        lines: context.isError ? styleLines(splitOutput(text), theme, true) : lines,
-        expanded: options.expanded,
-        collapsedLines: COLLAPSED_PREVIEW_LINES,
-        expandedLines: EXPANDED_PREVIEW_LINES,
-        footer,
-      });
+      const summary = context.isError
+        ? `error: ${extractText(result).replace(/\s+/g, " ").trim() || "read failed"}`
+        : options.isPartial ? "loading…" : readSummary(result);
+      return oneLineResult(context, theme.fg(context.isError ? "error" : "muted", `↳ ${summary}`));
     },
   });
 }
