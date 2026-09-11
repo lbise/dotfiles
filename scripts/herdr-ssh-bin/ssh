@@ -3,9 +3,12 @@
 set -Eeuo pipefail
 
 real_ssh=${HERDR_REAL_SSH:-}
-if [[ -z $real_ssh ]]; then
+# Existing panes may inherit a command name, stale path, or this wrapper.
+# Only use executable paths, and never recurse through our own symlinks.
+if [[ -z $real_ssh || $real_ssh != */* || ! -x $real_ssh || $real_ssh -ef ${BASH_SOURCE[0]} ]]; then
+    real_ssh=
     for candidate in /usr/bin/ssh /bin/ssh; do
-        if [[ -x $candidate ]]; then
+        if [[ -x $candidate && ! $candidate -ef ${BASH_SOURCE[0]} ]]; then
             real_ssh=$candidate
             break
         fi

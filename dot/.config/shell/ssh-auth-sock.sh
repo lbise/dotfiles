@@ -38,9 +38,9 @@ herdr() {
         herdr_auth_sock=$("$_herdr_socklink" show)
         # Saved-machine bridges skip interactive remote shell startup. This
         # Herdr-only ssh wrapper refreshes the remote link before the bridge.
-        HERDR_REAL_SSH="$(command -v ssh)" \
-            PATH="$HOME/.scripts/herdr-ssh-bin:$PATH" \
-            SSH_AUTH_SOCK="$herdr_auth_sock" \
+        # Let it find OpenSSH: command -v can return a function or the wrapper.
+        PATH="$HOME/.scripts/herdr-ssh-bin:$PATH" \
+        SSH_AUTH_SOCK="$herdr_auth_sock" \
             command herdr "$@"
     else
         command herdr "$@"
