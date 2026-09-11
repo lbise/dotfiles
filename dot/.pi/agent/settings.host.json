@@ -27,7 +27,7 @@
       }
     }
   },
-  "packages": ["npm:@agnishc/edb-context-viewer", "npm:pi-footer"],
+  "packages": ["npm:pi-context-view", "npm:pi-footer"],
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen"

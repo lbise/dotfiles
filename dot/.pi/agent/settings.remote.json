@@ -26,7 +26,7 @@
     }
   },
   "packages": [
-    "npm:@agnishc/edb-context-viewer",
+    "npm:pi-context-view",
     "npm:pi-footer"
   ],
   "hideThinkingBlock": true,
