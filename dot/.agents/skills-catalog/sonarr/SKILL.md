@@ -11,7 +11,7 @@ Run commands as:
 
 `sonarr.py <command> <subcommand> [options]`
 
-In this repo, the script lives at `scripts/sonarr.py`.
+The CLI has no working-directory requirement. Run `sonarr.py` when it is on `PATH`, or invoke the companion script by its installed path. In a dotfiles checkout that path is `./scripts/sonarr.py`.
 
 ## Environment Variables
 
@@ -75,7 +75,17 @@ Mutating commands require explicit confirmation:
 * Update resource with payload file:
   `sonarr.py resource update qualityprofile 1 --data-file ./profile.json --yes`
 
+## Restricted interface
+
+Packaged consumers that need read-only media data must use the companion script's fixed JSON interface, not the general commands above:
+
+* `sonarr.py restricted lookup --term <term>`
+* `sonarr.py restricted configuration`
+* `sonarr.py restricted status --id <tvdb-id>`
+
+It takes the service URL and credential only from `SONARR_URL` and `SONARR_API_KEY`, accepts no URL or request-path override, never follows redirects, and writes one sanitized JSON result to stdout. It does not authorize mutations.
+
 ## Notes
 
 * Paths passed to `request` can be either `/foo` (auto-prefixed to `/api/v3/foo`) or full `/api/v3/foo`.
-* For local usage in this dotfiles repo, invoke with `./scripts/sonarr.py` unless you have `sonarr.py` in your PATH.
+* The general CLI remains available for terminal-agent use. Its confirmation flags do not authorize an external consumer to run a mutation.

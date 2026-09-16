@@ -10,6 +10,8 @@ from typing import Any, Optional
 
 import requests
 
+from media_restricted import run as run_restricted
+
 
 class RadarrClient:
     def __init__(self, base_url: str, api_key: str, timeout: int = 30):
@@ -46,9 +48,10 @@ class RadarrClient:
             params=params,
             json=payload,
             timeout=self.timeout,
+            allow_redirects=False,
         )
 
-        if response.status_code >= 400:
+        if response.status_code >= 300:
             message = response.text.strip()
             raise requests.exceptions.HTTPError(
                 f"HTTP {response.status_code} {response.reason}: {message}",
@@ -753,6 +756,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "restricted":
+        raise SystemExit(run_restricted("radarr", RadarrClient, sys.argv[2:]))
+
     parser = build_parser()
     args = parser.parse_args()
 
