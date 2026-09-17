@@ -36,7 +36,7 @@ No direct compaction-engine collision exists in the configured local extensions:
 - `copilot-usage.ts`, `openai-codex-usage.ts`, and `herdr-agent-state.ts` observe lifecycle/provider events but do not compact.
 - `rtk.ts` filters only RTK-specific custom context messages and rewrites/tool-routes bash calls; it does not intercept compaction.
 - `pi-footer` is UI-only for this purpose.
-- `@agnishc/edb-context-viewer` only registers its context-inspection command.
+- `pi-context-view` observes context and compaction lifecycle events to build its views, but it does not provide or replace compaction.
 
 `pi-subagents` does listen to `session_before_compact` and `session_compact`, but it does not provide or cancel compaction. It suspends widgets for non-manual compaction and may send a hidden continuation after compaction when async children are active. Blackhole invokes public `ctx.compact()`, which Pi reports as a manual compaction event, so this is lifecycle interaction rather than competing summary generation. It is worth smoke-testing manual and automatic blackhole compaction while a background child is active.
 
