@@ -29,21 +29,24 @@
       "8": "8",
       "9": "9",
       "10": "0",
-      "active": "󱓻"
+      "active": "󱓻",
     },
     "persistent-workspaces": {
       "1": [],
       "2": [],
       "3": [],
       "4": [],
-      "5": []
-    }
+      "5": [],
+      "6": [],
+      "7": [],
+      "8": [],
+    },
   },
 
   "cpu": {
     "interval": 5,
     "format": "󰍛",
-    "on-click": "system-exec-term.sh btop"
+    "on-click": "system-exec-term.sh btop",
   },
   "clock": {
     "format": "{:L%A %H:%M}",
@@ -61,7 +64,7 @@
     "tooltip-format-disconnected": "Disconnected",
     "interval": 3,
     "spacing": 1,
-    "on-click": "system-exec-term.sh impala"
+    "on-click": "system-exec-term.sh impala",
   },
   "battery": {
     "format": "{capacity}% {icon}",
@@ -70,7 +73,7 @@
     "format-plugged": "",
     "format-icons": {
       "charging": ["󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅"],
-      "default": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+      "default": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
     },
     "format-full": "󰂅",
     "tooltip-format-discharging": "{power:>1.0f}W↓ {capacity}%",
@@ -79,8 +82,8 @@
     "on-click": "omarchy-menu power",
     "states": {
       "warning": 20,
-      "critical": 10
-    }
+      "critical": 10,
+    },
   },
   "bluetooth": {
     "format": "",
@@ -88,7 +91,7 @@
     "format-connected": "󰂱",
     "format-no-controller": "",
     "tooltip-format": "Devices connected: {num_connections}",
-    "on-click": "omarchy-launch-bluetooth"
+    "on-click": "omarchy-launch-bluetooth",
   },
   "pulseaudio": {
     "format": "{icon}",
@@ -98,8 +101,8 @@
     "scroll-step": 5,
     "format-muted": "",
     "format-icons": {
-      "default": ["", "", ""]
-    }
+      "default": ["", "", ""],
+    },
   },
   "custom/printer": {
     "exec": "system-printer-status.sh",
@@ -107,28 +110,28 @@
     "interval": 5,
     "format": "{text}",
     "escape": true,
-    "on-click": "system-config-printer"
+    "on-click": "system-config-printer",
   },
   "group/tray-expander": {
     "orientation": "inherit",
     "drawer": {
       "transition-duration": 600,
-      "children-class": "tray-group-item"
+      "children-class": "tray-group-item",
     },
-    "modules": ["custom/expand-icon", "custom/printer", "tray"]
+    "modules": ["custom/expand-icon", "custom/printer", "tray"],
   },
   "custom/expand-icon": {
     "format": "",
-    "tooltip": false
+    "tooltip": false,
   },
   "custom/screenrecording-indicator": {
     "on-click": "omarchy-cmd-screenrecord",
     "exec": "$OMARCHY_PATH/default/waybar/indicators/screen-recording.sh",
     "signal": 8,
-    "return-type": "json"
+    "return-type": "json",
   },
   "tray": {
     "icon-size": 12,
-    "spacing": 17
-  }
+    "spacing": 17,
+  },
 }
