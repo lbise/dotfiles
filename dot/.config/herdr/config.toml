@@ -7,6 +7,8 @@ name = "tokyo-night"
 # overlay0 for generated tab labels, so start from the normal text color.
 [theme.custom]
 overlay0 = "#c0caf5"
+# Make the focused workspace/agent row stand out from the Tokyo Night background.
+active_row_bg = "#3b4261"
 
 # Override individual color tokens on top of the base theme.
 # Accepts: hex (#rrggbb), named colors, rgb(r,g,b), or panel_bg = "reset"
@@ -93,8 +95,8 @@ toggle_sidebar = "prefix+p"
 
 # Navigate-mode movement. These local shortcuts win while navigate mode is open.
 # They are independent from focus_pane_*. Do not include prefix+, esc, enter, tab, or 1..9 here.
-# navigate_workspace_up = "up"
-# navigate_workspace_down = "down"
+navigate_workspace_up = "k"
+navigate_workspace_down = "j"
 # navigate_pane_left = "h"      # left arrow always focuses the pane to the left
 # navigate_pane_down = "j"
 # navigate_pane_up = "k"
