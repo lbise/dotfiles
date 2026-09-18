@@ -23,7 +23,7 @@ args=("$@")
 if (( ${#args[@]} > 0 )); then
     last=$((${#args[@]} - 1))
     remote_command=${args[$last]}
-    if [[ $remote_command == *" remote-client-bridge" ]]; then
+    if [[ $remote_command =~ [[:space:]]remote-client-bridge([[:space:]]|$) ]]; then
         args[$last]='if [ -S "${SSH_AUTH_SOCK:-}" ] && [ -x "$HOME/.scripts/herdr-socklink.sh" ]; then "$HOME/.scripts/herdr-socklink.sh" set-current-socket || echo "herdr ssh wrapper: could not refresh SSH_AUTH_SOCK" >&2; fi; '"$remote_command"
     fi
 fi

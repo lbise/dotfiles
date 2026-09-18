@@ -55,6 +55,6 @@ output=$(
     TEST_AGENT_SOCK="$agent_sock" \
     TEST_SOCKLINK_DIR="$socklink_dir" \
     "$ROOT/scripts/herdr-ssh-bin/ssh" machine \
-    'exec "$HOME/.local/bin/herdr" remote-client-bridge'
+    'exec "$HOME/.local/bin/herdr" remote-client-bridge --idle-timeout-v1'
 )
 [[ $output == bridge-agent=usable ]]
