@@ -25,6 +25,7 @@ COMMON_LINKS=(
     ".config/fcitx5"
     ".config/environment.d"
     ".config/shell/ssh-auth-sock.sh"
+    ".config/shell/herdr-display.sh"
     ".pi/agent/prompts"
     # Includes pi-footer.json at ~/.pi/agent/extensions/pi-footer.json.
     ".pi/agent/extensions"

@@ -44,6 +44,7 @@ set -Eeuo pipefail
 remote_command=${!#}
 HOME=$TEST_REMOTE_HOME \
 SSH_AUTH_SOCK=$TEST_AGENT_SOCK \
+DISPLAY=$TEST_DISPLAY \
 SOCKLINK_DIR=$TEST_SOCKLINK_DIR \
 bash -c "$remote_command"
 EOF
@@ -53,8 +54,20 @@ output=$(
     HERDR_REAL_SSH="$fake_ssh" \
     TEST_REMOTE_HOME="$remote_home" \
     TEST_AGENT_SOCK="$agent_sock" \
+    TEST_DISPLAY="localhost:42.0" \
     TEST_SOCKLINK_DIR="$socklink_dir" \
     "$ROOT/scripts/herdr-ssh-bin/ssh" machine \
     'exec "$HOME/.local/bin/herdr" remote-client-bridge --idle-timeout-v1'
 )
 [[ $output == bridge-agent=usable ]]
+
+# The same bridge refresh must publish connection-specific display variables
+# for shells that outlive the SSH connection which started the Herdr server.
+environment_file="$remote_home/.config/herdr/client-environment.sh"
+(
+    unset DISPLAY WAYLAND_DISPLAY XAUTHORITY
+    source "$environment_file"
+    [[ $DISPLAY == localhost:42.0 ]]
+    [[ ! -v WAYLAND_DISPLAY ]]
+    [[ ! -v XAUTHORITY ]]
+)

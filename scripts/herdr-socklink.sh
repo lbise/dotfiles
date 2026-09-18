@@ -7,7 +7,7 @@ SOCKLINK_DIR="${SOCKLINK_DIR:-${SOCKLINK_TMPDIR:-/tmp}/socklink-$(id -u)}"
 HERDR_LINK="$SOCKLINK_DIR/herdr"
 
 usage() {
-    echo "Usage: $(basename "$0") {set-current-tty|set-current-socket|show}" >&2
+    echo "Usage: $(basename "$0") {set-current-tty|set-current-socket|set-client-environment|show}" >&2
 }
 
 set_current_target() {
@@ -29,6 +29,31 @@ set_current_target() {
     ln -s "$target" "$temp_link"
     mv -f "$temp_link" "$HERDR_LINK"
     rmdir "$temp_dir"
+    trap - EXIT
+}
+
+write_client_environment() {
+    local environment_dir environment_file temp_file variable
+
+    environment_dir="${HERDR_ENVIRONMENT_DIR:-$HOME/.config/herdr}"
+    environment_file="$environment_dir/client-environment.sh"
+    mkdir -p "$environment_dir"
+    if [[ ! -O "$environment_dir" ]]; then
+        echo "Expected $environment_dir to be owned by the current user" >&2
+        return 1
+    fi
+
+    umask 077
+    temp_file=$(mktemp "$environment_dir/.client-environment.XXXXXX")
+    trap 'rm -f "$temp_file"' EXIT
+    for variable in DISPLAY WAYLAND_DISPLAY XAUTHORITY; do
+        if [[ -v "$variable" ]]; then
+            printf 'export %s=%q\n' "$variable" "${!variable}"
+        else
+            printf 'unset %s\n' "$variable"
+        fi
+    done >"$temp_file"
+    mv -f "$temp_file" "$environment_file"
     trap - EXIT
 }
 
@@ -54,6 +79,7 @@ set_current_socket() {
     fi
 
     set_current_target "$SSH_AUTH_SOCK"
+    write_client_environment
 }
 
 case "${1:-}" in
@@ -62,6 +88,9 @@ case "${1:-}" in
         ;;
     set-current-socket)
         set_current_socket
+        ;;
+    set-client-environment)
+        write_client_environment
         ;;
     show)
         printf '%s\n' "$HERDR_LINK"

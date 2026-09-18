@@ -78,6 +78,9 @@ source $HOME/.aliases
 if [[ -f "$HOME/.config/shell/ssh-auth-sock.sh" ]]; then
     source "$HOME/.config/shell/ssh-auth-sock.sh"
 fi
+if [[ -f "$HOME/.config/shell/herdr-display.sh" ]]; then
+    source "$HOME/.config/shell/herdr-display.sh"
+fi
 # --------------------------------------------------------------------------------
 
 # Work specific

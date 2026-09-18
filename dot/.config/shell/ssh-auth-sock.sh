@@ -35,6 +35,7 @@ herdr() {
         local herdr_auth_sock
         "$_socklink" -c herdr-client set-tty-link
         "$_herdr_socklink" set-current-tty
+        "$_herdr_socklink" set-client-environment
         herdr_auth_sock=$("$_herdr_socklink" show)
         # Saved-machine bridges skip interactive remote shell startup. This
         # Herdr-only ssh wrapper refreshes the remote link before the bridge.
