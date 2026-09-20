@@ -21,6 +21,7 @@ COMMON_LINKS=(
     ".config/opencode"
     ".config/herdr/config.toml"
     ".ssh/config"
+    ".ssh/rc"
     ".gnupg/gpg-agent.conf"
     ".config/fcitx5"
     ".config/environment.d"
