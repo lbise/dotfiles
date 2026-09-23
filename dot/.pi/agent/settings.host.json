@@ -1,29 +1,26 @@
 {
-  "lastChangelogVersion": "0.85.1",
+  "lastChangelogVersion": "0.87.1",
   "defaultProvider": "github-copilot",
   "defaultModel": "gpt-5.6-luna",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
   "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
   "enabledModels": [
-    "github-copilot/gpt-5.6-sol",
-    "github-copilot/gpt-5.6-terra",
-    "openai-codex/gpt-5.6-terra",
-    "openai-codex/gpt-5.6-sol",
-    "github-copilot/gpt-5.6-luna",
-    "openai-codex/gpt-5.6-luna",
-    "github-copilot/gpt-6-astra",
-    "openai-codex/gpt-6-astra"
+    "github-copilot/claude-opus-5.5",
+    "github-copilot/gpt-6-luna",
+    "github-copilot/gpt-6-sol",
+    "openai-codex/gpt-6-astra",
+    "openai-codex/gpt-6-luna",
+    "openai-codex/gpt-6-sol"
   ],
   "delegate": {
     "agents": {
       "explore": {
-        "model": "openai-codex/gpt-5.6-luna",
+        "model": "github-copilot/gpt-6-luna",
         "thinking": "medium"
       },
       "general": {
-        "model": "openai-codex/gpt-5.6-terra",
-        "thinking": "high"
+        "model": "parent"
       }
     }
   },

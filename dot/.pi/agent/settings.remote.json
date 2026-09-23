@@ -4,31 +4,24 @@
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
-  "extensions": [
-    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
-  ],
+  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
   "enabledModels": [
-    "github-copilot/gpt-5.6-sol",
-    "github-copilot/gpt-5.6-terra",
-    "github-copilot/gpt-5.6-luna",
-    "github-copilot/gpt-6-astra"
+    "github-copilot/claude-opus-5.5",
+    "github-copilot/gpt-6-luna",
+    "github-copilot/gpt-6-sol"
   ],
   "delegate": {
     "agents": {
       "explore": {
-        "model": "github-copilot/gpt-5.6-luna",
+        "model": "github-copilot/gpt-6-luna",
         "thinking": "medium"
       },
       "general": {
-        "model": "github-copilot/gpt-5.6-terra",
-        "thinking": "high"
+        "model": "parent"
       }
     }
   },
-  "packages": [
-    "npm:pi-context-view",
-    "npm:pi-footer"
-  ],
+  "packages": ["npm:pi-context-view", "npm:pi-footer"],
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen"
