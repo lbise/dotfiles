@@ -1,34 +1,27 @@
 {
-  "lastChangelogVersion": "0.85.1",
+  "lastChangelogVersion": "0.87.1",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-6-astra",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
-  "extensions": [
-    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
-  ],
+  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
   "enabledModels": [
-    "openai-codex/gpt-5.6-terra",
-    "openai-codex/gpt-5.6-sol",
-    "openai-codex/gpt-5.6-luna",
-    "openai-codex/gpt-6-astra"
+    "openai-codex/gpt-6-astra",
+    "openai-codex/gpt-6-luna",
+    "openai-codex/gpt-6-sol"
   ],
   "delegate": {
     "agents": {
       "explore": {
-        "model": "openai-codex/gpt-5.6-luna",
+        "model": "openai-codex/gpt-6-luna",
         "thinking": "medium"
       },
       "general": {
-        "model": "openai-codex/gpt-5.6-terra",
-        "thinking": "high"
+        "model": "parent"
       }
     }
   },
-  "packages": [
-    "npm:pi-context-view",
-    "npm:pi-footer"
-  ],
+  "packages": ["npm:pi-context-view", "npm:pi-footer"],
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen"
