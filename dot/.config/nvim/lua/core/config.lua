@@ -38,11 +38,7 @@ vim.cmd("highlight ColorColumn ctermbg=0 guibg=#333333")
 -- Do not use swap files
 vim.opt.swapfile = false
 
--- Herdr carries OSC 52 clipboard writes to the attached terminal, including
--- over SSH. Keep the tmux provider when running inside tmux.
-if vim.env.HERDR_PANE_ID and not vim.env.TMUX then
-	vim.g.clipboard = "osc52"
-end
+-- Clipboard provider selection lives in core/clipboard.lua.
 
 -- Sync clipboard between OS and Neovim.
 --  Schedule the setting after `UiEnter` because it can increase startup-time.

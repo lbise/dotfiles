@@ -6,6 +6,7 @@ end
 local setup = function()
     require('core.tools')
     require('core.tmux').setup()
+    require('core.clipboard').setup()
     require('core.config')
     require('core.filetypes')
 

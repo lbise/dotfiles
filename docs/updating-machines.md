@@ -32,7 +32,8 @@ dotfiles bootstrap
 stash, or remove those changes first. It also uses `git pull --ff-only`, so it
 will not create an unexpected merge commit.
 
-The default `apps` set is delta, eza, fd, fzf, herdr, Neovim, ripgrep, and tmux.
+The default `apps` set is delta, eza, fd, fzf, herdr, Neovim, ripgrep, tmux,
+and win32yank (WSL only).
 OpenCode and zsh are excluded because their installers can run remote install
 scripts or change the login shell. Run either explicitly when wanted:
 

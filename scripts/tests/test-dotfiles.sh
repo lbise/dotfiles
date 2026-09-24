@@ -78,7 +78,7 @@ test_apps_default_skips_maintenance() {
     mkdir -p "$repo/install/apps"
     cp "$ROOT/install/apps/update_apps.sh" "$repo/install/apps/update_apps.sh"
 
-    for app in delta eza fd fzf herdr nvim opencode ripgrep tmux zsh; do
+    for app in delta eza fd fzf herdr nvim opencode ripgrep tmux win32yank zsh; do
         cat > "$repo/install/apps/$app.sh" <<SCRIPT
 #!/usr/bin/env bash
 printf '%s\\n' '$app' >> '$log'
@@ -88,7 +88,7 @@ SCRIPT
 
     DOTFILES_DIR="$repo" "$DOTFILES_BIN" apps >/dev/null
 
-    for app in delta eza fd fzf herdr nvim ripgrep tmux; do
+    for app in delta eza fd fzf herdr nvim ripgrep tmux win32yank; do
         assert_file_contains "$log" "$app"
     done
     ! grep -Fxq opencode "$log" || fail "default apps update ran opencode"

@@ -14,6 +14,7 @@ DEFAULT_APPS=(
     nvim
     ripgrep
     tmux
+    win32yank
 )
 ALL_APPS=("${DEFAULT_APPS[@]}" opencode zsh)
 

@@ -24,6 +24,23 @@ Super+X retains the shell's Ctrl+X behavior in a terminal; it does not cut termi
 
 Elephant's defaults retain 100 entries in its on-disk cache, with no age-based expiry. Text marked with the supported password-manager hint is excluded, but unmarked secrets can enter history. See [the source investigation](research/omarchy-clipboard.md) for retention and sensitive-data details.
 
+## Neovim
+
+`dot/.config/nvim/lua/core/clipboard.lua` picks the provider:
+
+| Session | Copy | `p` from the system clipboard |
+| --- | --- | --- |
+| tmux | tmux provider (tmux emits OSC 52) | tmux provider |
+| Local Arch desktop | `wl-copy` (Neovim's detection) | `wl-paste` |
+| Local WSL | `win32yank.exe`, else `clip.exe` | `win32yank.exe`, else PowerShell `Get-Clipboard` |
+| SSH | OSC 52 | OSC 52 read if the terminal allows it |
+
+Over SSH, Ghostty answers OSC 52 reads (`clipboard-read = allow`). Windows Terminal does not, so `p` pastes the last Neovim yank; paste from Windows with Ctrl+Shift+V instead. Neovim asks the terminal once per session and waits up to 1 s before falling back.
+
+In WSL, `install/apps/win32yank.sh` installs `win32yank.exe` to `~/.local/bin`. Without it, Neovim falls back to `clip.exe` and PowerShell, which is slow and can mangle non-ASCII text.
+
+Run `nvim --clean --headless -l scripts/tests/test-nvim-clipboard.lua` from the repository root to check provider selection.
+
 ## Checks
 
 Run the helper's isolated regression tests without touching the desktop clipboard:
