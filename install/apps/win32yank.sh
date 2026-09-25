@@ -15,6 +15,7 @@ fi
 REPO="equalsraf/win32yank"
 INSTALL_DIR="$HOME/.local/bin"
 BINARY="$INSTALL_DIR/win32yank.exe"
+VERSION_FILE="$HOME/.local/state/win32yank/version"
 
 case "$(get_arch)" in
     x86_64) ASSET="win32yank-x64.zip" ;;
@@ -36,8 +37,12 @@ fi
 LATEST_VERSION=$(normalize_version "$TAG")
 
 if [[ -x "$BINARY" ]]; then
-    CURRENT_VERSION=$(normalize_version "$("$BINARY" --version 2>/dev/null || true)" || true)
-    if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
+    # win32yank does not support a version flag, so track the release we installed.
+    CURRENT_VERSION=""
+    if [[ -f "$VERSION_FILE" ]]; then
+        CURRENT_VERSION=$(normalize_version "$(<"$VERSION_FILE")" || true)
+    fi
+    if [[ -n "$CURRENT_VERSION" && "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
         echo "win32yank is already up to date ($CURRENT_VERSION)"
         exit 0
     fi
@@ -56,4 +61,6 @@ unzip -q -o "$TMP_DIR/$ASSET" win32yank.exe -d "$TMP_DIR"
 
 mkdir -p "$INSTALL_DIR"
 install -m 755 "$TMP_DIR/win32yank.exe" "$BINARY"
+mkdir -p "$(dirname "$VERSION_FILE")"
+printf '%s\n' "$LATEST_VERSION" > "$VERSION_FILE"
 echo "win32yank installed successfully to $BINARY"
