@@ -2,6 +2,9 @@
 	name = Leonard Bise
 	email = leonard.bise@sonova.com
 
+[commit]
+    gpgsign = true
+
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
