@@ -34,12 +34,13 @@ COMMON_LINKS=(
     ".agents/skills"
 )
 
-# Desktop-only symlinks (Hyprland, Waybar, etc.)
+# Desktop-only symlinks (Hyprland, Quickshell, etc.)
 DESKTOP_LINKS=(
     ".config/ghostty"
     ".config/hypr"
     ".config/mako"
-    ".config/waybar"
+    ".config/quickshell"
+    ".config/systemd/user/leo-quickshell.service"
     ".config/uwsm"
     ".config/walker"
     ".config/leo"
