@@ -4,12 +4,15 @@
   "defaultModel": "claude-opus-5-5",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
-  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
+  "extensions": [
+    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
+  ],
   "enabledModels": [
     "anthropic/claude-opus-5-5",
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6-luna",
-    "openai-codex/gpt-6-sol"
+    "openai-codex/gpt-6-sol",
+    "anthropic/claude-opus-5-5"
   ],
   "delegate": {
     "agents": {
