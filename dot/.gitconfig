@@ -107,7 +107,7 @@
     gpgsign = false
 
 [tag]
-	gpgsign = true
+	gpgsign = false
 
 [safe]
 	directory = *
@@ -160,10 +160,10 @@
 [gpg "ssh"]
 	defaultKeyCommand = ssh-add -L
 [credential "https://github.com"]
-	helper = 
+	helper =
 	helper = !/usr/bin/gh auth git-credential
 [credential "https://gist.github.com"]
-	helper = 
+	helper =
 	helper = !/usr/bin/gh auth git-credential
 [push]
 	autoSetupRemote = true
