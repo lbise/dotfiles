@@ -135,5 +135,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/home/leo/.bun/_bun" ] && source "/home/leo/.bun/_bun"
 
 # Go
-export GOROOT=$HOME/go-sdk
-export PATH=$GOROOT/bin:$PATH
+if [ -d "$HOME/go-sdk" ]; then
+  export GOROOT=$HOME/go-sdk
+  export PATH=$GOROOT/bin:$PATH
+fi
