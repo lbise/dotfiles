@@ -51,6 +51,21 @@ Set each agent's default model in Pi's global `~/.pi/agent/settings.json` or pro
 
 Settings override `model` and `thinking` from an agent's Markdown frontmatter. If neither settings nor frontmatter select a model, the agent inherits the parent. Global and project settings use Pi's normal nested merge rules, so a project can override one agent without repeating the others.
 
+## Child extensions
+
+Child sessions load no extensions by default. List package sources in `delegate.extensions` to load them into every child session. Use this for extensions that must shape provider requests, such as `@pi-plugins/claude-oauth`, whose `before_provider_request` hook rewrites Anthropic OAuth payloads:
+
+```json
+{
+  "packages": ["npm:@pi-plugins/claude-oauth"],
+  "delegate": {
+    "extensions": ["npm:@pi-plugins/claude-oauth"]
+  }
+}
+```
+
+Each source must match an enabled entry in `packages`, written the same way. Children load the parent's installed copy, so Pi reuses the already-loaded module. Delegation fails if a listed source has no enabled extension.
+
 ## Custom agents
 
 Add Markdown files to either location:
@@ -100,7 +115,7 @@ Foreground delegation follows the parent tool's abort signal. Aborting the paren
 - `delegate_result` retains the latest 100 settled background results per parent-session process.
 - No nested delegation.
 - No chain or workflow parameters. Pi can issue several `delegate` calls in one response for parallel work.
-- Child sessions load no extensions. Only Pi's built-in coding tools can pass through the parent and agent allowlists.
+- Child sessions load no extensions except those listed in `delegate.extensions`. Only Pi's built-in coding tools can pass through the parent and agent allowlists.
 - Children resolve authentication and provider configuration from Pi's files. Runtime-only API keys, provider registrations, and provider overrides from the parent are not inherited.
 - An ephemeral parent gets an ephemeral child. Resuming with `task_id` requires a saved parent session.
 - Parallel writers share the same checkout unless the caller provides isolation outside this extension.

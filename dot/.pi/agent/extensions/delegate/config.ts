@@ -22,8 +22,23 @@ export type AgentSettingsOverride = {
 
 export type DelegateConfiguration = {
   agents: Map<string, AgentSettingsOverride>;
+  /** Package sources, as written in settings `packages`, whose extensions load into child sessions. */
+  extensions: string[];
   diagnostics: string[];
 };
+
+export type ExtensionResource = { path: string; enabled: boolean; metadata: { source: string } };
+
+/** Pick the enabled extension entry points that belong to the configured package sources. */
+export function selectChildExtensions(
+  resources: readonly ExtensionResource[],
+  sources: readonly string[],
+): { paths: string[]; missing: string[] } {
+  const enabled = resources.filter((resource) => resource.enabled);
+  const paths = enabled.filter((resource) => sources.includes(resource.metadata.source)).map((resource) => resource.path);
+  const missing = sources.filter((source) => !enabled.some((resource) => resource.metadata.source === source));
+  return { paths, missing };
+}
 
 function isObject(value: unknown): value is SettingsObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -44,16 +59,25 @@ export function parseDelegateConfiguration(
 ): DelegateConfiguration {
   const diagnostics: string[] = [];
   const agents = new Map<string, AgentSettingsOverride>();
+  const extensions: string[] = [];
   const globalDelegate = isObject(globalSettings) ? globalSettings.delegate : undefined;
   const projectDelegate = isObject(projectSettings) ? projectSettings.delegate : undefined;
   const delegate = deepMerge(globalDelegate, projectDelegate);
-  if (delegate === undefined) return { agents, diagnostics };
+  if (delegate === undefined) return { agents, extensions, diagnostics };
   if (!isObject(delegate)) {
-    return { agents, diagnostics: ["settings.json: delegate must be an object"] };
+    return { agents, extensions, diagnostics: ["settings.json: delegate must be an object"] };
   }
-  if (delegate.agents === undefined) return { agents, diagnostics };
+  if (delegate.extensions !== undefined) {
+    if (Array.isArray(delegate.extensions) && delegate.extensions.every((source) => typeof source === "string")) {
+      extensions.push(...delegate.extensions);
+    } else {
+      diagnostics.push("settings.json: delegate.extensions must be an array of package sources");
+    }
+  }
+  if (delegate.agents === undefined) return { agents, extensions, diagnostics };
   if (!isObject(delegate.agents)) {
-    return { agents, diagnostics: ["settings.json: delegate.agents must be an object"] };
+    diagnostics.push("settings.json: delegate.agents must be an object");
+    return { agents, extensions, diagnostics };
   }
 
   for (const [name, value] of Object.entries(delegate.agents)) {
@@ -89,7 +113,7 @@ export function parseDelegateConfiguration(
     }
     agents.set(name, override);
   }
-  return { agents, diagnostics };
+  return { agents, extensions, diagnostics };
 }
 
 export function configureAgents(

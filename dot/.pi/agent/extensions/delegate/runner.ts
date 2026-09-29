@@ -2,6 +2,7 @@ import type { AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core"
 import type { Model } from "@earendil-works/pi-ai";
 import {
   createAgentSession,
+  DefaultPackageManager,
   DefaultResourceLoader,
   getAgentDir,
   type ModelRegistry,
@@ -10,6 +11,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import type { TaskAgent } from "./agents.ts";
+import { parseDelegateConfiguration, selectChildExtensions } from "./config.ts";
 import { resolveResumeSession, taskAgentName, taskSessionName } from "./sessions.ts";
 
 const MAX_ACTIVITY = 8;
@@ -75,6 +77,24 @@ function appendActivity(activity: string[], value: string): void {
   if (activity.length > MAX_ACTIVITY) activity.splice(0, activity.length - MAX_ACTIVITY);
 }
 
+/**
+ * Resolve `delegate.extensions` to the parent's installed entry points. Loading the same
+ * paths lets Pi reuse the cached extension modules instead of installing temporary copies.
+ */
+async function childExtensionPaths(cwd: string, agentDir: string, settingsManager: SettingsManager): Promise<string[]> {
+  const { extensions: sources } = parseDelegateConfiguration(
+    settingsManager.getGlobalSettings(),
+    settingsManager.getProjectSettings(),
+  );
+  if (sources.length === 0) return [];
+  const resolved = await new DefaultPackageManager({ cwd, agentDir, settingsManager }).resolve();
+  const { paths, missing } = selectChildExtensions(resolved.extensions, sources);
+  if (missing.length) {
+    throw new Error(`delegate.extensions has no enabled extension for: ${missing.join(", ")}`);
+  }
+  return paths;
+}
+
 function resolveModel(request: RunTaskRequest): ReturnType<ModelRegistry["find"]> {
   if (!request.agent.model) return request.parentModel;
   const [provider, ...parts] = request.agent.model.split("/");
@@ -113,6 +133,9 @@ export async function runTask(
 ): Promise<TaskResult> {
   const model = resolveModel(request);
   if (!model) throw new Error(`No usable model for agent ${request.agent.name}`);
+  const agentDir = process.env.PI_CODING_AGENT_DIR ?? getAgentDir();
+  const settingsManager = SettingsManager.create(request.cwd, agentDir, { projectTrusted: request.projectTrusted });
+  const extensionPaths = await childExtensionPaths(request.cwd, agentDir, settingsManager);
   const manager = await childSession(request);
   const taskId = manager.getSessionId();
   const sessionPath = manager.getSessionFile();
@@ -122,13 +145,12 @@ export async function runTask(
     shortcut: request.shortcut, model: `${model.provider}/${model.id}`, activity,
   };
   const emit = () => onProgress?.({ ...state, activity: [...activity] });
-  const agentDir = process.env.PI_CODING_AGENT_DIR ?? getAgentDir();
-  const settingsManager = SettingsManager.create(request.cwd, agentDir, { projectTrusted: request.projectTrusted });
   const loader = new DefaultResourceLoader({
     cwd: request.cwd,
     agentDir,
     settingsManager,
     noExtensions: true,
+    additionalExtensionPaths: extensionPaths,
     appendSystemPrompt: [
       request.agent.prompt,
       `You are the ${request.agent.name} child agent. Complete the delegated task and end with a concise report. Do not delegate work or invoke subagents.`,

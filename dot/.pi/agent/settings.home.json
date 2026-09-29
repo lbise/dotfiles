@@ -15,6 +15,7 @@
     "anthropic/claude-opus-5-5"
   ],
   "delegate": {
+    "extensions": ["npm:@pi-plugins/claude-oauth"],
     "agents": {
       "explore": {
         "model": "openai-codex/gpt-6-luna",
