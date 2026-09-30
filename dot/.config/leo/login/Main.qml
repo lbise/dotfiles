@@ -18,10 +18,16 @@ Rectangle {
     readonly property color accentColor: config.accent || "#64D6A5"
     readonly property color alertColor: config.alert || "#F7768E"
     readonly property string fontFamily: config.fontFamily || "JetBrainsMono Nerd Font"
+    // Icons come from the proportional Nerd Font, as in the Quickshell bar.
+    readonly property string glyphFamily: fontFamily + " Propo"
     // Desktop palette body text is smaller; login fields stay readable at a distance.
     readonly property int formSize: Math.max(16, Number(config.fontSize) || 18)
+    readonly property int hintSize: 16
     readonly property int cardRadius: Number(config.cardRadius) || 14
     readonly property int inputRadius: Number(config.inputRadius) || 8
+    // Bar and control radii follow DESIGN.md: base + 3 and base × 0.7.
+    readonly property int groupRadius: inputRadius + 3
+    readonly property int controlRadius: Math.round(inputRadius * 0.7)
     readonly property int clockSize: Number(config.clockSize) || 72
     readonly property bool effectsAvailable: GraphicsInfo.api !== GraphicsInfo.Software
     property date now: new Date()
@@ -29,6 +35,20 @@ Rectangle {
     property string failure: ""
     property string pendingPower: ""
     property Item powerOrigin: null
+
+    // Material Design glyphs from the Nerd Font; the same set as the bar.
+    readonly property var glyphs: ({
+        monitor: "\u{F0379}",
+        chevronUp: "\u{F0143}",
+        sleep: "\u{F04B2}",
+        restart: "\u{F0709}",
+        power: "\u{F0425}",
+        alert: "\u{F0026}"
+    })
+
+    function alpha(color, amount) {
+        return Qt.rgba(color.r, color.g, color.b, amount);
+    }
 
     function focusForm() {
         if (username.text.length === 0)
@@ -155,59 +175,154 @@ Rectangle {
         wrapMode: Text.WordWrap
     }
 
+    // The ground-coloured input used by the bar popups, enlarged for login.
+    // Text is centred so the field matches Hyprlock's native input. Qt hides
+    // a centred placeholder on focus, so the hint is drawn here instead and
+    // the caret waits for the first character, as in Hyprlock.
     component Field: Controls.TextField {
         id: field
-        height: 48
-        leftPadding: 14
-        rightPadding: 14
-        color: root.foregroundColor
-        placeholderTextColor: root.mutedColor
-        selectionColor: root.accentColor
-        selectedTextColor: root.backgroundColor
-        font.family: root.fontFamily
-        font.pixelSize: root.formSize
-        activeFocusOnTab: true
-        selectByMouse: true
-        background: Rectangle {
-            color: root.backgroundColor
-            radius: root.inputRadius
-            border.color: root.ruleColor
-            border.width: field.activeFocus ? 2 : 1
-        }
-    }
-
-    component Action: Controls.Button {
-        id: action
-        property bool primary: false
-        property bool destructive: false
+        property string hint: ""
         height: 48
         leftPadding: 16
         rightPadding: 16
+        horizontalAlignment: TextInput.AlignHCenter
+        color: root.foregroundColor
+        placeholderTextColor: root.mutedColor
+        selectionColor: root.alpha(root.accentColor, 0.35)
+        selectedTextColor: root.foregroundColor
+        font.family: root.fontFamily
+        font.pixelSize: root.formSize
+        passwordCharacter: "•"
+        activeFocusOnTab: true
+        selectByMouse: true
+        opacity: enabled ? 1 : 0.55
+        cursorDelegate: Rectangle {
+            id: caret
+            width: 2
+            color: root.foregroundColor
+            visible: field.activeFocus && field.length > 0
+            SequentialAnimation on opacity {
+                running: caret.visible
+                loops: Animation.Infinite
+                PropertyAction { value: 1 }
+                PauseAnimation { duration: 530 }
+                PropertyAction { value: 0 }
+                PauseAnimation { duration: 530 }
+            }
+        }
+        background: Rectangle {
+            color: root.backgroundColor
+            radius: root.inputRadius
+            border.width: 1
+            border.color: field.activeFocus ? root.accentColor : root.ruleColor
+            Behavior on border.color { ColorAnimation { duration: 120 } }
+            Text {
+                anchors.centerIn: parent
+                visible: field.length === 0 && field.preeditText.length === 0
+                text: field.hint
+                color: root.mutedColor
+                font: field.font
+            }
+        }
+    }
+
+    // Pill button from the Quickshell kit: normal, primary or danger.
+    component Pill: Controls.Button {
+        id: pill
+        property string kind: "normal"
+        height: 48
+        leftPadding: 20
+        rightPadding: 20
         activeFocusOnTab: true
         hoverEnabled: true
         font.family: root.fontFamily
         font.pixelSize: root.formSize
+        font.weight: kind === "primary" ? Font.DemiBold : Font.Normal
         opacity: enabled ? 1 : 0.55
         contentItem: Text {
-            text: action.text
-            font: action.font
-            color: action.primary ? root.backgroundColor
-                : (action.destructive ? root.alertColor : root.foregroundColor)
+            text: pill.text
+            font: pill.font
+            color: pill.kind === "primary" ? root.backgroundColor
+                : (pill.kind === "danger" ? root.alertColor : root.foregroundColor)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
         }
         background: Rectangle {
-            color: action.primary ? root.accentColor : root.surfaceColor
-            radius: root.inputRadius
-            border.color: root.ruleColor
-            border.width: action.activeFocus ? 2 : 1
+            radius: height / 2
+            color: pill.kind === "primary"
+                ? (pill.down ? Qt.darker(root.accentColor, 1.08)
+                    : (pill.hovered ? Qt.lighter(root.accentColor, 1.08) : root.accentColor))
+                : pill.kind === "danger"
+                    ? root.alpha(root.alertColor, pill.down ? 0.28 : (pill.hovered ? 0.22 : 0.15))
+                    : root.alpha(root.foregroundColor, pill.down ? 0.16 : (pill.hovered ? 0.12 : 0.08))
+            Behavior on color { ColorAnimation { duration: 120 } }
+            // Focus ring sits outside the pill so it also shows on the jade fill.
             Rectangle {
                 anchors.fill: parent
-                radius: parent.radius
-                color: root.foregroundColor
-                opacity: action.down ? 0.16 : (action.hovered ? 0.08 : 0)
+                anchors.margins: -4
+                radius: height / 2
+                color: "transparent"
+                border.width: 2
+                border.color: root.accentColor
+                visible: pill.activeFocus
             }
+        }
+        Keys.onReturnPressed: clicked()
+        Keys.onEnterPressed: clicked()
+    }
+
+    // Bar group: the Quickshell bar's ground, outline and radius.
+    component Group: Rectangle {
+        default property alias content: groupRow.data
+        width: groupRow.implicitWidth + 8
+        height: 44
+        radius: root.groupRadius
+        color: root.backgroundColor
+        border.width: 1
+        border.color: root.ruleColor
+        Row {
+            id: groupRow
+            anchors.centerIn: parent
+            spacing: 2
+        }
+    }
+
+    // Bar button: muted glyph and pearl label, filled on hover.
+    component BarAction: Controls.Button {
+        id: barAction
+        property string glyph: ""
+        property color glyphColor: root.mutedColor
+        height: 36
+        leftPadding: 12
+        rightPadding: 14
+        activeFocusOnTab: true
+        hoverEnabled: true
+        font.family: root.fontFamily
+        font.pixelSize: root.hintSize
+        opacity: enabled ? 1 : 0.55
+        contentItem: Row {
+            spacing: 10
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: barAction.glyph
+                color: barAction.glyphColor
+                font.family: root.glyphFamily
+                font.pixelSize: 18
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: barAction.text
+                color: root.foregroundColor
+                font: barAction.font
+            }
+        }
+        background: Rectangle {
+            radius: root.controlRadius
+            color: root.alpha(root.foregroundColor,
+                barAction.down ? 0.12 : (barAction.hovered ? 0.08 : 0))
+            border.width: barAction.activeFocus ? 1 : 0
+            border.color: root.accentColor
         }
         Keys.onReturnPressed: clicked()
         Keys.onEnterPressed: clicked()
@@ -225,13 +340,26 @@ Rectangle {
         border.color: root.ruleColor
         border.width: 1
 
+        // Popup lift from DESIGN.md: black at 50%, soft blur, 10px down.
+        layer.enabled: root.effectsAvailable
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: "#000000"
+            shadowOpacity: 0.5
+            shadowBlur: 0.9
+            shadowVerticalOffset: 10
+            blurMax: 32
+        }
+
+        // 36px padding and 12px gaps put the password field on the card's
+        // centre line, where Hyprlock draws its only field.
         Column {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.leftMargin: 28
             anchors.rightMargin: 28
-            anchors.topMargin: 20
+            anchors.topMargin: 36
             spacing: 12
             enabled: !root.busy && !powerDialog.opened
 
@@ -240,7 +368,7 @@ Rectangle {
                 objectName: "username"
                 width: parent.width
                 text: userModel.lastUser
-                placeholderText: qsTr("Username")
+                hint: qsTr("Username")
                 Accessible.name: qsTr("Username")
                 inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
                 onTextChanged: {
@@ -255,7 +383,7 @@ Rectangle {
                 id: password
                 objectName: "password"
                 width: parent.width
-                placeholderText: qsTr("Password")
+                hint: qsTr("Password")
                 Accessible.name: qsTr("Password")
                 echoMode: TextInput.Password
                 inputMethodHints: Qt.ImhSensitiveData | Qt.ImhHiddenText
@@ -264,95 +392,139 @@ Rectangle {
                 KeyNavigation.tab: signIn
                 KeyNavigation.backtab: username
             }
-            Action {
+            Pill {
                 id: signIn
                 objectName: "signIn"
                 width: parent.width
-                primary: true
+                kind: "primary"
                 text: root.busy ? qsTr("Signing in…") : qsTr("Sign in")
                 onClicked: root.submit()
                 KeyNavigation.tab: session
                 KeyNavigation.backtab: password
             }
         }
+    }
+
+    Row {
+        id: feedback
+        objectName: "feedback"
+        readonly property string message: root.failure || (keyboard.capsLock ? qsTr("Caps Lock is on.") : "")
+        property alias text: feedbackText.text
+        readonly property bool fitsBelow: card.y + card.height + 16 + height + 12 <= root.height - 80
+        visible: message.length > 0
+        y: fitsBelow ? card.y + card.height + 16 : card.y - height - 14
+        anchors.horizontalCenter: card.horizontalCenter
+        spacing: 8
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.glyphs.alert
+            color: feedbackText.color
+            font.family: root.glyphFamily
+            font.pixelSize: 18
+        }
+        Text {
+            id: feedbackText
+            width: Math.min(implicitWidth, root.width - 64)
+            anchors.verticalCenter: parent.verticalCenter
+            wrapMode: Text.WordWrap
+            text: feedback.message
+            color: root.failure ? root.alertColor : root.foregroundColor
+            font.family: root.fontFamily
+            font.pixelSize: root.hintSize
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+        }
+    }
+
+    // Session choice lives with the other system controls, bottom left.
+    Group {
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.margins: 24
+        enabled: !root.busy && !powerDialog.opened && session.count > 0
 
         Controls.ComboBox {
             id: session
             objectName: "session"
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.leftMargin: 28
-            anchors.rightMargin: 28
-            anchors.bottomMargin: 20
-            height: 24
-            enabled: !root.busy && !powerDialog.opened && count > 0
+            height: 36
+            implicitWidth: sessionContent.implicitWidth + leftPadding + rightPadding
             model: sessionModel
             textRole: "name"
             currentIndex: -1
             activeFocusOnTab: true
             hoverEnabled: true
             font.family: root.fontFamily
-            font.pixelSize: 16
+            font.pixelSize: root.hintSize
             Accessible.name: qsTr("Desktop session")
-            displayText: count > 0 ? qsTr("Session: %1").arg(currentText) : qsTr("No sessions available")
-            leftPadding: 4
-            rightPadding: 20
-            indicator: Canvas {
-                x: parent.width - width - 4
-                y: (parent.height - height) / 2
-                width: 10
-                height: 6
-                onPaint: {
-                    var ctx = getContext("2d");
-                    ctx.reset();
-                    ctx.strokeStyle = root.mutedColor;
-                    ctx.lineWidth = 1.5;
-                    ctx.beginPath();
-                    ctx.moveTo(1, 1);
-                    ctx.lineTo(5, 5);
-                    ctx.lineTo(9, 1);
-                    ctx.stroke();
+            displayText: count > 0 ? currentText : qsTr("No sessions available")
+            leftPadding: 12
+            rightPadding: 12
+            indicator: null
+            contentItem: Row {
+                id: sessionContent
+                spacing: 10
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.glyphs.monitor
+                    color: root.mutedColor
+                    font.family: root.glyphFamily
+                    font.pixelSize: 18
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, 320)
+                    text: session.displayText
+                    color: root.foregroundColor
+                    font: session.font
+                    elide: Text.ElideRight
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.glyphs.chevronUp
+                    color: root.mutedColor
+                    font.family: root.glyphFamily
+                    font.pixelSize: 16
+                    rotation: session.popup.visible ? 180 : 0
                 }
             }
-            contentItem: Text {
-                text: session.displayText
-                font: session.font
-                color: root.mutedColor
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
-            }
             background: Rectangle {
-                color: session.hovered ? root.backgroundColor : "transparent"
-                radius: 4
-                border.color: root.ruleColor
-                border.width: session.activeFocus ? 2 : 0
+                radius: root.controlRadius
+                color: root.alpha(root.foregroundColor,
+                    session.popup.visible ? 0.12 : (session.hovered ? 0.08 : 0))
+                border.width: session.activeFocus ? 1 : 0
+                border.color: root.accentColor
             }
             delegate: Controls.ItemDelegate {
                 id: sessionOption
                 required property string name
                 required property int index
-                width: session.width
+                readonly property bool current: session.currentIndex === index
+                width: ListView.view ? ListView.view.width : session.width
                 height: 40
                 text: name
                 highlighted: session.highlightedIndex === index
                 font: session.font
+                leftPadding: 12
+                rightPadding: 12
                 contentItem: Text {
                     text: sessionOption.text
                     font: sessionOption.font
-                    color: sessionOption.highlighted ? root.accentColor : root.foregroundColor
+                    color: sessionOption.current ? root.accentColor : root.foregroundColor
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight
                 }
                 background: Rectangle {
-                    color: sessionOption.highlighted ? root.backgroundColor : root.surfaceColor
+                    radius: root.inputRadius + 1
+                    color: sessionOption.highlighted ? root.alpha(root.foregroundColor, 0.08) : "transparent"
                 }
             }
+            // Opens upward, above the bar group, as a popup card.
             popup: Controls.Popup {
-                y: session.height + 8
-                width: session.width
+                y: -implicitHeight - 12
+                x: -4
+                width: Math.max(260, session.width + 8)
                 padding: 6
-                implicitHeight: Math.min(contentItem.implicitHeight + 12, 200)
+                implicitHeight: Math.min(contentItem.implicitHeight + 12, 260)
                 contentItem: ListView {
                     clip: true
                     implicitHeight: contentHeight
@@ -362,7 +534,7 @@ Rectangle {
                 }
                 background: Rectangle {
                     color: root.surfaceColor
-                    radius: root.inputRadius
+                    radius: root.cardRadius
                     border.color: root.ruleColor
                 }
             }
@@ -372,35 +544,20 @@ Rectangle {
         }
     }
 
-    Text {
-        id: feedback
-        objectName: "feedback"
-        readonly property bool fitsBelow: card.y + card.height + 14 + implicitHeight + 12 <= root.height - 72
-        y: fitsBelow ? card.y + card.height + 14 : card.y - implicitHeight - 14
-        anchors.horizontalCenter: card.horizontalCenter
-        width: Math.min(520, parent.width - 32)
-        horizontalAlignment: Text.AlignHCenter
-        wrapMode: Text.WordWrap
-        text: root.failure || (keyboard.capsLock ? qsTr("Caps Lock is on.") : "")
-        color: root.failure ? root.alertColor : root.mutedColor
-        font.family: root.fontFamily
-        font.pixelSize: 16
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text
-    }
-
-    Row {
+    // Power actions use the bar's own button style and glyphs.
+    Group {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 24
-        spacing: 12
+        visible: sddm.canSuspend || sddm.canReboot || sddm.canPowerOff
         enabled: !root.busy && !powerDialog.opened
-        Action {
+
+        BarAction {
             id: suspend
             objectName: "suspend"
             visible: sddm.canSuspend
+            glyph: root.glyphs.sleep
             text: qsTr("Suspend")
-            font.pixelSize: 16
             onClicked: {
                 if (!root.busy && !powerDialog.opened && sddm.canSuspend) {
                     password.clear();
@@ -410,22 +567,23 @@ Rectangle {
             KeyNavigation.tab: reboot.visible ? reboot : (powerOff.visible ? powerOff : username)
             KeyNavigation.backtab: session
         }
-        Action {
+        BarAction {
             id: reboot
             objectName: "reboot"
             visible: sddm.canReboot
+            glyph: root.glyphs.restart
             text: qsTr("Restart")
-            font.pixelSize: 16
             onClicked: root.requestPower("reboot", reboot)
             KeyNavigation.tab: powerOff.visible ? powerOff : username
             KeyNavigation.backtab: suspend.visible ? suspend : session
         }
-        Action {
+        BarAction {
             id: powerOff
             objectName: "powerOff"
             visible: sddm.canPowerOff
-            text: qsTr("Power off")
-            font.pixelSize: 16
+            glyph: root.glyphs.power
+            glyphColor: root.alertColor
+            text: qsTr("Shut down")
             onClicked: root.requestPower("poweroff", powerOff)
             KeyNavigation.tab: username
             KeyNavigation.backtab: reboot.visible ? reboot : (suspend.visible ? suspend : session)
@@ -437,7 +595,6 @@ Rectangle {
         objectName: "powerDialog"
         anchors.centerIn: parent
         width: Math.min(400, root.width - 32)
-        height: 200
         padding: 24
         modal: true
         focus: true
@@ -457,45 +614,69 @@ Rectangle {
             if (root.powerOrigin)
                 root.powerOrigin.forceActiveFocus();
         }
-        contentItem: Item {
-            Text {
+        contentItem: Column {
+            spacing: 24
+            Row {
                 width: parent.width
-                text: root.pendingPower === "reboot" ? qsTr("Restart this computer?") : qsTr("Power off this computer?")
-                color: root.foregroundColor
-                font.family: root.fontFamily
-                font.pixelSize: 18
-                wrapMode: Text.WordWrap
-            }
-            Text {
-                y: 40
-                width: parent.width
-                text: qsTr("This will end any running sessions.")
-                color: root.mutedColor
-                font.family: root.fontFamily
-                font.pixelSize: 16
-                wrapMode: Text.WordWrap
+                spacing: 14
+                Rectangle {
+                    width: 44
+                    height: 44
+                    radius: 22
+                    color: root.alpha(root.alertColor, 0.15)
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.pendingPower === "reboot" ? root.glyphs.restart : root.glyphs.power
+                        color: root.alertColor
+                        font.family: root.glyphFamily
+                        font.pixelSize: 22
+                    }
+                }
+                Column {
+                    width: parent.width - 58
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 4
+                    Text {
+                        width: parent.width
+                        text: root.pendingPower === "reboot" ? qsTr("Restart this computer?") : qsTr("Shut down this computer?")
+                        color: root.foregroundColor
+                        font.family: root.fontFamily
+                        font.pixelSize: 18
+                        font.weight: Font.DemiBold
+                        wrapMode: Text.WordWrap
+                    }
+                    Text {
+                        width: parent.width
+                        text: qsTr("Running sessions will end.")
+                        color: root.mutedColor
+                        font.family: root.fontFamily
+                        font.pixelSize: root.hintSize
+                        wrapMode: Text.WordWrap
+                    }
+                }
             }
             Row {
-                anchors.bottom: parent.bottom
                 width: parent.width
                 spacing: 12
-                Action {
+                Pill {
                     id: cancelPower
                     objectName: "cancelPower"
                     width: (parent.width - parent.spacing) / 2
+                    height: 44
                     text: qsTr("Cancel")
-                    font.pixelSize: 16
+                    font.pixelSize: root.hintSize
                     onClicked: powerDialog.close()
                     KeyNavigation.tab: confirmPower
                     KeyNavigation.backtab: confirmPower
                 }
-                Action {
+                Pill {
                     id: confirmPower
                     objectName: "confirmPower"
                     width: (parent.width - parent.spacing) / 2
-                    destructive: true
-                    text: root.pendingPower === "reboot" ? qsTr("Restart") : qsTr("Power off")
-                    font.pixelSize: 16
+                    height: 44
+                    kind: "danger"
+                    text: root.pendingPower === "reboot" ? qsTr("Restart") : qsTr("Shut down")
+                    font.pixelSize: root.hintSize
                     onClicked: {
                         var action = root.pendingPower;
                         powerDialog.close();

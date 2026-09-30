@@ -138,6 +138,7 @@ def hyprlock_conf(palette: dict) -> str:
         )],
         # Hyprlang uses ## for a literal #, needed by Pango colour markup.
         f'$lock_muted_hex = #{colors["muted"]}',
+        f'$lock_alert_hex = #{colors["alert"]}',
         f'$lock_font = {palette["font"]["family"]}',
         # Hyprlock labels use points, while the Qt login theme uses pixels.
         f'$lock_font_size = {round((palette["font"]["size"] + 4) * 0.75)}',

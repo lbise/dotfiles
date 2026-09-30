@@ -38,7 +38,9 @@ DROP = 'etc/sddm.conf.d/99-leo-theme.conf'
 MAIN = 'etc/sddm.conf'
 KEYS = {'Theme': {'Current': 'leo'},
         'General': {'InputMethod': '', 'GreeterEnvironment': 'QT_IM_MODULE='}}
-FONT_NAMES = {'JetBrainsMonoNerdFont-Regular.ttf', 'JetBrainsMonoNerdFont-Bold.ttf',
+# Regular, Medium (clock) and SemiBold (Sign in, dialog titles); Propo for glyphs.
+FONT_NAMES = {'JetBrainsMonoNerdFont-Regular.ttf', 'JetBrainsMonoNerdFont-Medium.ttf',
+              'JetBrainsMonoNerdFont-SemiBold.ttf', 'JetBrainsMonoNerdFont-Bold.ttf',
               'JetBrainsMonoNerdFontPropo-Regular.ttf'}
 
 

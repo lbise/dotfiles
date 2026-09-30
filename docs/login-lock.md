@@ -9,9 +9,9 @@ SDDM login and native Hyprlock use the same graphite Quickshell palette and the 
 - `dot/.config/hypr/hyprlock.conf` owns native layout and authentication. It displays `$USER` and uses native Enter submission. PAM stays enabled; optional fingerprint support stays enabled too, but this machine has no `fprintd` service.
 - `dot/.config/leo/login/Main.qml` is the SDDM theme. `theme.conf` supplies defaults and `metadata.desktop` registers it. The editable username starts with SDDM's remembered user. Session selection uses SDDM's remembered-session API, then falls back to Hyprland or the first available session.
 
-The card is 400×240px, centred horizontally and 100px below screen centre, with a 14px radius and rule border. Clock and pearl date sit above the form at 72px and 18px. Body text is 18px, hints 16px, and the password field is 344×48px. Hyprlock label sizes are points, not pixels. The generator calibrates them, including 54pt for the roughly 72px clock, and converts pixel sizes to Pango units for placeholders.
+The card is 400×240px, centred horizontally and 100px below screen centre, with a 14px radius and rule border. Its rows (36px padding, three 48px rows, 12px gaps) place the password field on the card's centre line on both screens; [DESIGN.md](../DESIGN.md#authentication) describes the rows and the bar groups in the bottom corners. Clock and pearl date sit above the form at 72px and 18px. Body text is 18px, hints 16px, and the password field is 344×48px. Hyprlock label sizes are points, not pixels. The generator calibrates them, including 54pt for the roughly 72px clock, and converts pixel sizes to Pango units for placeholders.
 
-Native power actions use `scripts/system/system-lock-power.py` with a three-second second-click guard for restart and shutdown. `system-lock-power-status.sh` supplies lightweight Bash status labels. SDDM uses a confirmation modal with Cancel focused by default. Suspend needs no confirmation; SDDM only shows it when the daemon reports support. These controls do not bypass authentication or change power policy.
+Native power actions use `scripts/system/system-lock-power.py` with a three-second second-click guard for restart and shutdown. `system-lock-power-status.sh` supplies lightweight Bash status labels; with `--markup GLYPH_COLOUR ALERT_COLOUR` it prints the Pango markup Hyprlock shows (glyph and label, or a rose "Confirm" while armed). The lock-screen group positions in `hyprlock.conf` come from `pango-view` measurements; re-measure them if the labels or font size change. SDDM uses a confirmation modal with Cancel focused by default. Suspend needs no confirmation; SDDM only shows it when the daemon reports support. These controls do not bypass authentication or change power policy.
 
 ## Install and activate
 
@@ -26,6 +26,8 @@ bash scripts/system/system-login-install.sh
 The installer validates before asking for sudo. It copies the theme and wallpaper into `/usr/share/sddm/themes/leo` and these local files from `~/.local/share/fonts/NerdFonts` into `/usr/local/share/fonts/leo`:
 
 - `JetBrainsMonoNerdFont-Regular.ttf`
+- `JetBrainsMonoNerdFont-Medium.ttf` (clock)
+- `JetBrainsMonoNerdFont-SemiBold.ttf` (Sign in, dialog title)
 - `JetBrainsMonoNerdFont-Bold.ttf`
 - `JetBrainsMonoNerdFontPropo-Regular.ttf`
 
@@ -86,4 +88,4 @@ The QML suite needs Qt 6 `qmltestrunner`, Python 3 and `timeout`. Authentication
 
 Screenshots and logs live under `.scratch/login-preview` and need not be committed. Final native captures are `review-lock-{1280,1920,2560}.png`; final login captures are in `review-login/`, with login, error and confirmation states at each tested size.
 
-Independent review returned **ship at the reviewed scope** after verifying the contrast, matching blur, power-confirmation status reader, rollback limitations and password-submission assertion. The checks passed: 14 theme tests, 6 confirmation/status-reader tests, the staged installer suite and 18 QML checks including captures. Real PAM authentication, fingerprint recognition, session startup and privileged installation remain untested.
+Independent review returned **ship at the reviewed scope** after verifying the contrast, matching blur, power-confirmation status reader, rollback limitations and password-submission assertion. The checks passed: 14 theme tests, 6 confirmation/status-reader tests, the staged installer suite and 18 QML checks including captures. A second visual pass later moved system controls into bar groups and aligned the two cards on one row grid; after it, 14 theme tests, 7 confirmation/status-reader tests, the staged installer suite and 18 QML checks passed, with fresh captures in `review-lock-*.png` and `pass2/`. Real PAM authentication, fingerprint recognition, session startup and privileged installation remain untested.

@@ -97,7 +97,12 @@ Item {
             compare(username.width, 344);
             compare(password.width, 344);
             compare(findChild(theme, "signIn").width, 344);
-            compare(session.width, 344);
+            compare(findChild(theme, "signIn").height, 48);
+            // The password field sits on the card's centre line, as in Hyprlock.
+            compare(password.mapToItem(card, 0, 0).y + password.height / 2, card.height / 2);
+            // Session and power controls sit outside the card, below it.
+            verify(session.mapToItem(theme, 0, 0).y > card.y + card.height);
+            verify(findChild(theme, "powerOff").mapToItem(theme, 0, 0).y > card.y + card.height);
         }
         function test_initialFocusAndTab() {
             verify(password.activeFocus);

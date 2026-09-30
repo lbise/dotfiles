@@ -14,7 +14,8 @@ import sys
 import tempfile
 
 SCRIPT = Path(sys.argv[1])
-FONT_NAMES = ('JetBrainsMonoNerdFont-Regular.ttf', 'JetBrainsMonoNerdFont-Bold.ttf',
+FONT_NAMES = ('JetBrainsMonoNerdFont-Regular.ttf', 'JetBrainsMonoNerdFont-Medium.ttf',
+              'JetBrainsMonoNerdFont-SemiBold.ttf', 'JetBrainsMonoNerdFont-Bold.ttf',
               'JetBrainsMonoNerdFontPropo-Regular.ttf')
 THEME = Path('usr/share/sddm/themes/leo')
 FONTS = Path('usr/local/share/fonts/leo')

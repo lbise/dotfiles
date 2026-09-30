@@ -132,6 +132,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn('$lock_surface = rgb(202020)', conf)
         self.assertIn('$lock_accent = rgb(00FF88)', conf)
         self.assertIn('$lock_muted_hex = ##A0A0A0', conf)
+        self.assertIn('$lock_alert_hex = ##FF0000', conf)
         self.assertIn('$lock_font = Test Mono', conf)
         self.assertIn('$lock_font_size = 13', conf)
         self.assertIn('$lock_hint_size = 11', conf)

@@ -70,6 +70,35 @@ class ConfirmationTest(unittest.TestCase):
             self.assertEqual(subprocess.check_output(['bash', str(reader), 'reboot'], env=env,
                                                     text=True).strip(), 'Restart')
 
+    def test_shell_markup_mode(self):
+        reader = SCRIPT.with_name('system-lock-power-status.sh')
+        with tempfile.TemporaryDirectory() as directory:
+            env = dict(os.environ, XDG_RUNTIME_DIR=directory)
+            state = Path(directory) / 'leo-lock-power.json'
+            now = time.clock_gettime(time.CLOCK_BOOTTIME)
+
+            def icon(glyph):
+                return f'<span font_family="JetBrainsMono Nerd Font Propo" size="115%">{glyph}</span>'
+
+            def read(action, *colours):
+                return subprocess.run(['bash', str(reader), action, '--markup', *colours], env=env,
+                                      text=True, capture_output=True)
+
+            state.write_text(json.dumps({}))
+            result = read('reboot', '#A0A4B5', '#F7768E')
+            self.assertEqual(result.stdout.strip(),
+                             '<span foreground="#A0A4B5">' + icon('\U000F0709') + '</span> Restart')
+            # The shut-down glyph always uses the alert colour.
+            self.assertEqual(read('poweroff', '#A0A4B5', '#F7768E').stdout.strip(),
+                             '<span foreground="#F7768E">' + icon('\U000F0425') + '</span> Shut down')
+            state.write_text(json.dumps({'action': 'reboot', 'at': now}))
+            self.assertEqual(read('reboot', '#A0A4B5', '#F7768E').stdout.strip(),
+                             '<span foreground="#F7768E">' + icon('\U000F0709') + ' Confirm</span>')
+            for colours in (('A0A4B5', '#F7768E'), ('#A0A4B5', '"><b>'), ('#A0A4B5',)):
+                result = read('reboot', *colours)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, '')
+
     def test_invalid_arguments_never_execute(self):
         with patch.object(power.subprocess, 'run') as run:
             for args in ([], ['unlock'], ['status', 'suspend'], ['reboot', 'anything']):
