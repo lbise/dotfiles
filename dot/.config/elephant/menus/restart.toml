@@ -1,0 +1,38 @@
+# Restart submenu, reached from Update (update.toml).
+name = "restart"
+parent = "update"
+name_pretty = "Restart"
+hide_name_pretty_prefix = true
+icon = "view-refresh-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Quickshell"
+subtext = "Bar and popups"
+icon = "view-refresh-symbolic"
+actions = { "restart" = "system-restart-quickshell.sh" }
+
+[[entries]]
+text = "Walker"
+subtext = "This launcher"
+icon = "view-refresh-symbolic"
+actions = { "restart" = "pkill -x walker; sleep 0.3; setsid uwsm-app -- walker --gapplication-service >/dev/null 2>&1 &" }
+
+[[entries]]
+text = "Elephant"
+subtext = "Launcher data backend"
+icon = "view-refresh-symbolic"
+# systemd-run detaches the restart from elephant's own cgroup, which the restart would kill.
+actions = { "restart" = "systemd-run --user --no-block --quiet systemctl --user restart elephant.service" }
+
+[[entries]]
+text = "Mako"
+subtext = "Reload notification config"
+icon = "view-refresh-symbolic"
+actions = { "restart" = "makoctl reload" }
+
+[[entries]]
+text = "Hyprland"
+subtext = "Reload config"
+icon = "view-refresh-symbolic"
+actions = { "restart" = "hyprctl reload" }

@@ -15,20 +15,20 @@ colors:
 typography:
   title:
     fontFamily: "JetBrainsMono Nerd Font"
-    fontSize: "16px"
+    fontSize: "17px"
     fontWeight: 600
   body:
     fontFamily: "JetBrainsMono Nerd Font"
-    fontSize: "13px"
+    fontSize: "14px"
     fontWeight: 400
     fontFeature: "tnum"
   label:
     fontFamily: "JetBrainsMono Nerd Font"
-    fontSize: "11px"
+    fontSize: "12px"
     fontWeight: 400
   glyph:
     fontFamily: "JetBrainsMono Nerd Font Propo"
-    fontSize: "16px"
+    fontSize: "17px"
 rounded:
   control: "6px"
   base: "8px"
@@ -145,16 +145,16 @@ A near-neutral charcoal family with pearl text and a single cool-green accent; s
 
 ## Typography
 
-**Body Font:** JetBrainsMono Nerd Font (13px, weight 400)
+**Body Font:** JetBrainsMono Nerd Font (14px, weight 400)
 **Glyph Font:** JetBrainsMono Nerd Font Propo (proportional glyph widths)
 
 **Character:** one monospaced family for text and numbers keeps readings aligned and matches the terminal next to it. Hierarchy comes from size, weight and the muted colour, not from a second face.
 
 ### Hierarchy
-- **Title** (600, 16px): popup titles such as "Sound" or "Wi-Fi".
-- **Name** (600, 13px): the subject of a section when it is one thing ("Claude Code", "Office Laser").
-- **Body** (400, 13px, tabular figures): rows, values, bar labels, the clock.
-- **Label** (400 or 500, 11px, muted): subtitles, section headings, details under meters, chips.
+- **Title** (600, 17px): popup titles such as "Sound" or "Wi-Fi".
+- **Name** (600, 14px): the subject of a section when it is one thing ("Claude Code", "Office Laser").
+- **Body** (400, 14px, tabular figures): rows, values, bar labels, the clock.
+- **Label** (400 or 500, 12px, muted): subtitles, section headings, details under meters, chips.
 
 ### Named Rules
 **The Tabular Rule.** Numbers that update (clock, percentages, sizes, load) use tabular figures so they do not shift.
@@ -192,6 +192,12 @@ Implemented in `dot/.config/quickshell/leo-shell/`; `.scratch/quickshell-redesig
 - **Toggle, Chip, IconButton, KeyValue, UsageBar, InputField:** as named; all follow the colour and shape rules above.
 
 Other apps follow the same roles through `system-theme-apply.py`: Walker (ground, surface box, rule outline, jade selection), Mako (ground, rule outline, rose outline for critical), Hyprland (rule borders).
+
+### Authentication
+
+SDDM login and native Hyprlock share the graphite Quickshell palette over the existing user-selected wallpaper, never a screenshot of the open session. The form card is centred horizontally, with its centre 100px below screen centre. It is 400×240px with the card radius of 14px and a rule border; the password field is 344×48px. Above it, the clock is 72px and the date is 18px in pearl after contrast review. Form text is 18px; hints are 16px. These larger sizes are specific to authentication, not replacements for the desktop typography tokens.
+
+Hyprlock uses native point-sized labels, calibrated by the generator, with a 54pt clock matching roughly 72px and Pango placeholder sizes converted from pixels. It displays `$USER` and submits with Enter, not a fake button. SDDM has an editable remembered username, a session selector and a real Sign in button. Restart and shutdown require confirmation, using a three-second second click on the lock screen and a modal with Cancel focused by default at login. See [login and lock](docs/login-lock.md) for operation and validation limits.
 
 ## Do's and Don'ts
 

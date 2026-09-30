@@ -1,0 +1,16 @@
+# Generated from palette.json by system-theme-apply.py.
+[General]
+background=#1B1D24
+surface=#272A34
+rule=#3B404E
+foreground=#DCDDE5
+muted=#A0A4B5
+accent=#64D6A5
+alert=#F7768E
+fontFamily=JetBrainsMono Nerd Font
+fontSize=18
+cardRadius=14
+inputRadius=8
+clockSize=72
+wallpaper=wallpaper.jpg
+

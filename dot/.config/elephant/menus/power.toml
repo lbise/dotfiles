@@ -1,0 +1,32 @@
+# Power actions on their own, opened by Super+Escape (`walker -m menus:power`).
+# No parent, so Escape closes the menu. system.toml is the same list inside the main
+# menu; keep the two in sync.
+name = "power"
+name_pretty = "Power"
+hide_name_pretty_prefix = true
+icon = "system-shutdown-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Lock"
+keywords = ["lock", "screen"]
+icon = "system-lock-screen-symbolic"
+actions = { "lock" = "system-lock-screen.sh" }
+
+[[entries]]
+text = "Suspend"
+keywords = ["suspend", "sleep"]
+icon = "weather-clear-night-symbolic"
+actions = { "suspend" = "systemctl suspend" }
+
+[[entries]]
+text = "Restart"
+keywords = ["restart", "reboot"]
+icon = "system-reboot-symbolic"
+actions = { "restart" = "system-reboot.sh" }
+
+[[entries]]
+text = "Shutdown"
+keywords = ["shutdown", "poweroff", "power off"]
+icon = "system-shutdown-symbolic"
+actions = { "shutdown" = "system-shutdown.sh" }

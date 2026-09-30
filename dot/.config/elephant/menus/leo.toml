@@ -1,0 +1,55 @@
+# Main menu, opened with Super+Space (`walker -m menus:leo`). Super+R stays apps-only.
+# Each submenu lives in its own file next to this one (install.toml, update.toml, ...).
+name = "leo"
+name_pretty = "Leo"
+hide_name_pretty_prefix = true
+icon = "applications-other"
+fixed_order = true
+
+[[entries]]
+text = "Install"
+subtext = "Packages from the repos and the AUR"
+icon = "system-software-install-symbolic"
+submenu = "install"
+
+[[entries]]
+text = "Remove"
+subtext = "Uninstall packages"
+icon = "user-trash-symbolic"
+actions = { "remove" = "system-exec-float.sh 'Remove package' system-pkg-remove.sh" }
+
+[[entries]]
+text = "Update"
+subtext = "Packages, firmware, restart services"
+icon = "software-update-available-symbolic"
+submenu = "update"
+
+[[entries]]
+text = "Capture"
+subtext = "Screenshot, text, color"
+icon = "camera-photo-symbolic"
+submenu = "capture"
+
+[[entries]]
+text = "Style"
+subtext = "Background and theme"
+icon = "preferences-desktop-wallpaper-symbolic"
+submenu = "style"
+
+[[entries]]
+text = "Setup"
+subtext = "Wi-Fi, Bluetooth, audio, config files"
+icon = "preferences-system-symbolic"
+submenu = "setup"
+
+[[entries]]
+text = "Learn"
+subtext = "Keybindings and documentation"
+icon = "help-browser-symbolic"
+submenu = "learn"
+
+[[entries]]
+text = "System"
+subtext = "Lock, suspend, restart, shutdown"
+icon = "system-shutdown-symbolic"
+submenu = "system"

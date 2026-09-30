@@ -14,7 +14,7 @@ text-color=#DCDDE5
 border-color=#3B404E
 progress-color=over #64D6A5
 border-radius=8
-font=JetBrainsMono Nerd Font 14
+font=JetBrainsMono Nerd Font 15
 
 # Criteria sections must follow the global options, so keep this block last.
 [urgency=critical]

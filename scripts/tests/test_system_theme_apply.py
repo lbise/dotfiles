@@ -127,6 +127,33 @@ class RenderTest(unittest.TestCase):
         self.assertIn('$inactiveBorderColor = rgba(30303080)', conf)
         self.assertIn('col.border_active = $activeBorderColor', conf)
 
+    def test_hyprlock_variables_come_from_palette(self) -> None:
+        conf = theme.hyprlock_conf(self.palette)
+        self.assertIn('$lock_surface = rgb(202020)', conf)
+        self.assertIn('$lock_accent = rgb(00FF88)', conf)
+        self.assertIn('$lock_muted_hex = ##A0A0A0', conf)
+        self.assertIn('$lock_font = Test Mono', conf)
+        self.assertIn('$lock_font_size = 13', conf)
+        self.assertIn('$lock_hint_size = 11', conf)
+        self.assertIn('$lock_clock_size = 54', conf)
+        self.assertIn('$lock_card_radius = 12', conf)
+        self.assertIn('$lock_input_radius = 6', conf)
+        # The generated file must never change authentication or power behaviour.
+        self.assertNotIn('auth {', conf)
+        self.assertNotIn('onclick', conf)
+
+    def test_login_config_is_local_and_preserves_hash_colours(self) -> None:
+        import configparser
+        config = configparser.ConfigParser(interpolation=None)
+        config.read_string(theme.login_config(self.palette))
+        values = config['General']
+        self.assertEqual(values['surface'], '#202020')
+        self.assertEqual(values['fontFamily'], 'Test Mono')
+        self.assertEqual(values['fontSize'], '17')
+        self.assertEqual(values['cardRadius'], '12')
+        self.assertEqual(values['wallpaper'], 'wallpaper.jpg')
+        self.assertNotIn('/home/', theme.login_config(self.palette))
+
     def test_invalid_colour_names_the_key(self) -> None:
         palette = copy.deepcopy(PALETTE)
         palette['colors']['accent'] = '#12345'
@@ -170,6 +197,8 @@ class CommandTest(unittest.TestCase):
         applied = self._run()
         self.assertEqual(applied.returncode, 0, applied.stderr)
         self.assertIn('rgb(303030)', (self.root / 'leo/theme/hyprland.conf').read_text())
+        self.assertIn('$lock_accent = rgb(00FF88)', (self.root / 'leo/theme/hyprlock.conf').read_text())
+        self.assertIn('accent=#00FF88', (self.root / 'leo/login/theme.conf.user').read_text())
 
         again = self._run('--check')
         self.assertEqual(again.returncode, 0, again.stdout)

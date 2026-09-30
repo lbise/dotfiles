@@ -1,0 +1,25 @@
+# Style submenu, reached from the main menu (leo.toml).
+name = "style"
+parent = "leo"
+name_pretty = "Style"
+hide_name_pretty_prefix = true
+icon = "preferences-desktop-wallpaper-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Background"
+subtext = "Pick a wallpaper"
+icon = "preferences-desktop-wallpaper-symbolic"
+submenu = "wallpaper"
+
+[[entries]]
+text = "Edit palette"
+subtext = "Colors, font and shape"
+icon = "document-edit-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/leo/theme/palette.json" }
+
+[[entries]]
+text = "Apply palette"
+subtext = "Regenerate theme files and restart Walker"
+icon = "view-refresh-symbolic"
+actions = { "apply" = "system-theme-apply.py --reload >/dev/null && { notify-send -a leo 'Theme applied'; pkill -x walker; sleep 0.3; setsid uwsm-app -- walker --gapplication-service >/dev/null 2>&1 & } || notify-send -u critical -a leo 'Theme apply failed'" }

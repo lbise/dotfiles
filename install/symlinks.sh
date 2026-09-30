@@ -43,6 +43,8 @@ DESKTOP_LINKS=(
     ".config/systemd/user/leo-quickshell.service"
     ".config/uwsm"
     ".config/walker"
+    ".config/elephant/menus"
+    ".config/xdg-terminals.list"
     ".config/leo"
     ".local/share/applications/connect-rdp.desktop"
 )

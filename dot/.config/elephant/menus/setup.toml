@@ -1,0 +1,49 @@
+# Setup submenu, reached from the main menu (leo.toml).
+name = "setup"
+parent = "leo"
+name_pretty = "Setup"
+hide_name_pretty_prefix = true
+icon = "preferences-system-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Wi-Fi"
+subtext = "impala"
+icon = "network-wireless-symbolic"
+actions = { "open" = "system-exec-float.sh 'Wi-Fi' impala" }
+
+[[entries]]
+text = "Bluetooth"
+subtext = "bluetui"
+icon = "bluetooth-symbolic"
+actions = { "open" = "system-exec-float.sh 'Bluetooth' bluetui" }
+
+[[entries]]
+text = "Audio"
+subtext = "pavucontrol"
+icon = "audio-volume-high-symbolic"
+actions = { "open" = "uwsm-app -- pavucontrol" }
+
+[[entries]]
+text = "Hyprland settings"
+subtext = "Monitors, input, layout (HyprMod)"
+icon = "video-display-symbolic"
+actions = { "open" = "uwsm-app -- hyprmod" }
+
+[[entries]]
+text = "Printer"
+subtext = "Install CUPS and the Canon MG5200 driver"
+icon = "printer-symbolic"
+actions = { "setup" = "system-exec-float.sh 'Printer setup' system-setup-printer.sh" }
+
+[[entries]]
+text = "Timezone"
+subtext = "Reset to Europe/Zurich"
+icon = "preferences-system-time-symbolic"
+actions = { "set" = "system-exec-float.sh 'Timezone' bash -c 'system-set-timezone.sh; read -rsp \"Done. Press enter to close…\"'" }
+
+[[entries]]
+text = "Config"
+subtext = "Edit dotfiles in Neovim"
+icon = "text-x-generic-symbolic"
+submenu = "config"

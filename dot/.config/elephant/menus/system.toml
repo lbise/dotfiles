@@ -1,0 +1,33 @@
+# Power actions, reached from the main menu (leo.toml). Escape goes back to it.
+# Super+Escape opens power.toml instead, which has no parent so Escape just closes.
+# Keep the two files' entries in sync.
+name = "system"
+parent = "leo"
+name_pretty = "System"
+hide_name_pretty_prefix = true
+icon = "system-shutdown-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Lock"
+keywords = ["lock", "screen"]
+icon = "system-lock-screen-symbolic"
+actions = { "lock" = "system-lock-screen.sh" }
+
+[[entries]]
+text = "Suspend"
+keywords = ["suspend", "sleep"]
+icon = "weather-clear-night-symbolic"
+actions = { "suspend" = "systemctl suspend" }
+
+[[entries]]
+text = "Restart"
+keywords = ["restart", "reboot"]
+icon = "system-reboot-symbolic"
+actions = { "restart" = "system-reboot.sh" }
+
+[[entries]]
+text = "Shutdown"
+keywords = ["shutdown", "poweroff", "power off"]
+icon = "system-shutdown-symbolic"
+actions = { "shutdown" = "system-shutdown.sh" }

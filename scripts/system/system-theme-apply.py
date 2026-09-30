@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply ~/.config/leo/theme/palette.json to Hyprland, Walker, Mako and Ghostty.
+"""Apply ~/.config/leo/theme/palette.json to the desktop, Hyprlock and SDDM.
 
 Usage:
   system-theme-apply.py [--palette PATH] [--check] [--reload]
@@ -15,7 +15,9 @@ leo-theme:end markers are generated.
 
 from __future__ import annotations
 
+import configparser
 import difflib
+import io
 import json
 import os
 import re
@@ -124,6 +126,50 @@ def hyprland_conf(palette: dict) -> str:
         '    col.border_active = $activeBorderColor\n'
         '}\n'
     )
+
+
+def hyprlock_conf(palette: dict) -> str:
+    """Only theme variables; layout and authentication stay in hyprlock.conf."""
+    colors = palette['colors']
+    lines = [
+        '# Generated from palette.json by system-theme-apply.py. Do not edit by hand.',
+        *[f'$lock_{key} = rgb({hex_digits(colors[key])})' for key in (
+            'background', 'surface', 'rule', 'foreground', 'muted', 'accent', 'alert', 'warning',
+        )],
+        # Hyprlang uses ## for a literal #, needed by Pango colour markup.
+        f'$lock_muted_hex = #{colors["muted"]}',
+        f'$lock_font = {palette["font"]["family"]}',
+        # Hyprlock labels use points, while the Qt login theme uses pixels.
+        f'$lock_font_size = {round((palette["font"]["size"] + 4) * 0.75)}',
+        f'$lock_hint_size = {round((palette["font"]["size"] + 2) * 0.75)}',
+        '$lock_clock_size = 54',
+        # Pango markup sizes are points * 1024; convert from pixels at 96 DPI.
+        f'$lock_input_text_size = {(palette["font"]["size"] + 4) * 768}',
+        f'$lock_card_radius = {palette["shape"]["radius"] + 6}',
+        f'$lock_input_radius = {palette["shape"]["radius"]}',
+    ]
+    return '\n'.join(lines) + '\n'
+
+
+def login_config(palette: dict) -> str:
+    """SDDM reads a local copy; it must not depend on the user's private home."""
+    config = configparser.ConfigParser(interpolation=None)
+    config.optionxform = str
+    config['General'] = {
+        **{key: palette['colors'][key] for key in (
+            'background', 'surface', 'rule', 'foreground', 'muted', 'accent', 'alert',
+        )},
+        'fontFamily': palette['font']['family'],
+        'fontSize': str(palette['font']['size'] + 4),
+        'cardRadius': str(palette['shape']['radius'] + 6),
+        'inputRadius': str(palette['shape']['radius']),
+        'clockSize': '72',
+        'wallpaper': 'wallpaper.jpg',
+    }
+    output = io.StringIO()
+    output.write('# Generated from palette.json by system-theme-apply.py.\n')
+    config.write(output, space_around_delimiters=False)
+    return output.getvalue()
 
 
 def walker_block(palette: dict) -> list[str]:
@@ -256,6 +302,8 @@ def targets(root: Path) -> list[tuple[Path, Callable[[dict, str], str], bool]]:
     """(path, render(palette, current_text), whole_file)."""
     return [
         (root / 'leo/theme/hyprland.conf', lambda palette, _text: hyprland_conf(palette), True),
+        (root / 'leo/theme/hyprlock.conf', lambda palette, _text: hyprlock_conf(palette), True),
+        (root / 'leo/login/theme.conf.user', lambda palette, _text: login_config(palette), True),
         (root / 'walker/themes/leo/style.css', walker_css, False),
         (root / 'mako/config', mako_config, False),
         (root / 'ghostty/config', ghostty_config, False),
@@ -290,6 +338,9 @@ def write_file(path: Path, text: str) -> None:
 
 RELOAD_NOTES = """\
 Hyprland reloads its config automatically.
+Hyprlock picks up the theme next time you lock.
+SDDM: run system-login-install.sh to update its system-wide theme and wallpaper.
+It takes effect at the next login; do not restart SDDM during your session.
 Ghostty: press ctrl+shift+, in open windows (new windows pick the theme up).
 Walker: restart it with
   pkill -x walker; uwsm-app -- walker --gapplication-service & disown"""

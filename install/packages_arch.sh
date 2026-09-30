@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock quickshell man-db man-pages iwd impala fcitx5 fcitx5-configtool fcitx5-gtk brightnessctl jq grim slurp satty wl-clipboard"
+PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock quickshell man-db man-pages iwd impala fcitx5 fcitx5-configtool fcitx5-gtk brightnessctl jq grim slurp satty wl-clipboard tesseract tesseract-data-eng hyprpicker"
 YAY_PKGS="neovim ghostty zen-browser-bin eza fd fzf ripgrep xdg-terminal-exec elephant-all-bin walker dropbox"
 
 migrate_legacy_tree_sitter_cli() {

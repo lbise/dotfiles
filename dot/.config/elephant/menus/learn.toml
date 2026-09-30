@@ -1,0 +1,49 @@
+# Learn submenu, reached from the main menu (leo.toml).
+name = "learn"
+parent = "leo"
+name_pretty = "Learn"
+hide_name_pretty_prefix = true
+icon = "help-browser-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Keybindings"
+subtext = "Everything bound in Hyprland"
+icon = "input-keyboard-symbolic"
+submenu = "keybindings"
+
+[[entries]]
+text = "Hyprland"
+subtext = "wiki.hypr.land"
+icon = "help-browser-symbolic"
+actions = { "open" = "xdg-open https://wiki.hypr.land/" }
+
+[[entries]]
+text = "Arch"
+subtext = "wiki.archlinux.org"
+icon = "help-browser-symbolic"
+actions = { "open" = "xdg-open https://wiki.archlinux.org/" }
+
+[[entries]]
+text = "Quickshell"
+subtext = "quickshell.org/docs"
+icon = "help-browser-symbolic"
+actions = { "open" = "xdg-open https://quickshell.org/docs/" }
+
+[[entries]]
+text = "Walker"
+subtext = "github.com/abenz1267/walker"
+icon = "help-browser-symbolic"
+actions = { "open" = "xdg-open https://github.com/abenz1267/walker" }
+
+[[entries]]
+text = "Neovim"
+subtext = "neovim.io/doc"
+icon = "help-browser-symbolic"
+actions = { "open" = "xdg-open https://neovim.io/doc/user/" }
+
+[[entries]]
+text = "Bash"
+subtext = "devhints.io/bash"
+icon = "help-browser-symbolic"
+actions = { "open" = "xdg-open https://devhints.io/bash" }

@@ -1,0 +1,25 @@
+# Update submenu, reached from the main menu (leo.toml).
+name = "update"
+parent = "leo"
+name_pretty = "Update"
+hide_name_pretty_prefix = true
+icon = "software-update-available-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "System packages"
+subtext = "Repos + AUR, then orphans and reboot check"
+icon = "software-update-available-symbolic"
+actions = { "update" = "system-exec-float.sh 'Update packages' system-update.sh packages" }
+
+[[entries]]
+text = "Firmware"
+subtext = "fwupd"
+icon = "application-x-firmware-symbolic"
+actions = { "update" = "system-exec-float.sh 'Update firmware' system-update.sh firmware" }
+
+[[entries]]
+text = "Restart"
+subtext = "Quickshell, Walker, Elephant, Mako, Hyprland"
+icon = "view-refresh-symbolic"
+submenu = "restart"

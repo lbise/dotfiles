@@ -1,0 +1,32 @@
+# Capture submenu, reached from the main menu (leo.toml).
+# The short sleep lets the launcher close before slurp or the screenshot starts.
+name = "capture"
+parent = "leo"
+name_pretty = "Capture"
+hide_name_pretty_prefix = true
+icon = "camera-photo-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Screenshot region"
+subtext = "Select an area"
+icon = "camera-photo-symbolic"
+actions = { "capture" = "sleep 0.3 && system-screenshot.sh region" }
+
+[[entries]]
+text = "Screenshot screen"
+subtext = "Focused monitor"
+icon = "camera-photo-symbolic"
+actions = { "capture" = "sleep 0.3 && system-screenshot.sh" }
+
+[[entries]]
+text = "Text"
+subtext = "OCR a region, copy the text"
+icon = "edit-select-all-symbolic"
+actions = { "capture" = "sleep 0.3 && system-capture.sh text" }
+
+[[entries]]
+text = "Color"
+subtext = "Pick a color, copy the hex value"
+icon = "color-select-symbolic"
+actions = { "capture" = "sleep 0.3 && system-capture.sh color" }

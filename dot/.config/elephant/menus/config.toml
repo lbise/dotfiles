@@ -1,0 +1,45 @@
+# Config submenu, reached from Setup (setup.toml). Opens the file in Neovim.
+# ~/.config paths are symlinks into this dotfiles repo, so edits land in git.
+name = "config"
+parent = "setup"
+name_pretty = "Config"
+hide_name_pretty_prefix = true
+icon = "text-x-generic-symbolic"
+fixed_order = true
+
+[[entries]]
+text = "Hyprland"
+icon = "text-x-generic-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/hypr/hyprland.conf" }
+
+[[entries]]
+text = "Walker"
+icon = "text-x-generic-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/walker/config.toml" }
+
+[[entries]]
+text = "Launcher menus"
+subtext = "Elephant menu definitions"
+icon = "text-x-generic-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/elephant/menus" }
+
+[[entries]]
+text = "Quickshell"
+icon = "text-x-generic-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/quickshell/leo-shell" }
+
+[[entries]]
+text = "Mako"
+icon = "text-x-generic-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/mako/config" }
+
+[[entries]]
+text = "Ghostty"
+icon = "text-x-generic-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/ghostty/config" }
+
+[[entries]]
+text = "Shell"
+subtext = ".zshrc"
+icon = "text-x-generic-symbolic"
+actions = { "edit" = "system-exec-term.sh nvim ~/.zshrc" }
