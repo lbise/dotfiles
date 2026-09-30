@@ -62,7 +62,8 @@ function usable(record) {
   return !!record && (totalTokens(record) > 0 || modelRows(record).length > 0 || limitRows(record).length > 0)
 }
 
-function recordRows(records) {
+// The favourite provider sorts first, then the rest by tokens.
+function recordRows(records, favorite) {
   var rows = []
   for (var id in records) {
     var record = records[id]
@@ -75,16 +76,25 @@ function recordRows(records) {
       tokens: totalTokens(record)
     })
   }
-  rows.sort(function(left, right) { return right.tokens - left.tokens })
+  rows.sort(function(left, right) {
+    if ((left.id === favorite) !== (right.id === favorite)) return left.id === favorite ? -1 : 1
+    return right.tokens - left.tokens || (left.id < right.id ? -1 : 1)
+  })
   return rows
 }
 
 function formatTokens(value) {
   var tokens = number(value)
-  if (tokens >= 1000000000) return (tokens / 1000000000).toFixed(1) + "B"
-  if (tokens >= 1000000) return (tokens / 1000000).toFixed(1) + "M"
-  if (tokens >= 1000) return (tokens / 1000).toFixed(1) + "k"
+  // 999.5k and up round to 1000k, so they move to the next unit.
+  if (tokens >= 999500000) return scaled(tokens / 1000000000) + "B"
+  if (tokens >= 999500) return scaled(tokens / 1000000) + "M"
+  if (tokens >= 1000) return scaled(tokens / 1000) + "k"
   return String(tokens)
+}
+
+// One decimal below 100, none above, so values stay short ("45.6M", "116M").
+function scaled(value) {
+  return value >= 100 ? value.toFixed(0) : value.toFixed(1)
 }
 
 function formatPercent(value) {

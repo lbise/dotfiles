@@ -6,292 +6,240 @@ import Quickshell
 import Quickshell.Io
 import "AiUsageModel.js" as Model
 
-Item {
+// AI quota and token usage per provider. The bar shows the starred provider's
+// highest quota, or the highest overall when none is starred. The popup lists
+// each provider's quotas, today's totals and tokens by model, starred first.
+BarButton {
   id: root
 
-  property color foreground: "white"
-  property color background: "#222831"
-  property string fontFamily: "monospace"
-  property bool popupOpen: false
-
-  readonly property var providerRows: Model.recordRows(data.records)
+  readonly property var providerRows: Model.recordRows(data.records, data.favorite)
   readonly property bool hasData: providerRows.length > 0
+  readonly property var rowsById: {
+    var map = {}
+    for (var i = 0; i < providerRows.length; i++) map[providerRows[i].id] = providerRows[i]
+    return map
+  }
+  // Provider ids in display order. Only replaced when the order changes, so
+  // a data refresh updates the popup in place instead of rebuilding it.
+  property var providerIds: []
+  readonly property var quotaRows: {
+    var starred = rowsById[data.favorite]
+    return starred && starred.limits.length > 0 ? [starred] : providerRows
+  }
   readonly property real highestQuota: {
     var highest = 0
-    for (var i = 0; i < providerRows.length; i++) {
-      var limits = providerRows[i].limits
+    for (var i = 0; i < quotaRows.length; i++) {
+      var limits = quotaRows[i].limits
       for (var j = 0; j < limits.length; j++) highest = Math.max(highest, limits[j].percent)
     }
     return highest
   }
+  // Newest updatedAt across the shown records, in ms (0 when unknown).
+  readonly property double updatedAt: {
+    var newest = 0
+    for (var i = 0; i < providerRows.length; i++) {
+      var time = new Date(providerRows[i].record.updatedAt || "").getTime()
+      if (isFinite(time)) newest = Math.max(newest, time)
+    }
+    return newest
+  }
+  property double now: Date.now()
 
-  implicitWidth: hasData ? button.implicitWidth : 0
-  implicitHeight: hasData ? button.implicitHeight : 0
   visible: hasData
+  icon: Icons.robot
+  label: highestQuota > 0 ? Model.formatPercent(highestQuota) : ""
+  tone: toneFor(highestQuota)
+  open: popup.shown
+  onClicked: Popups.toggle("ai", popup.screenName)
 
   AiUsageData {
     id: data
   }
 
+  function syncOrder() {
+    var ids = []
+    for (var i = 0; i < providerRows.length; i++) ids.push(providerRows[i].id)
+    if (ids.join("\n") !== providerIds.join("\n")) providerIds = ids
+  }
+
+  onProviderRowsChanged: syncOrder()
+  Component.onCompleted: syncOrder()
+
   IpcHandler {
     target: "leo.ai-usage"
-    function open(): void { root.openUsage() }
-    function close(): void { root.popupOpen = false }
-    function toggle(): void { root.popupOpen ? root.popupOpen = false : root.openUsage() }
+    function open(): void { Popups.openExternal("ai") }
+    function close(): void { if (Popups.current === "ai") Popups.close() }
+    function toggle(): void { Popups.toggleExternal("ai") }
     function refresh(): void { data.runUpdate(false) }
   }
 
+  // Keeps "Updated N min ago" current while the popup is open.
+  Timer {
+    interval: 30000
+    repeat: true
+    running: popup.shown
+    onTriggered: root.now = Date.now()
+  }
+
+  function toneFor(fraction) {
+    return fraction >= 0.9 ? "alert" : fraction >= 0.75 ? "warn" : ""
+  }
+
+  function updatedText() {
+    if (data.refreshing) return "Refreshing…"
+    if (updatedAt <= 0) return ""
+    var minutes = Math.floor(Math.max(0, now - updatedAt) / 60000)
+    if (minutes < 1) return "Updated just now"
+    if (minutes < 60) return "Updated " + minutes + " min ago"
+    return "Updated " + Qt.formatDateTime(new Date(updatedAt), "d MMM, HH:mm")
+  }
+
+  function tierText(record) {
+    var tier = String(record && record.tierLabel || "")
+    return tier === "" ? "" : tier.charAt(0).toUpperCase() + tier.slice(1)
+  }
+
+  // Only problems are worth a line; a loaded quota already shows as meters.
   function statusText(record) {
     var status = String(record && record.usageStatusText || "")
+    if (status === "" || /loaded$/i.test(status)) return ""
     if (status === "Codex unavailable") return "Quota unavailable. Local token history is still shown."
-    return status === "" ? "" : "Quota: " + status
+    return "Quota: " + status
   }
 
   function resetText(value) {
     if (!value) return ""
     var date = new Date(value)
     if (!isFinite(date.getTime())) return ""
-    return "resets " + Qt.formatDateTime(date, "d MMM, HH:mm")
+    var sameDay = date.toDateString() === new Date(now).toDateString()
+    return "Resets " + Qt.formatDateTime(date, sameDay ? "HH:mm" : "d MMM, HH:mm")
   }
 
-  function openUsage() {
-    popupOpen = true
-    data.runUpdate(true)
-  }
-
-  Button {
-    id: button
-    anchors.fill: parent
-    label: root.highestQuota > 0 ? "AI " + Model.formatPercent(root.highestQuota) : "AI"
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    horizontalPadding: 8
-    onClicked: root.openUsage()
-  }
-
-  PopupWindow {
+  PopupCard {
     id: popup
-    visible: root.popupOpen
-    grabFocus: true
-    color: "transparent"
-    implicitWidth: 460
-    implicitHeight: 570
+    popupId: "ai"
+    anchorItem: root
+    align: "right"
+    cardWidth: 420
+    maxBodyHeight: 620
+    title: "AI usage"
+    subtitle: root.updatedText()
 
-    onVisibleChanged: {
-      if (!visible) root.popupOpen = false
-      else card.forceActiveFocus()
+    onOpened: {
+      root.now = Date.now()
+      data.runUpdate(true)
     }
 
-    anchor {
-      window: root.QsWindow.window
-      adjustment: PopupAdjustment.Slide
-      edges: Edges.Top | Edges.Left
-      gravity: Edges.Bottom | Edges.Right
-      rect.width: 1
-      rect.height: 1
-
-      onAnchoring: {
-        var window = root.QsWindow.window
-        if (!window) return
-        var point = window.contentItem.mapFromItem(root, root.width - popup.width, root.height + 4)
-        popup.anchor.rect.x = Math.round(point.x)
-        popup.anchor.rect.y = Math.round(point.y)
+    tools: [
+      IconButton {
+        icon: Icons.refresh
+        busy: data.refreshing
+        onClicked: data.runUpdate(false)
+      },
+      IconButton {
+        icon: Icons.close
+        onClicked: Popups.close()
       }
-    }
+    ]
 
-    Rectangle {
-      id: card
-      anchors.fill: parent
-      radius: 6
-      color: root.background
-      border.color: root.foreground
-      border.width: 1
-      focus: true
-      Keys.onEscapePressed: root.popupOpen = false
+    Repeater {
+      model: root.providerIds
 
       ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 16
-        spacing: 10
+        id: provider
 
-        RowLayout {
-          Layout.fillWidth: true
-          Text {
+        required property string modelData
+        readonly property var row: root.rowsById[modelData] || ({ id: modelData, record: {}, limits: [], models: [] })
+        readonly property bool starred: data.favorite === modelData
+
+        Layout.fillWidth: true
+        spacing: 6
+
+        Section {
+          title: provider.row.record.name || provider.row.id
+          tag: root.tierText(provider.row.record)
+          named: true
+
+          actions: [
+            Glyph {
+              text: provider.starred ? Icons.star : Icons.starOutline
+              color: provider.starred ? Theme.accent : starPointer.containsMouse ? Theme.foreground : Theme.muted
+
+              MouseArea {
+                id: starPointer
+                anchors.fill: parent
+                anchors.margins: -4
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: data.setFavorite(provider.row.id)
+              }
+            }
+          ]
+
+          Repeater {
+            model: provider.row.limits.length
+
+            Meter {
+              required property int index
+              readonly property var limit: provider.row.limits[index] || ({ label: "", percent: 0, resetsAt: "" })
+              label: limit.label
+              value: Model.formatPercent(limit.percent)
+              fraction: limit.percent
+              detail: root.resetText(limit.resetsAt)
+              tone: root.toneFor(limit.percent)
+            }
+          }
+
+          Label {
             Layout.fillWidth: true
-            text: "AI usage"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: 15
-            font.bold: true
+            visible: text !== ""
+            text: root.statusText(provider.row.record)
+            muted: true
+            small: true
+            wrapMode: Text.Wrap
           }
-          Button {
-            label: data.refreshing ? "…" : "↻"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: data.runUpdate(false)
+
+          KeyValue {
+            key: "Today"
+            value: Model.formatTokens(provider.row.record.todayTotalTokens || 0) + " tokens · "
+              + (provider.row.record.todayPrompts || 0) + " prompts"
           }
-        }
 
-        Flickable {
-          id: providersFlickable
-          Layout.fillWidth: true
-          Layout.fillHeight: true
-          clip: true
-          contentHeight: providersColumn.implicitHeight
-          boundsBehavior: Flickable.StopAtBounds
+          ColumnLayout {
+            Layout.fillWidth: true
+            visible: provider.row.models.length > 0
+            spacing: 6
 
-          Column {
-            id: providersColumn
-            width: providersFlickable.width
-            spacing: 18
+            Label {
+              text: "Tokens by model"
+              muted: true
+              small: true
+            }
 
             Repeater {
-              model: root.providerRows
+              model: provider.row.models.length
 
-              Column {
-                required property var modelData
-                width: providersColumn.width
-                spacing: 8
-
-                RowLayout {
-                  width: parent.width
-                  Text {
-                    Layout.fillWidth: true
-                    text: modelData.record.name || modelData.id
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: 14
-                    font.bold: true
-                  }
-                  Text {
-                    visible: !!modelData.record.tierLabel
-                    text: modelData.record.tierLabel || ""
-                    color: root.foreground
-                    opacity: 0.7
-                    font.family: root.fontFamily
-                    font.pixelSize: 11
-                  }
-                }
-
-                Text {
-                  visible: !!modelData.record.usageStatusText
-                  width: parent.width
-                  text: root.statusText(modelData.record)
-                  color: root.foreground
-                  opacity: 0.7
-                  font.family: root.fontFamily
-                  font.pixelSize: 10
-                  wrapMode: Text.Wrap
-                }
-
-                Repeater {
-                  model: modelData.limits
-
-                  Column {
-                    required property var modelData
-                    width: providersColumn.width
-                    spacing: 4
-
-                    RowLayout {
-                      width: parent.width
-                      Text {
-                        Layout.fillWidth: true
-                        text: modelData.label
-                        color: root.foreground
-                        font.family: root.fontFamily
-                        font.pixelSize: 11
-                      }
-                      Text {
-                        text: Model.formatPercent(modelData.percent)
-                        color: root.foreground
-                        font.family: root.fontFamily
-                        font.pixelSize: 11
-                      }
-                    }
-                    Rectangle {
-                      width: parent.width
-                      height: 5
-                      radius: 3
-                      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
-                      Rectangle {
-                        width: parent.width * modelData.percent
-                        height: parent.height
-                        radius: 3
-                        color: root.foreground
-                      }
-                    }
-                    Text {
-                      visible: text !== ""
-                      text: root.resetText(modelData.resetsAt)
-                      color: root.foreground
-                      opacity: 0.6
-                      font.family: root.fontFamily
-                      font.pixelSize: 10
-                    }
-                  }
-                }
-
-                Text {
-                  width: parent.width
-                  text: "Today  " + Model.formatTokens(modelData.record.todayTotalTokens || 0)
-                    + " tokens  ·  " + (modelData.record.todayPrompts || 0) + " prompts"
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: 11
-                }
-
-                Text {
-                  visible: modelData.models.length > 0
-                  text: "Tokens by model"
-                  color: root.foreground
-                  opacity: 0.75
-                  font.family: root.fontFamily
-                  font.pixelSize: 11
-                }
-
-                Repeater {
-                  model: modelData.models
-
-                  RowLayout {
-                    required property var modelData
-                    width: providersColumn.width
-                    spacing: 8
-
-                    Text {
-                      Layout.preferredWidth: 165
-                      text: modelData.model
-                      color: root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: 10
-                      elide: Text.ElideMiddle
-                    }
-                    Rectangle {
-                      Layout.fillWidth: true
-                      height: 5
-                      radius: 3
-                      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
-                      Rectangle {
-                        width: parent.width * modelData.fraction
-                        height: parent.height
-                        radius: 3
-                        color: root.foreground
-                      }
-                    }
-                    Text {
-                      Layout.preferredWidth: 45
-                      text: Model.formatTokens(modelData.tokens)
-                      color: root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: 10
-                      horizontalAlignment: Text.AlignRight
-                    }
-                  }
-                }
+              UsageBar {
+                required property int index
+                readonly property var entry: provider.row.models[index] || ({ model: "", fraction: 0, tokens: 0 })
+                label: entry.model
+                fraction: entry.fraction
+                value: Model.formatTokens(entry.tokens)
               }
             }
           }
         }
       }
+    }
+
+    Label {
+      Layout.leftMargin: 10
+      Layout.rightMargin: 10
+      Layout.fillWidth: true
+      visible: !root.hasData
+      text: data.refreshing ? "Loading usage…" : "No usage data yet."
+      muted: true
+      wrapMode: Text.Wrap
     }
   }
 }

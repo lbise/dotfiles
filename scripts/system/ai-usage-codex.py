@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 AGENT_ID = "codex"
-AGENT_NAME = "Codex"
+AGENT_NAME = "OpenAI"
 AUTH_HELP = "Authenticate Codex in pi or run `codex login`."
 PI_AUTH_PATH = Path.home() / ".pi" / "agent" / "auth.json"
 CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token"

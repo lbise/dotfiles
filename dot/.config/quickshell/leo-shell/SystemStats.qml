@@ -2,176 +2,163 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import "SystemStatsModel.js" as Model
 
-Item {
+// Processor, memory and disk readings. Data is read once a second, and only
+// while the popup is open.
+BarButton {
   id: root
 
-  property color foreground: "white"
-  property color background: "#222831"
-  property string fontFamily: "monospace"
-  property bool popupOpen: false
+  readonly property var memory: stats.memory
+  readonly property real ramFraction: memory ? memory.used / memory.total : 0
+  readonly property real swapFraction: memory && memory.swapTotal ? memory.swapUsed / memory.swapTotal : 0
+  // Load is per core, so 1.0 means every core is busy.
+  readonly property real loadFraction: stats.load && stats.cores > 0 ? Math.min(1, stats.load.one / stats.cores) : 0
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  icon: Icons.memory
+  open: popup.shown
+  onClicked: Popups.toggle("sys", popup.screenName)
+
+  function percent(fraction) {
+    return Math.round(fraction * 100) + "%"
+  }
+
+  function usageTone(fraction) {
+    return fraction >= 0.95 ? "alert" : fraction >= 0.8 ? "warn" : ""
+  }
+
+  // Chips run hotter than drives; each gets its own warning thresholds.
+  function temperatureTone(degrees, warn, alert) {
+    return degrees >= alert ? "alert" : degrees >= warn ? "warn" : ""
+  }
+
+  function degrees(value) {
+    return Math.round(value) + " °C"
+  }
 
   SystemStatsData {
     id: stats
-    running: root.popupOpen
+    running: popup.shown
   }
 
-  Button {
-    id: button
-    anchors.fill: parent
-    label: "󰍛"
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    onClicked: root.popupOpen = !root.popupOpen
-  }
-
-  PopupWindow {
+  PopupCard {
     id: popup
-    visible: root.popupOpen
-    grabFocus: true
-    onVisibleChanged: {
-      if (!visible) root.popupOpen = false
-      else card.forceActiveFocus()
-    }
-    color: "transparent"
-    implicitWidth: 340
-    implicitHeight: content.implicitHeight + 32
+    popupId: "sys"
+    anchorItem: root
+    align: "right"
+    cardWidth: 330
+    maxBodyHeight: 820
+    title: "System"
+    subtitle: stats.uptime !== "" ? "Up " + stats.uptime : ""
 
-    anchor {
-      window: root.QsWindow.window
-      adjustment: PopupAdjustment.Slide
-      edges: Edges.Top | Edges.Left
-      gravity: Edges.Bottom | Edges.Right
-      rect.width: 1
-      rect.height: 1
-      onAnchoring: {
-        var window = root.QsWindow.window
-        if (!window) return
-        var point = window.contentItem.mapFromItem(root, root.width - popup.width, root.height + 4)
-        popup.anchor.rect.x = Math.round(point.x)
-        popup.anchor.rect.y = Math.round(point.y)
+    tools: [
+      IconButton {
+        icon: Icons.close
+        onClicked: Popups.close()
+      }
+    ]
+
+    Section {
+      title: "Processor"
+
+      Meter {
+        label: "Usage"
+        value: stats.cpuUsage < 0 ? "…" : root.percent(stats.cpuUsage)
+        fraction: Math.max(0, stats.cpuUsage)
+        tone: stats.cpuUsage < 0 ? "" : root.usageTone(stats.cpuUsage)
+      }
+
+      Meter {
+        visible: stats.load !== null
+        label: stats.cores > 0 ? "Load · " + stats.cores + " cores" : "Load"
+        value: stats.load ? Model.load(stats.load.one) : ""
+        fraction: root.loadFraction
+        detail: stats.load ? Model.load(stats.load.five) + " over 5 min · "
+          + Model.load(stats.load.fifteen) + " over 15 min" : ""
+        tone: root.usageTone(root.loadFraction)
       }
     }
 
-    Rectangle {
-      id: card
-      anchors.fill: parent
-      radius: 6
-      color: root.background
-      border.color: root.foreground
-      border.width: 1
-      focus: true
-      Keys.onEscapePressed: root.popupOpen = false
+    Section {
+      title: "Temperatures"
+      visible: stats.cpuTemperature >= 0 || stats.gpuTemperature >= 0 || stats.diskTemperatures.length > 0
 
-      ColumnLayout {
-        id: content
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 16
-        spacing: 16
+      Meter {
+        visible: stats.cpuTemperature >= 0
+        label: "CPU"
+        value: root.degrees(stats.cpuTemperature)
+        fraction: stats.cpuTemperature / 100
+        tone: root.temperatureTone(stats.cpuTemperature, 80, 90)
+      }
 
-        RowLayout {
-          Layout.fillWidth: true
-          Text {
-            Layout.fillWidth: true
-            text: "System stats"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: 15
-            font.bold: true
-          }
-          Button {
-            label: "×"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.popupOpen = false
-          }
-        }
+      Meter {
+        visible: stats.gpuTemperature >= 0
+        label: "GPU"
+        value: root.degrees(stats.gpuTemperature)
+        fraction: stats.gpuTemperature / 100
+        tone: root.temperatureTone(stats.gpuTemperature, 80, 90)
+      }
 
-        Metric {
-          title: "CPU"
-          value: stats.cpuUsage < 0 ? "Sampling…" : Math.round(stats.cpuUsage * 100) + "%"
-          fraction: Math.max(0, stats.cpuUsage)
-        }
-        Metric {
-          title: "RAM"
-          value: stats.memory ? Math.round(fraction * 100) + "%" : "Unavailable"
-          fraction: stats.memory ? stats.memory.used / stats.memory.total : 0
-          detail: stats.memory ? Model.gib(stats.memory.used) + " / " + Model.gib(stats.memory.total) : ""
-        }
-        Metric {
-          title: "Swap"
-          value: !stats.memory ? "Unavailable" : stats.memory.swapTotal === 0 ? "Disabled" : Math.round(fraction * 100) + "%"
-          fraction: stats.memory && stats.memory.swapTotal ? stats.memory.swapUsed / stats.memory.swapTotal : 0
-          detail: stats.memory && stats.memory.swapTotal ? Model.gib(stats.memory.swapUsed) + " / " + Model.gib(stats.memory.swapTotal) : ""
-        }
-        Text {
-          Layout.fillWidth: true
-          text: "Load · 1 / 5 / 15 min\n" + stats.loadAverage
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 12
-        }
-        Text {
-          text: "Uptime  " + stats.uptime
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 12
+      Repeater {
+        model: stats.diskTemperatures.length
+
+        Meter {
+          id: driveTemperature
+
+          required property int index
+          readonly property real reading: stats.diskTemperatures[index] || 0
+
+          label: stats.diskTemperatures.length > 1 ? "Disk " + (index + 1) : "Disk"
+          value: root.degrees(reading)
+          fraction: reading / 100
+          tone: root.temperatureTone(reading, 70, 80)
         }
       }
     }
-  }
 
-  component Metric: ColumnLayout {
-    property string title
-    property string value
-    property string detail: ""
-    property real fraction: 0
-    id: metric
-    Layout.fillWidth: true
-    spacing: 6
+    Section {
+      title: "Memory"
+      visible: root.memory !== null
 
-    RowLayout {
-      Layout.fillWidth: true
-      Text {
-        Layout.fillWidth: true
-        text: metric.title
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: 13
+      Meter {
+        label: "RAM"
+        value: root.memory ? root.percent(root.ramFraction) : ""
+        fraction: root.ramFraction
+        detail: root.memory ? Model.gib(root.memory.used) + " of " + Model.gib(root.memory.total) : ""
+        tone: root.usageTone(root.ramFraction)
       }
-      Text {
-        text: metric.value
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: 13
+
+      Meter {
+        visible: root.memory !== null && root.memory.swapTotal > 0
+        label: "Swap"
+        value: root.percent(root.swapFraction)
+        fraction: root.swapFraction
+        detail: root.memory && root.memory.swapTotal
+          ? Model.gib(root.memory.swapUsed) + " of " + Model.gib(root.memory.swapTotal) : ""
+        tone: root.usageTone(root.swapFraction)
       }
     }
-    Rectangle {
-      Layout.fillWidth: true
-      implicitHeight: 6
-      radius: 3
-      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
-      Rectangle {
-        width: parent.width * Math.max(0, Math.min(1, metric.fraction))
-        height: parent.height
-        radius: 3
-        color: root.foreground
+
+    Section {
+      title: "Disk"
+      visible: stats.disks.length > 0
+
+      Repeater {
+        model: stats.disks.length
+
+        Meter {
+          id: disk
+
+          required property int index
+          readonly property var entry: stats.disks[index] || ({ mount: "", total: 1, used: 0 })
+
+          label: entry.mount
+          value: root.percent(entry.used / entry.total)
+          fraction: entry.used / entry.total
+          detail: Model.gib(entry.used) + " of " + Model.gib(entry.total)
+          tone: root.usageTone(entry.used / entry.total)
+        }
       }
-    }
-    Text {
-      visible: metric.detail !== ""
-      text: metric.detail
-      color: root.foreground
-      opacity: 0.7
-      font.family: root.fontFamily
-      font.pixelSize: 11
     }
   }
 }

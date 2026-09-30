@@ -8,11 +8,23 @@ Item {
 
   property var records: ({})
   property bool refreshing: false
+  // Provider id pinned to the top and shown in the bar ("" for none).
+  property string favorite: ""
+  // Last raw text per provider, so an unchanged file does not replace the
+  // record and redraw the popup.
+  property var rawRecords: ({})
   readonly property string home: Quickshell.env("HOME") || ""
   readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || home + "/.local/state") + "/leo/ai-usage"
   readonly property string updateScript: home + "/.scripts/system/ai-usage-update.sh"
 
+  function setFavorite(id) {
+    root.favorite = root.favorite === id ? "" : id
+    favoriteFile.setText(root.favorite)
+  }
+
   function readRecord(id, content) {
+    if (root.rawRecords[id] === content) return
+    root.rawRecords[id] = content
     var next = Object.assign({}, root.records)
     next[id] = Model.parseRecord(content)
     root.records = next
@@ -50,6 +62,14 @@ Item {
   }
 
   FileView {
+    id: favoriteFile
+    path: root.stateDir + "/favorite"
+    printErrors: false
+    onLoaded: root.favorite = text().trim()
+    onLoadFailed: root.favorite = ""
+  }
+
+  FileView {
     id: claudeFile
     path: root.stateDir + "/claude.json"
     watchChanges: true
@@ -80,6 +100,7 @@ Item {
   }
 
   Component.onCompleted: {
+    favoriteFile.reload()
     root.refreshRecords()
     root.runUpdate(false)
   }

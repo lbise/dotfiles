@@ -1,22 +1,31 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQml
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.SystemTray
 import Quickshell.Widgets
 
-Item {
+// A chevron that opens the list of background apps (tray items).
+// Left-click activates an app, right-click shows its menu inside the card,
+// middle-click runs its secondary action. Shift+scroll sends the wheel to the app.
+//
+// The app menu is drawn here from the item's menu entries rather than with
+// item.display(): that opens a separate native menu window, which the
+// popup's Hyprland focus grab does not include, so it never appeared.
+BarButton {
   id: root
 
-  property color foreground: "white"
-  property color muted: foreground
-  property color background: "#222831"
-  property color surface: "#2B3540"
-  property color accent: foreground
-  property string fontFamily: "monospace"
-  property bool popupOpen: false
+  // Tray items the bar already covers, or that are not worth a row.
+  // Match against the item id (see `busctl --user get-property
+  // org.kde.StatusNotifierWatcher /StatusNotifierWatcher
+  // org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems`).
+  readonly property var hiddenIds: [
+    "nm-applet",  // Network: the Wi-Fi popup does this
+    "Fcitx"       // Input method
+  ]
 
   readonly property var trayItems: {
     var result = []
@@ -25,6 +34,7 @@ Item {
     for (var i = 0; i < values.length; i++) {
       var item = values[i]
       if (item.status === Status.Passive) continue
+      if (hiddenIds.indexOf(String(item.id)) !== -1) continue
       var key = String(item.id || item.title || i)
       if (seen[key]) continue
       seen[key] = true
@@ -32,15 +42,62 @@ Item {
     }
     return result
   }
+  readonly property bool needsAttention: trayItems.some(function(item) {
+    return item.status === Status.NeedsAttention
+  })
 
-  implicitWidth: trigger.implicitWidth
-  implicitHeight: trigger.implicitHeight
+  // The app whose menu is shown, and the submenus opened inside it.
+  property var menuItem: null
+  property var menuStack: []
+  property var menuTitles: []
+  readonly property var currentMenu: menuStack.length ? menuStack[menuStack.length - 1]
+    : menuItem ? menuItem.menu : null
+
+  function showMenu(item) {
+    console.log("[debug] showMenu " + (item ? item.id : "null") + " hasMenu=" + (item ? item.hasMenu : "")) // TEMP
+    if (!item || !item.hasMenu) return
+    menuStack = []
+    menuTitles = []
+    menuItem = item
+  }
+
+  function openSubmenu(entry) {
+    menuStack = menuStack.concat([entry])
+    menuTitles = menuTitles.concat([cleanText(entry.text)])
+  }
+
+  function back() {
+    if (menuStack.length) {
+      menuStack = menuStack.slice(0, -1)
+      menuTitles = menuTitles.slice(0, -1)
+    } else {
+      menuItem = null
+    }
+  }
+
+  // Menu labels use "_" or "&" to mark keyboard mnemonics.
+  function cleanText(text) {
+    return String(text || "").replace(/_([^_])/g, "$1").replace(/&([^&])/g, "$1")
+  }
+
+  // The menu entries are only valid while their app is still in the tray.
+  onTrayItemsChanged: if (menuItem && trayItems.indexOf(menuItem) === -1) menuItem = null
+
+  visible: trayItems.length > 0
+  icon: popup.shown ? Icons.chevronUp : Icons.chevronDown
+  tone: popup.shown ? "accent" : ""
+  open: popup.shown
+  attention: needsAttention && !popup.shown
+  horizontalPadding: 7
+  onClicked: Popups.toggle("apps", popup.screenName)
 
   IpcHandler {
     target: "leo.tray"
-    function open(): void { root.popupOpen = true }
-    function close(): void { root.popupOpen = false }
-    function toggle(): void { root.popupOpen = !root.popupOpen }
+    function open(): void { Popups.openExternal("apps") }
+    function close(): void { Popups.close() }
+    function toggle(): void { Popups.toggleExternal("apps") }
+    function debugMenu(index: int): void { root.showMenu(root.trayItems[index]) } // TEMP
+    function debugState(): string { return "current=" + Popups.current + " menu=" + (root.menuItem ? root.menuItem.id : "none") } // TEMP
   }
 
   function iconSource(icon) {
@@ -59,211 +116,203 @@ Item {
     return "image://icon/" + source + "?path=/usr/share/icons/Adwaita"
   }
 
-  function displayMenu(item, mouse, row) {
-    var window = row.QsWindow.window
-    if (!window || !item || !item.display) return
-    var point = window.contentItem.mapFromItem(row, mouse.x, mouse.y)
-    item.display(window, point.x, point.y)
-  }
-
+  // Turns "teams-for-linux_status_icon_1" into "Teams for linux" and
+  // "dropbox" into "Dropbox". Chromium web apps all report the same id.
   function appTitle(item) {
     var title = String(item.title || "").trim()
-    if (/^(chrome|chromium)_status_icon(_\d+)?$/i.test(title)) return "Browser app"
-    return title || String(item.id || "App")
+    var id = String(item.id || "").trim()
+    if (/^(chrome|chromium)_status_icon(_\d+)?$/i.test(title || id)) return "Browser app"
+    var name = title || id.replace(/_status_icon(_\d+)?$/i, "").replace(/-client(-\d+)?$/i, "")
+    name = name.replace(/[-_]+/g, " ").trim()
+    if (name === "") return "App"
+    return name.charAt(0).toUpperCase() + name.slice(1)
   }
 
-  Button {
-    id: trigger
-    anchors.fill: parent
-    label: root.trayItems.length ? "Apps · " + root.trayItems.length : "Apps"
-    foreground: root.popupOpen ? root.accent : root.foreground
-    fillColor: root.popupOpen
-      ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.13)
-      : root.surface
-    fontFamily: root.fontFamily
-    horizontalPadding: 11
-    onClicked: root.popupOpen = !root.popupOpen
-  }
-
-  PopupWindow {
+  PopupCard {
     id: popup
-    visible: root.popupOpen
-    grabFocus: true
-    color: "transparent"
-    implicitWidth: 300
-    implicitHeight: Math.min(390, 64 + Math.max(1, root.trayItems.length) * 42)
+    popupId: "apps"
+    anchorItem: root
+    cardWidth: 300
+    maxBodyHeight: 420
+    title: root.menuItem ? root.appTitle(root.menuItem) : "Background apps"
+    subtitle: root.menuItem
+      ? (root.menuTitles.length ? root.menuTitles.join(" › ") : "App menu")
+      : root.trayItems.length === 1 ? "1 running" : root.trayItems.length + " running"
 
-    onVisibleChanged: {
-      if (!visible) root.popupOpen = false
-      else card.forceActiveFocus()
-    }
+    tools: [
+      IconButton {
+        visible: root.menuItem !== null
+        icon: Icons.chevronLeft
+        onClicked: root.back()
+      }
+    ]
 
-    anchor {
-      window: root.QsWindow.window
-      adjustment: PopupAdjustment.Slide
-      edges: Edges.Top | Edges.Left
-      gravity: Edges.Bottom | Edges.Right
-      rect.width: 1
-      rect.height: 1
+    onShownChanged: if (!shown) root.menuItem = null
 
-      onAnchoring: {
-        var window = root.QsWindow.window
-        if (!window) return
-        var point = window.contentItem.mapFromItem(
-          root, root.width - popup.width, root.height + 4
-        )
-        popup.anchor.rect.x = Math.round(point.x)
-        popup.anchor.rect.y = Math.round(point.y)
+    Section {
+      list: true
+      visible: root.menuItem === null
+
+      Repeater {
+        model: root.trayItems
+
+        ListRow {
+          id: row
+          required property var modelData
+          imageSource: root.iconSource(modelData.icon)
+          letter: root.appTitle(modelData).charAt(0)
+          title: root.appTitle(modelData)
+          attention: modelData.status === Status.NeedsAttention
+          trailing: attention ? "Needs attention" : ""
+
+          onClicked: function(button, x, y) {
+            console.log("[debug] row clicked button=" + button) // TEMP
+            if (button === Qt.RightButton) {
+              root.showMenu(modelData)
+            } else if (button === Qt.MiddleButton) {
+              modelData.secondaryActivate()
+            } else if (modelData.onlyMenu) {
+              root.showMenu(modelData)
+            } else {
+              modelData.activate()
+              Popups.close()
+            }
+          }
+          onWheel: function(delta, modifiers) {
+            if (modifiers & Qt.ShiftModifier) modelData.scroll(delta, false)
+          }
+        }
       }
     }
 
+    Section {
+      list: true
+      visible: root.menuItem !== null
+
+      QsMenuOpener {
+        id: opener
+        menu: root.currentMenu
+      }
+
+      // Keep the app menu and every open submenu referenced. Without this,
+      // moving into a submenu drops the last reference to its parent and
+      // Quickshell unloads the tree, so the submenu shows up empty.
+      Instantiator {
+        model: root.menuItem ? [root.menuItem.menu].concat(root.menuStack) : []
+        delegate: QsMenuOpener {
+          required property var modelData
+          menu: modelData
+        }
+      }
+
+      Repeater {
+        model: opener.children
+
+        MenuEntryRow {
+          required property var modelData
+          entry: modelData
+        }
+      }
+
+      Label {
+        visible: opener.children.values.length === 0
+        Layout.margins: 8
+        text: "This app has no menu"
+        muted: true
+      }
+    }
+
+    Label {
+      Layout.fillWidth: true
+      Layout.leftMargin: 10
+      Layout.rightMargin: 10
+      visible: root.menuItem === null
+      text: "Right-click an app for its menu"
+      muted: true
+      small: true
+      wrapMode: Text.WordWrap
+    }
+  }
+
+  // One entry of an app menu: a separator, an action, a checkbox or radio
+  // item, or a submenu.
+  component MenuEntryRow: Item {
+    id: entryRow
+
+    property var entry: null
+    readonly property bool checkable: entry && entry.buttonType !== QsMenuButtonType.None
+    readonly property bool checked: entry && entry.checkState === Qt.Checked
+
+    Layout.fillWidth: true
+    implicitHeight: entry && entry.isSeparator ? 9 : 32
+
     Rectangle {
-      id: card
+      visible: entryRow.entry && entryRow.entry.isSeparator
+      anchors.verticalCenter: parent.verticalCenter
+      x: 8
+      width: parent.width - 16
+      height: 1
+      color: Theme.rule
+    }
+
+    Rectangle {
+      visible: entryRow.entry && !entryRow.entry.isSeparator
       anchors.fill: parent
-      radius: 6
-      color: root.background
-      border.color: root.accent
-      border.width: 1
-      focus: true
-      Keys.onEscapePressed: root.popupOpen = false
+      radius: Theme.radius
+      color: pointer.containsMouse && entryRow.entry.enabled ? Theme.alpha(Theme.foreground, 0.06) : "transparent"
 
-      ColumnLayout {
+      RowLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 8
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        spacing: 10
 
-        RowLayout {
-          Layout.fillWidth: true
+        Item {
+          Layout.preferredWidth: 18
+          Layout.preferredHeight: 18
 
-          Text {
-            Layout.fillWidth: true
-            text: "Background apps"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: 13
-            font.bold: true
+          Glyph {
+            anchors.centerIn: parent
+            visible: entryRow.checkable
+            text: entryRow.checked ? Icons.check : ""
+            size: 14
+            color: Theme.accent
           }
 
-          Button {
-            label: "×"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            horizontalPadding: 6
-            onClicked: root.popupOpen = false
+          IconImage {
+            anchors.centerIn: parent
+            visible: !entryRow.checkable && source !== ""
+            source: entryRow.entry && entryRow.entry.icon ? entryRow.entry.icon : ""
+            implicitSize: 16
           }
         }
 
-        Flickable {
+        Label {
           Layout.fillWidth: true
-          Layout.fillHeight: true
-          clip: true
-          contentHeight: itemsColumn.implicitHeight
-          boundsBehavior: Flickable.StopAtBounds
+          text: entryRow.entry ? root.cleanText(entryRow.entry.text) : ""
+          muted: entryRow.entry && !entryRow.entry.enabled
+        }
 
-          Column {
-            id: itemsColumn
-            width: parent.width
-            spacing: 2
+        Glyph {
+          visible: entryRow.entry && entryRow.entry.hasChildren
+          text: Icons.chevronRight
+          size: 14
+          color: Theme.muted
+        }
+      }
 
-            Text {
-              visible: root.trayItems.length === 0
-              height: visible ? 40 : 0
-              text: "No background apps"
-              color: root.muted
-              font.family: root.fontFamily
-              font.pixelSize: 12
-              verticalAlignment: Text.AlignVCenter
-            }
-
-            Repeater {
-              model: root.trayItems
-
-              Rectangle {
-                id: itemRow
-                required property var modelData
-                width: itemsColumn.width
-                height: 40
-                radius: 4
-                color: pointer.containsMouse ? root.surface : "transparent"
-
-                RowLayout {
-                  anchors.fill: parent
-                  anchors.leftMargin: 8
-                  anchors.rightMargin: 8
-                  spacing: 10
-
-                  Item {
-                    Layout.preferredWidth: 20
-                    Layout.preferredHeight: 20
-
-                    IconImage {
-                      id: trayIcon
-                      anchors.centerIn: parent
-                      width: 18
-                      height: 18
-                      source: root.iconSource(itemRow.modelData.icon)
-                      implicitSize: 18
-                    }
-
-                    Text {
-                      anchors.centerIn: parent
-                      visible: trayIcon.status === Image.Error || trayIcon.source === ""
-                      text: String(itemRow.modelData.title || "•").slice(0, 1)
-                      color: root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: 12
-                    }
-                  }
-
-                  Text {
-                    Layout.fillWidth: true
-                    text: root.appTitle(itemRow.modelData)
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
-                  }
-
-                  Text {
-                    visible: itemRow.modelData.status === Status.NeedsAttention
-                    text: "●"
-                    color: root.accent
-                    font.pixelSize: 10
-                  }
-                }
-
-                MouseArea {
-                  id: pointer
-                  anchors.fill: parent
-                  acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-                  hoverEnabled: true
-                  cursorShape: Qt.PointingHandCursor
-                  onPressed: function(mouse) {
-                    if (mouse.button === Qt.RightButton) {
-                      root.displayMenu(itemRow.modelData, mouse, itemRow)
-                      mouse.accepted = true
-                    }
-                  }
-                  onClicked: function(mouse) {
-                    if (mouse.button === Qt.RightButton) return
-                    if (mouse.button === Qt.MiddleButton) {
-                      itemRow.modelData.secondaryActivate()
-                    } else if (itemRow.modelData.onlyMenu) {
-                      root.displayMenu(itemRow.modelData, mouse, itemRow)
-                    } else {
-                      itemRow.modelData.activate()
-                      root.popupOpen = false
-                    }
-                  }
-                  onWheel: function(wheel) {
-                    if (wheel.modifiers & Qt.ShiftModifier)
-                      itemRow.modelData.scroll(wheel.angleDelta.y, false)
-                    else
-                      wheel.accepted = false // Let the drawer scroll instead.
-                  }
-                }
-              }
-            }
+      MouseArea {
+        id: pointer
+        anchors.fill: parent
+        hoverEnabled: true
+        enabled: entryRow.entry && entryRow.entry.enabled
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+          if (entryRow.entry.hasChildren) {
+            root.openSubmenu(entryRow.entry)
+          } else {
+            entryRow.entry.triggered()
+            Popups.close()
           }
         }
       }

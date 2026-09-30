@@ -17,6 +17,11 @@ function dayAt(index, date) {
   return day >= 1 && day <= daysInMonth(date) ? day : 0
 }
 
+// The date shown in cell `index`, including the days of the neighbouring months.
+function dateAt(index, date) {
+  return new Date(date.getFullYear(), date.getMonth(), index - firstWeekday(date) + 1)
+}
+
 function sameDay(left, right) {
   return left.getFullYear() === right.getFullYear()
     && left.getMonth() === right.getMonth()
@@ -38,6 +43,7 @@ if (typeof module !== "undefined") {
     daysInMonth: daysInMonth,
     firstWeekday: firstWeekday,
     dayAt: dayAt,
+    dateAt: dateAt,
     sameDay: sameDay,
     sameMonth: sameMonth,
     shiftMonth: shiftMonth

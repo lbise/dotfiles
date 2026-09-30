@@ -1,106 +1,101 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 
-Item {
+// Arch logo in the bar. The popup opens the launcher and clipboard, and holds
+// the session actions. Restart, Shut down and Log out ask for a second click.
+BarButton {
   id: root
 
-  property color foreground: "white"
-  property color background: "#222831"
-  property string fontFamily: "monospace"
-  property bool popupOpen: false
+  icon: Icons.arch
+  tone: "accent"
+  horizontalPadding: 9
+  open: popup.shown
+  onClicked: Popups.toggle("menu", popup.screenName)
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
-
-  Button {
-    id: button
-    anchors.fill: parent
-    label: "Menu"
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    onClicked: root.popupOpen = !root.popupOpen
+  function run(command) {
+    Popups.close()
+    Quickshell.execDetached(command)
   }
 
-  PopupWindow {
+  FileView {
+    id: hostnameFile
+    path: "/etc/hostname"
+  }
+
+  PopupCard {
     id: popup
-    visible: root.popupOpen
-    color: "transparent"
-    implicitWidth: 220
-    implicitHeight: 170
+    popupId: "menu"
+    anchorItem: root
+    align: "left"
+    cardWidth: 340
+    title: (Quickshell.env("USER") || "leo") + "@" + (hostnameFile.text().trim() || "localhost")
+    subtitle: "Arch Linux · Hyprland"
 
-    anchor {
-      id: popupAnchor
-      window: root.QsWindow.window
-      adjustment: PopupAdjustment.Slide
-      edges: Edges.Top | Edges.Left
-      gravity: Edges.Bottom | Edges.Right
-      rect.width: 1
-      rect.height: 1
+    Section {
+      list: true
 
-      onAnchoring: {
-        var window = root.QsWindow.window
-        if (!window) return
-        var point = window.contentItem.mapFromItem(root, 0, root.height + 4)
-        popupAnchor.rect.x = Math.round(point.x)
-        popupAnchor.rect.y = Math.round(point.y)
+      ListRow {
+        icon: Icons.apps
+        title: "Applications"
+        trailing: "Super Space"
+        onClicked: root.run(["walker"])
+      }
+
+      ListRow {
+        icon: Icons.clipboard
+        title: "Clipboard"
+        trailing: "Super Ctrl V"
+        onClicked: root.run(["walker", "-m", "clipboard"])
+      }
+
+      ListRow {
+        icon: Icons.coffee
+        title: "Keep awake"
+        subtitle: "Stop the screen from locking"
+        active: Caffeine.active
+        trailing: Caffeine.active ? "On" : "Off"
+        onClicked: Caffeine.toggle()
       }
     }
 
-    Rectangle {
-      anchors.fill: parent
-      radius: 6
-      color: root.background
-      border.color: root.foreground
-      border.width: 1
+    RowLayout {
+      Layout.fillWidth: true
+      spacing: 4
 
-      ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 12
-        spacing: 4
+      TileButton {
+        icon: Icons.lock
+        label: "Lock"
+        onActivated: root.run(["system-lock-screen.sh"])
+      }
 
-        Text {
-          text: "System"
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 13
-        }
+      TileButton {
+        icon: Icons.sleep
+        label: "Suspend"
+        onActivated: root.run(["systemctl", "suspend"])
+      }
 
-        Button {
-          Layout.fillWidth: true
-          label: "Applications"
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          horizontalPadding: 4
-          onClicked: {
-            root.popupOpen = false
-            Quickshell.execDetached(["walker"])
-          }
-        }
+      TileButton {
+        icon: Icons.logout
+        label: "Log out"
+        confirm: true
+        onActivated: root.run(["uwsm", "stop"])
+      }
 
-        Button {
-          Layout.fillWidth: true
-          label: "Clipboard"
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          horizontalPadding: 4
-          onClicked: {
-            root.popupOpen = false
-            Quickshell.execDetached(["walker", "-m", "clipboard"])
-          }
-        }
+      TileButton {
+        icon: Icons.restart
+        label: "Restart"
+        confirm: true
+        onActivated: root.run(["system-reboot.sh"])
+      }
 
-        Button {
-          Layout.fillWidth: true
-          label: "Power and session"
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          horizontalPadding: 4
-          onClicked: {
-            root.popupOpen = false
-            Quickshell.execDetached(["system-menu.sh", "system"])
-          }
-        }
+      TileButton {
+        icon: Icons.power
+        label: "Shut down"
+        danger: true
+        confirm: true
+        onActivated: root.run(["system-shutdown.sh"])
       }
     }
   }

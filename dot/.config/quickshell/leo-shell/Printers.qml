@@ -5,19 +5,18 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 
-Item {
+// CUPS printers in the bar. The icon turns red when a queue is stuck and
+// shows the number of queued jobs. The popup lists each printer with its
+// network state and queue, and can pause, resume or clear it.
+// Middle-click opens the printer settings.
+BarButton {
   id: root
 
-  property color foreground: "white"
-  property color background: "#222831"
-  property color accent: "#70B8B0"
-  property color alert: "#E06C75"
-  property string fontFamily: "monospace"
-  property bool popupOpen: false
   property bool loaded: false
   property var status: ({ ok: true, error: "", printers: [] })
   property string actionError: ""
   property string busyPrinter: ""
+  property string busyAction: ""
 
   readonly property string script: (Quickshell.env("HOME") || "") + "/.scripts/system/system-printers.py"
   readonly property var printers: status.printers || []
@@ -26,20 +25,28 @@ Item {
     for (var i = 0; i < printers.length; i++) count += printers[i].jobs.length
     return count
   }
-  // Attention means the queue cannot make progress: paused, rejecting jobs,
-  // or holding jobs for a printer that is off the network.
-  readonly property bool needsAttention: {
-    if (!status.ok) return true
-    for (var i = 0; i < printers.length; i++) {
-      var printer = printers[i]
-      if (printer.state === "paused" || !printer.accepting) return true
-      if (printer.jobs.length > 0 && printer.network.reachable === false) return true
-    }
-    return false
+  readonly property int attentionCount: printers.filter(function(p) { return root.printerNeedsAttention(p) }).length
+  readonly property int offlineCount: printers.filter(function(p) { return p.network.reachable === false }).length
+  readonly property bool needsAttention: !status.ok || attentionCount > 0
+
+  // Material Design file-document-outline; not in Icons yet.
+
+  icon: !status.ok || (loaded && printers.length === 0) ? Icons.printerOff
+    : needsAttention ? Icons.printerAlert
+    : Icons.printer
+  label: jobCount > 0 ? String(jobCount) : ""
+  tone: needsAttention ? "alert" : ""
+  open: popup.shown
+
+  onClicked: function(button) {
+    if (button === Qt.MiddleButton) openSettings()
+    else Popups.toggle("printers", popup.screenName)
   }
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  function openSettings() {
+    Popups.close()
+    Quickshell.execDetached(["system-config-printer"])
+  }
 
   function refresh() {
     if (!statusProcess.running) statusProcess.running = true
@@ -49,6 +56,7 @@ Item {
     if (actionProcess.running) return
     actionError = ""
     busyPrinter = name
+    busyAction = action
     actionProcess.command = [root.script, action, name]
     actionProcess.running = true
   }
@@ -62,11 +70,30 @@ Item {
     loaded = true
   }
 
+  function isStopped(printer) {
+    return printer.state === "paused" || !printer.accepting
+  }
+
+  // Attention means the queue cannot make progress: paused, rejecting jobs,
+  // or holding jobs for a printer that is off the network.
+  function printerNeedsAttention(printer) {
+    if (isStopped(printer)) return true
+    return printer.jobs.length > 0 && printer.network.reachable === false
+  }
+
   function stateLabel(printer) {
     if (printer.state === "paused") return "Paused"
     if (!printer.accepting) return "Rejecting jobs"
+    if (printer.network.reachable === false) return "Unreachable"
     if (printer.state === "printing") return "Printing"
     return "Ready"
+  }
+
+  function stateTone(printer) {
+    var label = stateLabel(printer)
+    if (label === "Ready") return "ok"
+    if (label === "Printing") return "accent"
+    return "alert"
   }
 
   function networkLabel(network) {
@@ -75,38 +102,23 @@ Item {
     else if (network.reachable === false) parts.push("Unreachable")
     if (network.address) parts.push(network.address)
     if (network.detail) parts.push(network.detail)
-    return parts.join("  ·  ")
+    return parts.join(" · ")
   }
 
   function networkColor(network) {
-    if (network.reachable === true) return root.accent
-    if (network.reachable === false) return root.alert
-    return Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.5)
+    if (network.reachable === false) return Theme.alert
+    if (network.reachable === true) return Theme.foreground
+    return Theme.muted
+  }
+
+  function queueLabel(count) {
+    if (count === 0) return "Empty"
+    return count + (count === 1 ? " job queued" : " jobs queued")
   }
 
   function formatSize(bytes) {
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB"
     return Math.max(1, Math.round(bytes / 1024)) + " KB"
-  }
-
-  Button {
-    id: button
-    anchors.fill: parent
-    label: {
-      if (!root.status.ok || (root.loaded && root.printers.length === 0)) return "󰹝"
-      var icon = root.needsAttention ? "󰐬" : "󰐪"
-      return root.jobCount > 0 ? icon + " " + root.jobCount : icon
-    }
-    foreground: root.needsAttention ? root.alert : root.foreground
-    fontFamily: root.fontFamily
-    onClicked: function(mouseButton) {
-      if (mouseButton === Qt.MiddleButton) {
-        Quickshell.execDetached(["system-config-printer"])
-      } else {
-        root.popupOpen = !root.popupOpen
-        if (root.popupOpen) root.refresh()
-      }
-    }
   }
 
   Process {
@@ -130,142 +142,98 @@ Item {
         root.actionError = String(actionStderr.text || "Printer action failed").trim()
       }
       root.busyPrinter = ""
+      root.busyAction = ""
       root.refresh()
     }
   }
 
   // Poll slowly for the bar icon; faster while the popup is visible.
   Timer {
-    interval: root.popupOpen ? 5000 : 60000
+    interval: popup.shown ? 5000 : 60000
     repeat: true
     running: true
     triggeredOnStart: true
     onTriggered: root.refresh()
   }
 
-  PopupWindow {
-    id: popup
-    visible: root.popupOpen
-    grabFocus: true
-    onVisibleChanged: {
-      if (!visible) {
-        root.popupOpen = false
-        root.actionError = ""
-      } else {
-        card.forceActiveFocus()
-      }
-    }
-    color: "transparent"
-    implicitWidth: 380
-    implicitHeight: content.implicitHeight + 32
-
-    anchor {
-      window: root.QsWindow.window
-      adjustment: PopupAdjustment.Slide
-      edges: Edges.Top | Edges.Left
-      gravity: Edges.Bottom | Edges.Right
-      rect.width: 1
-      rect.height: 1
-      onAnchoring: {
-        var window = root.QsWindow.window
-        if (!window) return
-        var point = window.contentItem.mapFromItem(root, root.width - popup.width, root.height + 4)
-        popup.anchor.rect.x = Math.round(point.x)
-        popup.anchor.rect.y = Math.round(point.y)
-      }
-    }
-
-    Rectangle {
-      id: card
-      anchors.fill: parent
-      radius: 6
-      color: root.background
-      border.color: root.foreground
-      border.width: 1
-      focus: true
-      Keys.onEscapePressed: root.popupOpen = false
-
-      ColumnLayout {
-        id: content
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 16
-        spacing: 10
-
-        RowLayout {
-          Layout.fillWidth: true
-          Text {
-            Layout.fillWidth: true
-            text: "Printers"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: 15
-            font.bold: true
-          }
-          Button {
-            label: statusProcess.running ? "…" : "↻"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.refresh()
-          }
-          Button {
-            label: "×"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.popupOpen = false
-          }
-        }
-
-        Text {
-          Layout.fillWidth: true
-          visible: !root.status.ok || (root.loaded && root.printers.length === 0) || !root.loaded
-          text: !root.loaded ? "Checking printers…"
-            : !root.status.ok ? root.status.error
-            : "No printers configured"
-          color: root.status.ok ? root.foreground : root.alert
-          opacity: root.status.ok ? 0.75 : 1
-          font.family: root.fontFamily
-          font.pixelSize: 12
-          wrapMode: Text.Wrap
-        }
-
-        Repeater {
-          model: root.printers
-          PrinterCard {}
-        }
-
-        Text {
-          Layout.fillWidth: true
-          visible: root.actionError !== ""
-          text: root.actionError
-          color: root.alert
-          font.family: root.fontFamily
-          font.pixelSize: 11
-          wrapMode: Text.Wrap
-        }
-
-        Button {
-          Layout.alignment: Qt.AlignRight
-          label: "Printer settings"
-          fontSize: 12
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          onClicked: {
-            root.popupOpen = false
-            Quickshell.execDetached(["system-config-printer"])
-          }
-        }
-      }
+  Connections {
+    target: popup
+    function onShownChanged() {
+      if (!popup.shown) root.actionError = ""
     }
   }
 
-  component PrinterCard: Rectangle {
-    id: printerCard
+  PopupCard {
+    id: popup
+    popupId: "printers"
+    anchorItem: root
+    align: "right"
+    cardWidth: 380
+    title: "Printers"
+    subtitle: !root.loaded ? "Checking printers…"
+      : !root.status.ok ? root.status.error
+      : root.printers.length === 0 ? "No printers configured"
+      : root.attentionCount === 1 ? "1 needs attention"
+      : root.attentionCount > 1 ? root.attentionCount + " need attention"
+      : root.offlineCount === 1 && root.printers.length === 1 ? "Printer offline"
+      : root.offlineCount > 0 ? root.offlineCount + " offline"
+      : "All ready"
+
+    onOpened: root.refresh()
+
+    tools: [
+      IconButton {
+        icon: Icons.refresh
+        busy: statusProcess.running
+        onClicked: root.refresh()
+      },
+      IconButton {
+        icon: Icons.close
+        onClicked: Popups.close()
+      }
+    ]
+
+    Label {
+      Layout.fillWidth: true
+      Layout.leftMargin: 10
+      Layout.rightMargin: 10
+      visible: root.loaded && root.status.ok && root.printers.length === 0
+      text: "No printers configured"
+      muted: true
+    }
+
+    Repeater {
+      model: root.printers
+      PrinterSection {}
+    }
+
+    Label {
+      Layout.fillWidth: true
+      Layout.leftMargin: 10
+      Layout.rightMargin: 10
+      visible: root.actionError !== ""
+      text: root.actionError
+      color: Theme.alert
+      small: true
+      wrapMode: Text.Wrap
+      elide: Text.ElideNone
+    }
+
+    footer: [
+      PillButton {
+        text: "Printer settings"
+        icon: Icons.cog
+        onClicked: root.openSettings()
+      }
+    ]
+  }
+
+  component PrinterSection: Section {
+    id: section
 
     required property var modelData
     readonly property bool busy: root.busyPrinter === modelData.name
-    readonly property bool stopped: modelData.state === "paused" || !modelData.accepting
+    readonly property bool stopped: root.isStopped(modelData)
     readonly property var problems: {
       var list = modelData.reasons.filter(function(reason) { return reason !== "Paused" })
       if (modelData.message && stopped) list.push(modelData.message)
@@ -274,138 +242,97 @@ Item {
     // While a queue runs, CUPS's state message is progress ("Sending data…"), not an error.
     readonly property string progress: stopped ? "" : modelData.message
 
-    Layout.fillWidth: true
-    implicitHeight: cardContent.implicitHeight + 20
-    radius: 4
-    color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+    title: modelData.description
+    tag: modelData.isDefault ? "Default" : ""
+    status: root.stateLabel(modelData)
+    statusTone: root.stateTone(modelData)
+
+    Label {
+      Layout.fillWidth: true
+      visible: section.problems.length > 0
+      text: section.problems.join(" · ")
+      color: Theme.alert
+      wrapMode: Text.Wrap
+      elide: Text.ElideNone
+    }
 
     ColumnLayout {
-      id: cardContent
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.margins: 10
-      spacing: 5
+      Layout.fillWidth: true
+      spacing: 8
 
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: 8
-        Text {
-          Layout.fillWidth: true
-          text: printerCard.modelData.description + (printerCard.modelData.isDefault ? "  ·  default" : "")
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 13
-          font.bold: true
-          elide: Text.ElideRight
-        }
-        Text {
-          text: root.stateLabel(printerCard.modelData)
-          color: printerCard.stopped ? root.alert : printerCard.modelData.state === "printing" ? root.accent : root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 12
-          font.bold: printerCard.stopped
-        }
+      KeyValue {
+        wrap: true
+        visible: section.modelData.model !== ""
+        key: "Model"
+        value: section.modelData.model
       }
 
-      Text {
-        Layout.fillWidth: true
-        visible: text !== ""
-        text: printerCard.modelData.model
-        color: root.foreground
-        opacity: 0.65
-        font.family: root.fontFamily
-        font.pixelSize: 10
-        elide: Text.ElideRight
+      KeyValue {
+        wrap: true
+        key: section.modelData.connection === "network" ? "Network" : "Connection"
+        value: root.networkLabel(section.modelData.network)
+        valueColor: root.networkColor(section.modelData.network)
       }
 
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-        Rectangle {
-          implicitWidth: 7
-          implicitHeight: 7
-          radius: 3.5
-          color: root.networkColor(printerCard.modelData.network)
-        }
-        Text {
-          Layout.fillWidth: true
-          text: root.networkLabel(printerCard.modelData.network)
-          color: root.foreground
-          opacity: 0.85
-          font.family: root.fontFamily
-          font.pixelSize: 11
-          elide: Text.ElideRight
-        }
+      KeyValue {
+        wrap: true
+        key: "Queue"
+        value: root.queueLabel(section.modelData.jobs.length)
       }
+    }
 
-      Text {
-        Layout.fillWidth: true
-        visible: printerCard.problems.length > 0
-        text: printerCard.problems.join("  ·  ")
-        color: root.alert
-        font.family: root.fontFamily
-        font.pixelSize: 11
-        wrapMode: Text.Wrap
-      }
+    Label {
+      Layout.fillWidth: true
+      visible: section.progress !== ""
+      text: section.progress
+      muted: true
+      small: true
+    }
 
-      Text {
-        Layout.fillWidth: true
-        visible: printerCard.progress !== ""
-        text: printerCard.progress
-        color: root.foreground
-        opacity: 0.65
-        font.family: root.fontFamily
-        font.pixelSize: 11
-        elide: Text.ElideRight
-      }
-
-      Text {
-        Layout.fillWidth: true
-        Layout.topMargin: 2
-        text: printerCard.modelData.jobs.length === 0 ? "Queue empty"
-          : printerCard.modelData.jobs.length + (printerCard.modelData.jobs.length === 1 ? " job queued" : " jobs queued")
-        color: root.foreground
-        opacity: 0.75
-        font.family: root.fontFamily
-        font.pixelSize: 11
-      }
+    // Job rows bleed into the section padding so their icons line up with the text above.
+    ColumnLayout {
+      Layout.fillWidth: true
+      Layout.leftMargin: -8
+      Layout.rightMargin: -8
+      visible: section.modelData.jobs.length > 0
+      spacing: 0
 
       Repeater {
-        model: printerCard.modelData.jobs.slice(0, 5)
-        Text {
+        model: section.modelData.jobs.slice(0, 5)
+
+        ListRow {
           required property var modelData
-          Layout.fillWidth: true
-          text: (modelData.active ? "▸ " : "  ") + modelData.title + "  ·  " + root.formatSize(modelData.size) + "  ·  " + modelData.owner
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 11
-          elide: Text.ElideRight
+          icon: modelData.active ? Icons.printer : Icons.document
+          title: modelData.title || "Untitled"
+          subtitle: root.formatSize(modelData.size) + " · " + modelData.owner
+          trailing: modelData.active ? "Printing" : ""
+          active: modelData.active
+          interactive: false
         }
       }
+    }
 
-      RowLayout {
-        Layout.fillWidth: true
-        Layout.topMargin: 2
-        spacing: 6
-        Item { Layout.fillWidth: true }
-        Button {
-          visible: printerCard.modelData.jobs.length > 0
-          label: "Cancel jobs"
-          fontSize: 12
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          onClicked: if (!printerCard.busy) root.runAction("cancel-jobs", printerCard.modelData.name)
-        }
-        Button {
-          label: printerCard.busy ? "…" : printerCard.stopped ? "Resume" : "Pause"
-          fontSize: 12
-          foreground: printerCard.stopped ? root.background : root.foreground
-          fillColor: printerCard.stopped ? root.accent : "transparent"
-          hoverColor: printerCard.stopped ? Qt.lighter(root.accent, 1.15) : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
-          fontFamily: root.fontFamily
-          onClicked: if (!printerCard.busy) root.runAction(printerCard.stopped ? "resume" : "pause", printerCard.modelData.name)
-        }
+    RowLayout {
+      Layout.fillWidth: true
+      spacing: 6
+
+      Item { Layout.fillWidth: true }
+
+      PillButton {
+        visible: section.modelData.jobs.length > 0
+        text: section.busy && root.busyAction === "cancel-jobs" ? "Cancelling…" : "Cancel jobs"
+        kind: "danger"
+        enabled: !section.busy
+        onClicked: root.runAction("cancel-jobs", section.modelData.name)
+      }
+
+      PillButton {
+        text: section.busy && root.busyAction === "resume" ? "Resuming…"
+          : section.busy && root.busyAction === "pause" ? "Pausing…"
+          : section.stopped ? "Resume" : "Pause"
+        kind: section.stopped ? "primary" : "normal"
+        enabled: !section.busy
+        onClicked: root.runAction(section.stopped ? "resume" : "pause", section.modelData.name)
       }
     }
   }

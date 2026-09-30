@@ -1,0 +1,26 @@
+{
+  "name": "Graphite, jade accent",
+  "colors": {
+    "background": "#1B1D24",
+    "surface": "#272A34",
+    "rule": "#3B404E",
+    "foreground": "#DCDDE5",
+    "muted": "#A0A4B5",
+    "accent": "#64D6A5",
+    "alert": "#F7768E",
+    "warning": "#E0AF68",
+    "good": "#9ECE6A"
+  },
+  "font": {
+    "family": "JetBrainsMono Nerd Font",
+    "size": 13,
+    "weight": 400
+  },
+  "shape": {
+    "radius": 8,
+    "barHeight": 34
+  },
+  "terminal": {
+    "ghosttyTheme": "TokyoNight Night"
+  }
+}

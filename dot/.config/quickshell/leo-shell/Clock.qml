@@ -2,33 +2,24 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import "CalendarModel.js" as CalendarModel
 
-Item {
+// Day and time in the bar. Click opens the month calendar, right-click
+// resets it to the current month.
+BarButton {
   id: root
 
-  property color foreground: "white"
-  property color background: "#222831"
-  property string fontFamily: "monospace"
-  property bool popupOpen: false
   property date currentDate: new Date()
   property date displayedMonth: CalendarModel.monthStart(currentDate)
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  prefix: Qt.formatDateTime(currentDate, "ddd")
+  label: Qt.formatDateTime(currentDate, "HH:mm")
+  horizontalPadding: 9
+  open: popup.shown
 
-  Timer {
-    id: clockTimer
-    interval: 1000
-    repeat: true
-    running: true
-    onTriggered: root.currentDate = new Date()
-  }
-
-  function openCalendar() {
-    displayedMonth = CalendarModel.monthStart(root.currentDate)
-    popupOpen = true
+  onClicked: function(mouseButton) {
+    if (mouseButton === Qt.RightButton) goToToday()
+    else Popups.toggle("calendar", popup.screenName)
   }
 
   function previousMonth() {
@@ -40,191 +31,141 @@ Item {
   }
 
   function goToToday() {
-    displayedMonth = CalendarModel.monthStart(root.currentDate)
+    displayedMonth = CalendarModel.monthStart(currentDate)
   }
 
-  Button {
-    id: button
-    anchors.fill: parent
-    label: Qt.formatDateTime(root.currentDate, "ddd  HH:mm")
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    horizontalPadding: 9
-    onClicked: function(mouseButton) {
-      if (mouseButton === Qt.RightButton) root.goToToday()
-      else root.openCalendar()
-    }
+  Timer {
+    interval: 1000
+    repeat: true
+    running: true
+    onTriggered: root.currentDate = new Date()
   }
 
-  PopupWindow {
+  PopupCard {
     id: popup
-    visible: root.popupOpen
-    grabFocus: true
-    color: "transparent"
-    implicitWidth: 330
-    implicitHeight: 350
+    popupId: "calendar"
+    anchorItem: root
+    align: "center"
+    cardWidth: 300
 
-    onVisibleChanged: {
-      if (!visible) root.popupOpen = false
-      else card.forceActiveFocus()
+    onOpened: {
+      root.goToToday()
+      // The card handles Escape; the arrow keys land here first.
+      calendar.forceActiveFocus()
     }
 
-    anchor {
-      window: root.QsWindow.window
-      adjustment: PopupAdjustment.Slide
-      edges: Edges.Top | Edges.Left
-      gravity: Edges.Bottom | Edges.Right
-      rect.width: 1
-      rect.height: 1
+    ColumnLayout {
+      id: calendar
+      Layout.fillWidth: true
+      Layout.leftMargin: 6
+      Layout.rightMargin: 6
+      Layout.topMargin: 4
+      spacing: 8
 
-      onAnchoring: {
-        var window = root.QsWindow.window
-        if (!window) return
-        var point = window.contentItem.mapFromItem(
-          root, root.width / 2 - popup.width / 2, root.height + 4
-        )
-        popup.anchor.rect.x = Math.round(point.x)
-        popup.anchor.rect.y = Math.round(point.y)
-      }
-    }
-
-    Rectangle {
-      id: card
-      anchors.fill: parent
-      radius: 6
-      color: root.background
-      border.color: root.foreground
-      border.width: 1
-      focus: true
-
-      Keys.onEscapePressed: root.popupOpen = false
       Keys.onLeftPressed: root.previousMonth()
       Keys.onRightPressed: root.nextMonth()
 
-      ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 16
-        spacing: 12
+      RowLayout {
+        Layout.fillWidth: true
 
-        RowLayout {
+        IconButton {
+          icon: Icons.chevronLeft
+          onClicked: root.previousMonth()
+        }
+
+        Label {
           Layout.fillWidth: true
+          horizontalAlignment: Text.AlignHCenter
+          text: Qt.formatDateTime(root.displayedMonth, "MMMM yyyy")
+          strong: true
+          font.pixelSize: Theme.fontSize + 2
+        }
 
-          Button {
-            label: "‹"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.previousMonth()
-          }
+        IconButton {
+          icon: Icons.chevronRight
+          onClicked: root.nextMonth()
+        }
+      }
 
-          Text {
+      GridLayout {
+        id: grid
+
+        readonly property real cellSize: (width - columnSpacing * 6) / 7
+
+        Layout.fillWidth: true
+        columns: 7
+        columnSpacing: 3
+        rowSpacing: 3
+
+        Repeater {
+          model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+
+          Label {
+            required property string modelData
             Layout.fillWidth: true
-            text: Qt.formatDateTime(root.displayedMonth, "MMMM yyyy")
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: 15
-            font.bold: true
+            Layout.preferredWidth: grid.cellSize
+            Layout.bottomMargin: 2
             horizontalAlignment: Text.AlignHCenter
-          }
-
-          Button {
-            label: "›"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.nextMonth()
+            text: modelData
+            muted: true
+            small: true
           }
         }
 
-        RowLayout {
-          Layout.fillWidth: true
-          spacing: 0
+        Repeater {
+          model: 42
 
-          Repeater {
-            model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+          Rectangle {
+            id: cell
 
-            Text {
-              required property string modelData
-              Layout.fillWidth: true
-              text: modelData
-              color: root.foreground
-              opacity: 0.65
-              font.family: root.fontFamily
-              font.pixelSize: 11
-              horizontalAlignment: Text.AlignHCenter
-            }
-          }
-        }
+            required property int index
+            readonly property date date: CalendarModel.dateAt(index, root.displayedMonth)
+            readonly property bool inMonth: CalendarModel.sameMonth(date, root.displayedMonth)
+            readonly property bool today: CalendarModel.sameDay(date, root.currentDate)
+            readonly property bool weekend: index % 7 > 4
 
-        GridLayout {
-          id: daysGrid
-          Layout.fillWidth: true
-          Layout.fillHeight: true
-          columns: 7
-          rows: 6
-          columnSpacing: 2
-          rowSpacing: 2
-
-          Repeater {
-            model: 42
-
-            Rectangle {
-              id: dayCell
-              required property int index
-              readonly property int day: CalendarModel.dayAt(index, root.displayedMonth)
-              readonly property bool today: day > 0 && CalendarModel.sameDay(
-                new Date(root.displayedMonth.getFullYear(), root.displayedMonth.getMonth(), day),
-                root.currentDate
-              )
-
-              Layout.fillWidth: true
-              Layout.fillHeight: true
-              radius: 4
-              color: today
-                ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-                : mouse.containsMouse
-                  ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
-                  : "transparent"
-
-              Text {
-                anchors.centerIn: parent
-                text: dayCell.day > 0 ? String(dayCell.day) : ""
-                color: root.foreground
-                opacity: dayCell.day > 0 ? 1 : 0
-                font.family: root.fontFamily
-                font.pixelSize: 12
-                font.bold: dayCell.today
-              }
-
-              MouseArea {
-                id: mouse
-                anchors.fill: parent
-                enabled: dayCell.day > 0
-                hoverEnabled: true
-                onClicked: root.popupOpen = false
-              }
-            }
-          }
-        }
-
-        RowLayout {
-          Layout.fillWidth: true
-
-          Text {
             Layout.fillWidth: true
-            text: Qt.formatDateTime(root.currentDate, "dddd, d MMMM yyyy")
-            color: root.foreground
-            opacity: 0.7
-            font.family: root.fontFamily
-            font.pixelSize: 11
-          }
+            Layout.preferredWidth: grid.cellSize
+            Layout.preferredHeight: grid.cellSize
+            radius: width / 2
+            color: today ? (pointer.containsMouse ? Qt.lighter(Theme.accent, 1.08) : Theme.accent)
+              : pointer.containsMouse ? Theme.alpha(Theme.foreground, 0.08)
+              : "transparent"
 
-          Button {
-            label: "Today"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.goToToday()
+            Behavior on color { ColorAnimation { duration: 120 } }
+
+            Label {
+              anchors.centerIn: parent
+              text: cell.date.getDate()
+              color: cell.today ? Theme.background
+                : !cell.inMonth ? Theme.alpha(Theme.muted, 0.55)
+                : cell.weekend ? Theme.muted
+                : Theme.foreground
+              font.weight: cell.today ? Font.Bold : Theme.fontWeight
+            }
+
+            MouseArea {
+              id: pointer
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              // A day of this month closes the calendar; a neighbouring day shows its month.
+              onClicked: {
+                if (cell.inMonth) Popups.close()
+                else root.displayedMonth = CalendarModel.monthStart(cell.date)
+              }
+            }
           }
         }
       }
     }
+
+    footerNote: Qt.formatDateTime(root.currentDate, "dddd, d MMMM yyyy")
+    footer: [
+      PillButton {
+        text: "Today"
+        onClicked: root.goToToday()
+      }
+    ]
   }
 }

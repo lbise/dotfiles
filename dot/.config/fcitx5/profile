@@ -10,7 +10,7 @@ DefaultIM=keyboard-ch-fr
 # Name
 Name=keyboard-ch-fr
 # Layout
-Layout=
+# Layout=
 
 [GroupOrder]
 0=Default

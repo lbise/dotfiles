@@ -1,153 +1,153 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
+import Quickshell.Services.Pipewire
 
-Item {
+// Volume in the bar. Right-click mutes, scrolling changes the volume.
+// The popup sets output and input volume and picks the output device.
+BarButton {
   id: root
 
-  property color foreground: "white"
-  property color background: "#222831"
-  property string fontFamily: "monospace"
-  property bool popupOpen: false
-  property real volume: 0
-  property bool muted: false
+  readonly property var sink: Pipewire.defaultAudioSink
+  readonly property var source: Pipewire.defaultAudioSource
+  readonly property var sinkAudio: sink ? sink.audio : null
+  readonly property var sourceAudio: source ? source.audio : null
+  readonly property real volume: sinkAudio ? sinkAudio.volume : 0
+  readonly property bool muted: sinkAudio ? sinkAudio.muted : false
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
-
-  function refresh() {
-    if (!statusProcess.running) statusProcess.running = true
+  readonly property var outputs: {
+    var nodes = Pipewire.nodes.values
+    var result = []
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i]
+      if (node.isSink && !node.isStream && node.audio) result.push(node)
+    }
+    return result
   }
 
-  function applyStatus(output) {
-    var match = String(output || "").match(/Volume:\s*([0-9.]+)(?:\s+(MUTED))?/)
-    if (!match) return
-    root.volume = Number(match[1])
-    root.muted = !!match[2]
-  }
+  icon: muted ? Icons.volumeOff
+    : volume >= 0.5 ? Icons.volumeHigh
+    : volume > 0 ? Icons.volumeMedium
+    : Icons.volumeLow
+  tone: muted ? "dim" : ""
+  open: popup.shown
 
-  function changeVolume(delta) {
-    var amount = Math.round(Math.abs(delta) * 100) + "%"
-    Quickshell.execDetached([
-      "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", amount + (delta < 0 ? "-" : "+")
-    ])
-    refreshTimer.restart()
+  onClicked: function(button) {
+    if (button === Qt.RightButton) toggleMute()
+    else Popups.toggle("audio", popup.screenName)
+  }
+  onWheel: function(delta) { setVolume(volume + (delta > 0 ? 0.05 : -0.05)) }
+
+  function setVolume(value) {
+    if (!sinkAudio) return
+    sinkAudio.muted = false
+    sinkAudio.volume = Math.max(0, Math.min(1, value))
   }
 
   function toggleMute() {
-    Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
-    refreshTimer.restart()
+    if (sinkAudio) sinkAudio.muted = !sinkAudio.muted
   }
 
-  Process {
-    id: statusProcess
-    command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.applyStatus(text)
-    }
+  function nodeName(node) {
+    if (!node) return "No device"
+    return node.description || node.nickname || node.name || "Audio device"
   }
 
-  Timer {
-    id: pollTimer
-    interval: 2000
-    repeat: true
-    running: true
-    onTriggered: root.refresh()
+  function nodeKind(node) {
+    var text = (String(node.name) + " " + String(node.description)).toLowerCase()
+    if (text.indexOf("bluez") !== -1) return "Bluetooth"
+    if (text.indexOf("hdmi") !== -1 || text.indexOf("displayport") !== -1) return "Display"
+    if (text.indexOf("usb") !== -1) return "USB"
+    return "Built-in"
   }
 
-  Timer {
-    id: refreshTimer
-    interval: 150
-    onTriggered: root.refresh()
+  function nodeIcon(node) {
+    var kind = nodeKind(node)
+    if (kind === "Bluetooth") return Icons.headphones
+    if (kind === "Display") return Icons.monitor
+    return Icons.speaker
   }
 
-  Component.onCompleted: root.refresh()
-
-  Button {
-    id: button
-    anchors.fill: parent
-    label: root.muted ? "" : (root.volume < 0.5 ? "" : "")
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    onClicked: function(mouseButton) {
-      if (mouseButton === Qt.RightButton) root.toggleMute()
-      else root.popupOpen = !root.popupOpen
-    }
+  // Volume and mute are only live for tracked nodes.
+  PwObjectTracker {
+    objects: [root.sink, root.source].concat(root.outputs)
   }
 
-  PopupWindow {
+  PopupCard {
     id: popup
-    visible: root.popupOpen
-    color: "transparent"
-    implicitWidth: 250
-    implicitHeight: 112
+    popupId: "audio"
+    anchorItem: root
+    cardWidth: 340
+    title: "Sound"
+    subtitle: root.muted ? "Muted" : root.nodeName(root.sink)
 
-    anchor {
-      id: popupAnchor
-      window: root.QsWindow.window
-      adjustment: PopupAdjustment.Slide
-      edges: Edges.Top | Edges.Left
-      gravity: Edges.Bottom | Edges.Right
-      rect.width: 1
-      rect.height: 1
+    PillSlider {
+      Layout.leftMargin: 4
+      Layout.rightMargin: 4
+      label: "Output"
+      icon: root.muted ? Icons.volumeOff : Icons.volumeHigh
+      value: root.volume
+      muted: root.muted
+      onMoved: function(value) { root.setVolume(value) }
+      onIconClicked: root.toggleMute()
+    }
 
-      onAnchoring: {
-        var window = root.QsWindow.window
-        if (!window) return
-        var point = window.contentItem.mapFromItem(root, 0, root.height + 4)
-        popupAnchor.rect.x = Math.round(point.x)
-        popupAnchor.rect.y = Math.round(point.y)
+    Section {
+      title: "Output device"
+      list: true
+
+      Repeater {
+        model: root.outputs
+
+        ListRow {
+          required property var modelData
+          readonly property bool current: root.sink !== null && modelData.id === root.sink.id
+
+          icon: root.nodeIcon(modelData)
+          title: root.nodeName(modelData)
+          subtitle: root.nodeKind(modelData)
+          active: current
+          trailingIcon: current ? Icons.check : ""
+          onClicked: Pipewire.preferredDefaultAudioSink = modelData
+        }
+      }
+
+      Label {
+        visible: root.outputs.length === 0
+        Layout.margins: 8
+        text: "No output devices"
+        muted: true
       }
     }
 
-    Rectangle {
-      anchors.fill: parent
-      radius: 6
-      color: root.background
-      border.color: root.foreground
-      border.width: 1
+    PillSlider {
+      Layout.leftMargin: 4
+      Layout.rightMargin: 4
+      visible: root.sourceAudio !== null
+      label: "Input · " + root.nodeName(root.source)
+      icon: root.sourceAudio && root.sourceAudio.muted ? Icons.microphoneOff : Icons.microphone
+      value: root.sourceAudio ? root.sourceAudio.volume : 0
+      muted: root.sourceAudio ? root.sourceAudio.muted : false
+      onMoved: function(value) {
+        root.sourceAudio.muted = false
+        root.sourceAudio.volume = value
+      }
+      onIconClicked: root.sourceAudio.muted = !root.sourceAudio.muted
+    }
 
-      ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 12
-        spacing: 8
-
-        Text {
-          text: "Audio  " + Math.round(root.volume * 100) + "%"
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 13
-        }
-
-        RowLayout {
-          Layout.fillWidth: true
-          spacing: 6
-
-          Button {
-            Layout.fillWidth: true
-            label: "−"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.changeVolume(-0.05)
-          }
-          Button {
-            Layout.fillWidth: true
-            label: root.muted ? "Unmute" : "Mute"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.toggleMute()
-          }
-          Button {
-            Layout.fillWidth: true
-            label: "+"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.changeVolume(0.05)
-          }
+    footer: [
+      PillButton {
+        text: root.muted ? "Unmute" : "Mute"
+        onClicked: root.toggleMute()
+      },
+      PillButton {
+        text: "Mixer"
+        icon: Icons.tune
+        onClicked: {
+          Popups.close()
+          Quickshell.execDetached(["pavucontrol"])
         }
       }
-    }
+    ]
   }
 }

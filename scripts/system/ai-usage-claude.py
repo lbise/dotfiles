@@ -31,8 +31,9 @@ from pathlib import Path
 from typing import Any
 
 AGENT_ID = "claude"
-AGENT_NAME = "Claude Code"
-AUTH_HELP = "Run `claude auth login` to restore authoritative usage."
+AGENT_NAME = "Anthropic"
+AUTH_HELP = "Sign in with `/login` in pi (Anthropic) or `claude auth login` to show plan limits."
+PI_AUTH_PATH = Path.home() / ".pi" / "agent" / "auth.json"
 USAGE_ENDPOINT = "https://api.anthropic.com/api/oauth/usage"
 PROBE_MIN_INTERVAL_SECONDS = 15
 
@@ -593,6 +594,34 @@ def oauth_login(claude_dir: Path) -> tuple[str, int, str]:
   return str(login.get("accessToken") or ""), number(login.get("expiresAt")), plan
 
 
+# pi stores its Anthropic subscription login (the same OAuth token type as
+# Claude Code) in its own auth file and refreshes it whenever pi runs. API
+# keys are skipped: the usage endpoint only answers subscription tokens.
+def pi_login(auth_path: Path = PI_AUTH_PATH) -> tuple[str, int, str]:
+  try:
+    entry = json.loads(auth_path.read_text(encoding="utf-8")).get("anthropic")
+  except Exception:
+    return "", 0, ""
+  if not isinstance(entry, dict) or entry.get("type") != "oauth":
+    return "", 0, ""
+  access = str(entry.get("access") or "")
+  if not access.startswith("sk-ant-oat"):
+    return "", 0, ""
+  return access, number(entry.get("expires")), ""
+
+
+# Prefer whichever login still has a live token; Claude Code first because
+# its record also carries the plan label. With no live token, keep one that
+# has expired so the panel can say "Sign-in expired" rather than nothing.
+def choose_login(*logins: tuple[str, int, str]) -> tuple[str, int, str]:
+  now_ms = time.time() * 1000
+  with_token = [login for login in logins if login[0]]
+  for login in with_token:
+    if login[1] <= 0 or login[1] > now_ms:
+      return login
+  return with_token[0] if with_token else ("", 0, "")
+
+
 def plan_label(tier: str, subscription: str) -> str:
   if tier:
     match = re.search(r"max_(\d+x)", tier, re.IGNORECASE)
@@ -814,9 +843,9 @@ def collect_limits(access_token: str, expires_at_ms: int, force: bool) -> dict[s
     result["limits"] = fallback
     result["usageStatusText"] = "Sign-in expired"
     result["authHelpText"] = (
-      "Claude Code's saved sign-in expired"
+      "The saved Claude sign-in expired"
       + (" — showing the last known limits." if fallback else ".")
-      + " Start Claude Code, or run `claude auth login`, to refresh it."
+      + " Start pi or Claude Code to refresh it."
     )
     return result
 
@@ -879,7 +908,7 @@ def main() -> int:
   if opencode is not None:
     stats = merge_stats(stats, opencode)
 
-  access_token, expires_at_ms, plan = oauth_login(claude_dir)
+  access_token, expires_at_ms, plan = choose_login(oauth_login(claude_dir), pi_login())
   limits = collect_limits(access_token, expires_at_ms, args.force)
 
   record = {

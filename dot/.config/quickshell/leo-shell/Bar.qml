@@ -3,11 +3,14 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 
+// A floating bar: the layer surface spans the top edge, and the visible bar
+// is inset by Theme.gap on the sides and Theme.barInset from the top. The
+// reserved zone covers the inset plus the bar, so Hyprland's own gaps_out
+// puts windows the same distance below the bar as they sit from the sides.
 PanelWindow {
   id: root
 
   required property var output
-  required property var shellTheme
 
   screen: output
   anchors {
@@ -15,115 +18,68 @@ PanelWindow {
     left: true
     right: true
   }
-  implicitHeight: shellTheme.barHeight
-  color: shellTheme.background
+  implicitHeight: Theme.barInset + Theme.barHeight
+  color: "transparent"
   exclusionMode: ExclusionMode.Auto
   WlrLayershell.namespace: "leo-bar"
   WlrLayershell.layer: WlrLayer.Top
+  // Only the bar itself takes input; the transparent strip around it does not.
+  mask: Region { item: bar }
 
   Rectangle {
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
-    height: 1
-    color: root.shellTheme.rule
-  }
+    id: bar
 
-  RowLayout {
-    anchors.left: parent.left
-    anchors.leftMargin: 10
-    anchors.verticalCenter: parent.verticalCenter
-    spacing: 8
+    x: Theme.gap
+    y: Theme.barInset
+    width: parent.width - Theme.gap * 2
+    height: Theme.barHeight
+    radius: Theme.radius + 3
+    color: Theme.background
+    border.width: 1
+    border.color: Theme.rule
 
-    Menu {
-      foreground: root.shellTheme.foreground
-      background: root.shellTheme.background
-      fontFamily: root.shellTheme.fontFamily
+    RowLayout {
+      anchors.left: parent.left
+      anchors.leftMargin: 4
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 6
+
+      Menu {}
+      Workspaces {}
     }
 
-    Workspaces {
-      foreground: root.shellTheme.foreground
-      muted: root.shellTheme.muted
-      accent: root.shellTheme.accent
-      fontFamily: root.shellTheme.fontFamily
-    }
-  }
-
-  Clock {
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.verticalCenter: parent.verticalCenter
-    foreground: root.shellTheme.foreground
-    fontFamily: root.shellTheme.fontFamily
-  }
-
-  RowLayout {
-    anchors.right: parent.right
-    anchors.rightMargin: 10
-    anchors.verticalCenter: parent.verticalCenter
-    spacing: 1
-
-    AiUsage {
-      foreground: root.shellTheme.foreground
-      background: root.shellTheme.background
-      fontFamily: root.shellTheme.fontFamily
+    Clock {
+      anchors.centerIn: parent
     }
 
-    SystemStats {
-      foreground: root.shellTheme.foreground
-      background: root.shellTheme.background
-      fontFamily: root.shellTheme.fontFamily
+    RowLayout {
+      anchors.right: parent.right
+      anchors.rightMargin: 4
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 1
+
+      Media {}
+      KeepAwake {}
+      AiUsage {}
+      SystemStats {}
+
+      Rectangle {
+        Layout.leftMargin: 8
+        Layout.rightMargin: 8
+        implicitWidth: 1
+        implicitHeight: 14
+        color: Theme.rule
+      }
+
+      Printers {}
+      Bluetooth {}
+      Audio {}
+      Wifi {}
+      Battery {}
+      Notifications {}
+      Tray {
+        Layout.leftMargin: 4
+      }
     }
-
-    Divider {}
-
-    Printers {
-      foreground: root.shellTheme.foreground
-      background: root.shellTheme.background
-      accent: root.shellTheme.accent
-      alert: root.shellTheme.alert
-      fontFamily: root.shellTheme.fontFamily
-    }
-
-    Bluetooth {
-      foreground: root.shellTheme.foreground
-      background: root.shellTheme.background
-      fontFamily: root.shellTheme.fontFamily
-    }
-
-    Audio {
-      foreground: root.shellTheme.foreground
-      background: root.shellTheme.background
-      fontFamily: root.shellTheme.fontFamily
-    }
-
-    Wifi {
-      foreground: root.shellTheme.foreground
-      background: root.shellTheme.background
-      fontFamily: root.shellTheme.fontFamily
-    }
-
-    Battery {
-      foreground: root.shellTheme.foreground
-      accent: root.shellTheme.accent
-      fontFamily: root.shellTheme.fontFamily
-    }
-
-    Tray {
-      Layout.leftMargin: 10
-      foreground: root.shellTheme.foreground
-      muted: root.shellTheme.muted
-      background: root.shellTheme.background
-      surface: root.shellTheme.surface
-      accent: root.shellTheme.accent
-      fontFamily: root.shellTheme.fontFamily
-    }
-  }
-
-  component Divider: Rectangle {
-    Layout.leftMargin: 9
-    Layout.rightMargin: 9
-    implicitWidth: 1
-    implicitHeight: 14
-    color: root.shellTheme.rule
   }
 }
