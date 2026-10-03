@@ -38,6 +38,10 @@ WALKER_COLORS = {
     'selected-text': 'accent',
     'border': 'rule',
 }
+# Login and lock: display faces for large type and the clock size in pixels.
+DEFAULT_DISPLAY_FONT = 'Mona Sans Display SemiExpanded'
+DEFAULT_TEXT_FONT = 'Mona Sans SemiExpanded'
+AUTH_CLOCK_PX = 120
 MAKO_KEYS = ('background-color', 'text-color', 'border-color', 'progress-color', 'border-radius', 'font')
 
 
@@ -83,10 +87,17 @@ def validate_palette(data: object) -> dict:
         raise PaletteError(f'shape.radius must not be negative, got {radius}')
     if not ghostty_theme or '\n' in ghostty_theme:
         raise PaletteError(f'terminal.ghosttyTheme must be a non-empty single line, got {ghostty_theme!r}')
+    # Display faces for the login and lock screens' large type; optional.
+    display = {}
+    for key, default in (('display', DEFAULT_DISPLAY_FONT), ('text', DEFAULT_TEXT_FONT)):
+        value = data['font'].get(key, default)
+        if not isinstance(value, str) or not value.strip() or '\n' in value:
+            raise PaletteError(f'font.{key} must be a non-empty single line, got {value!r}')
+        display[key] = value.strip()
 
     return {
         'colors': colors,
-        'font': {'family': family, 'size': size},
+        'font': {'family': family, 'size': size, **display},
         'shape': {'radius': radius},
         'terminal': {'ghosttyTheme': ghostty_theme},
     }
@@ -128,6 +139,16 @@ def hyprland_conf(palette: dict) -> str:
     )
 
 
+def auth_sizes(palette: dict) -> dict:
+    """Pixel sizes shared by the login and lock screens, from the desktop size.
+
+    The corner controls keep the desktop bar's text size; the field, name and
+    date are larger so they read at a distance.
+    """
+    size = palette['font']['size']
+    return {'text': size + 6, 'field': size + 4, 'message': size + 1, 'chip': size}
+
+
 def hyprlock_conf(palette: dict) -> str:
     """Only theme variables; layout and authentication stay in hyprlock.conf."""
     colors = palette['colors']
@@ -140,14 +161,21 @@ def hyprlock_conf(palette: dict) -> str:
         f'$lock_muted_hex = #{colors["muted"]}',
         f'$lock_alert_hex = #{colors["alert"]}',
         f'$lock_font = {palette["font"]["family"]}',
+        # Hyprlock parses font_family as a Pango description, where a word
+        # such as "SemiExpanded" would become a stretch and drop out of the
+        # family. A trailing comma ends the family list, keeping every word.
+        f'$lock_display_font = {palette["font"]["display"]},',
+        f'$lock_text_font = {palette["font"]["text"]},',
         # Hyprlock labels use points, while the Qt login theme uses pixels.
-        f'$lock_font_size = {round((palette["font"]["size"] + 4) * 0.75)}',
-        f'$lock_hint_size = {round((palette["font"]["size"] + 2) * 0.75)}',
-        '$lock_clock_size = 54',
+        f'$lock_clock_size = {round(AUTH_CLOCK_PX * 0.75)}',
+        f'$lock_text_size = {round(auth_sizes(palette)["text"] * 0.75)}',
+        f'$lock_message_size = {round(auth_sizes(palette)["message"] * 0.75)}',
         # Pango markup sizes are points * 1024; convert from pixels at 96 DPI.
-        f'$lock_input_text_size = {(palette["font"]["size"] + 4) * 768}',
-        f'$lock_card_radius = {palette["shape"]["radius"] + 6}',
-        f'$lock_input_radius = {palette["shape"]["radius"]}',
+        f'$lock_field_text_size = {auth_sizes(palette)["field"] * 768}',
+        f'$lock_chip_text_size = {auth_sizes(palette)["chip"] * 768}',
+        f'$lock_chip_glyph_size = {(auth_sizes(palette)["chip"] + 3) * 768}',
+        # Round controls fill with text at 8%, like the desktop pill buttons.
+        f'$lock_control_fill = rgba({hex_digits(colors["foreground"])}14)',
     ]
     return '\n'.join(lines) + '\n'
 
@@ -160,11 +188,14 @@ def login_config(palette: dict) -> str:
         **{key: palette['colors'][key] for key in (
             'background', 'surface', 'rule', 'foreground', 'muted', 'accent', 'alert',
         )},
+        'warning': palette['colors']['warning'],
         'fontFamily': palette['font']['family'],
-        'fontSize': str(palette['font']['size'] + 4),
+        'displayFamily': palette['font']['display'],
+        'textFamily': palette['font']['text'],
+        'clockSize': str(AUTH_CLOCK_PX),
+        **{f'{key}Size': str(value) for key, value in auth_sizes(palette).items()},
         'cardRadius': str(palette['shape']['radius'] + 6),
         'inputRadius': str(palette['shape']['radius']),
-        'clockSize': '72',
         'wallpaper': 'wallpaper.jpg',
     }
     output = io.StringIO()

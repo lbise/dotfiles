@@ -70,34 +70,34 @@ class ConfirmationTest(unittest.TestCase):
             self.assertEqual(subprocess.check_output(['bash', str(reader), 'reboot'], env=env,
                                                     text=True).strip(), 'Restart')
 
-    def test_shell_markup_mode(self):
+    def test_shell_pending_prompt(self):
         reader = SCRIPT.with_name('system-lock-power-status.sh')
         with tempfile.TemporaryDirectory() as directory:
             env = dict(os.environ, XDG_RUNTIME_DIR=directory)
             state = Path(directory) / 'leo-lock-power.json'
             now = time.clock_gettime(time.CLOCK_BOOTTIME)
+            icon = ('<span font_family="JetBrainsMono Nerd Font Propo" size="115%">'
+                    '\U000F0026</span>')
 
-            def icon(glyph):
-                return f'<span font_family="JetBrainsMono Nerd Font Propo" size="115%">{glyph}</span>'
-
-            def read(action, *colours):
-                return subprocess.run(['bash', str(reader), action, '--markup', *colours], env=env,
+            def read(*args):
+                return subprocess.run(['bash', str(reader), 'pending', *args], env=env,
                                       text=True, capture_output=True)
 
-            state.write_text(json.dumps({}))
-            result = read('reboot', '#A0A4B5', '#F7768E')
-            self.assertEqual(result.stdout.strip(),
-                             '<span foreground="#A0A4B5">' + icon('\U000F0709') + '</span> Restart')
-            # The shut-down glyph always uses the alert colour.
-            self.assertEqual(read('poweroff', '#A0A4B5', '#F7768E').stdout.strip(),
-                             '<span foreground="#F7768E">' + icon('\U000F0425') + '</span> Shut down')
-            state.write_text(json.dumps({'action': 'reboot', 'at': now}))
-            self.assertEqual(read('reboot', '#A0A4B5', '#F7768E').stdout.strip(),
-                             '<span foreground="#F7768E">' + icon('\U000F0709') + ' Confirm</span>')
-            for colours in (('A0A4B5', '#F7768E'), ('#A0A4B5', '"><b>'), ('#A0A4B5',)):
-                result = read('reboot', *colours)
+            # Nothing armed: an empty line, so Hyprlock shows nothing.
+            for value in ({}, {'action': 'reboot', 'at': now - 10}):
+                state.write_text(json.dumps(value))
+                result = read('--markup', '#F7768E')
+                self.assertEqual((result.returncode, result.stdout), (0, '\n'), result.stderr)
+            for action, verb in (('reboot', 'restart'), ('poweroff', 'shut down')):
+                state.write_text(json.dumps({'action': action, 'at': now}))
+                self.assertEqual(read('--markup', '#F7768E').stdout.strip(),
+                                 f'<span foreground="#F7768E">{icon} Click again to {verb}</span>')
+            for args in (('--markup', 'F7768E'), ('--markup', '"><b>'), ('--markup',), ()):
+                result = read(*args)
                 self.assertEqual(result.returncode, 2)
                 self.assertEqual(result.stdout, '')
+            self.assertEqual(subprocess.run(['bash', str(reader), 'reboot', 'extra'], env=env,
+                                            capture_output=True).returncode, 2)
 
     def test_invalid_arguments_never_execute(self):
         with patch.object(power.subprocess, 'run') as run:

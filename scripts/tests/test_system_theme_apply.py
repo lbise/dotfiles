@@ -134,11 +134,17 @@ class RenderTest(unittest.TestCase):
         self.assertIn('$lock_muted_hex = ##A0A0A0', conf)
         self.assertIn('$lock_alert_hex = ##FF0000', conf)
         self.assertIn('$lock_font = Test Mono', conf)
-        self.assertIn('$lock_font_size = 13', conf)
-        self.assertIn('$lock_hint_size = 11', conf)
-        self.assertIn('$lock_clock_size = 54', conf)
-        self.assertIn('$lock_card_radius = 12', conf)
-        self.assertIn('$lock_input_radius = 6', conf)
+        # Display faces default to Mona Sans; the trailing comma keeps Pango
+        # from reading "SemiExpanded" as a stretch.
+        self.assertIn('$lock_display_font = Mona Sans Display SemiExpanded,', conf)
+        self.assertIn('$lock_text_font = Mona Sans SemiExpanded,', conf)
+        self.assertIn('$lock_clock_size = 90', conf)
+        self.assertIn('$lock_text_size = 14', conf)
+        self.assertIn('$lock_message_size = 10', conf)
+        self.assertIn('$lock_field_text_size = 13056', conf)
+        self.assertIn('$lock_chip_text_size = 9984', conf)
+        self.assertIn('$lock_chip_glyph_size = 12288', conf)
+        self.assertIn('$lock_control_fill = rgba(F0F0F014)', conf)
         # The generated file must never change authentication or power behaviour.
         self.assertNotIn('auth {', conf)
         self.assertNotIn('onclick', conf)
@@ -150,10 +156,29 @@ class RenderTest(unittest.TestCase):
         values = config['General']
         self.assertEqual(values['surface'], '#202020')
         self.assertEqual(values['fontFamily'], 'Test Mono')
-        self.assertEqual(values['fontSize'], '17')
+        self.assertEqual(values['displayFamily'], 'Mona Sans Display SemiExpanded')
+        self.assertEqual(values['textFamily'], 'Mona Sans SemiExpanded')
+        self.assertEqual(values['warning'], '#FFAA00')
+        # Corner controls keep the desktop text size; the form reads larger.
+        self.assertEqual(values['clockSize'], '120')
+        self.assertEqual(values['textSize'], '19')
+        self.assertEqual(values['fieldSize'], '17')
+        self.assertEqual(values['messageSize'], '14')
+        self.assertEqual(values['chipSize'], '13')
         self.assertEqual(values['cardRadius'], '12')
         self.assertEqual(values['wallpaper'], 'wallpaper.jpg')
         self.assertNotIn('/home/', theme.login_config(self.palette))
+
+    def test_display_fonts_follow_the_palette(self) -> None:
+        palette = copy.deepcopy(PALETTE)
+        palette['font']['display'] = 'Other Display'
+        palette['font']['text'] = 'Other Text'
+        valid = theme.validate_palette(palette)
+        self.assertIn('$lock_display_font = Other Display,', theme.hyprlock_conf(valid))
+        self.assertIn('textFamily=Other Text', theme.login_config(valid))
+        palette['font']['text'] = 'Two\nlines'
+        with self.assertRaisesRegex(theme.PaletteError, r'font\.text'):
+            theme.validate_palette(palette)
 
     def test_invalid_colour_names_the_key(self) -> None:
         palette = copy.deepcopy(PALETTE)

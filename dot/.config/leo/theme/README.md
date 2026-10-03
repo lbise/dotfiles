@@ -18,7 +18,7 @@ The script lives in `scripts/system/` and is on `PATH` as `~/.scripts/system/sys
 - `accent` marks selection and current state only, like the selected Walker entry or the Mako progress bar. Do not use it for decoration.
 - `alert`, `warning` and `good` are status colours. Critical Mako notifications get an `alert` border.
 
-`font`, `shape.radius` and `terminal.ghosttyTheme` feed the Mako font and corner radius and the Ghostty theme. Quickshell reads `palette.json` directly and updates live, so it needs no generated file.
+`font`, `shape.radius` and `terminal.ghosttyTheme` feed the Mako font and corner radius and the Ghostty theme. Quickshell reads `palette.json` directly and updates live, so it needs no generated file. `font.display` and `font.text` name the Mona Sans faces for the large type on the login and lock screens (defaults apply when absent).
 
 ## Generated files
 

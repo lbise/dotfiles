@@ -76,7 +76,7 @@ import struct
 import sys
 
 for width, height in [(800, 600), (1280, 720), (1920, 1080), (2560, 1440)]:
-    for state in ['login', 'error', 'confirm']:
+    for state in ['login', 'typing', 'error', 'confirm', 'session']:
         image = Path(sys.argv[1]) / f'{width}x{height}-{state}.png'
         data = image.read_bytes()
         assert data[:8] == b'\x89PNG\r\n\x1a\n', image

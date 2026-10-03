@@ -3,34 +3,30 @@
 # The action/confirmation decision still lives in system-lock-power.py.
 #
 #   system-lock-power-status.sh reboot|poweroff
-#   system-lock-power-status.sh reboot|poweroff --markup GLYPH_COLOUR ALERT_COLOUR
+#   system-lock-power-status.sh pending --markup ALERT_COLOUR
 #
-# Plain mode prints the label ("Restart", "Confirm Restart"). Markup mode
-# prints Pango markup for Hyprlock: a Material Design glyph and the label,
-# or "Confirm" in the alert colour while the action is armed.
+# Plain mode prints the label ("Restart", "Confirm Restart"). Pending mode
+# prints the Pango markup Hyprlock shows under its bar while restart or
+# shutdown waits for the second click, and an empty line otherwise.
 set -u
 
 usage() {
-  echo 'Usage: system-lock-power-status.sh reboot|poweroff [--markup GLYPH_COLOUR ALERT_COLOUR]' >&2
+  echo 'Usage: system-lock-power-status.sh reboot|poweroff | pending --markup ALERT_COLOUR' >&2
   exit 2
 }
 
+markup=''
 case "${1:-}" in
-  reboot) label=Restart glyph=$'\U000F0709' ;;
-  poweroff) label='Shut down' glyph=$'\U000F0425' ;;
+  reboot) label=Restart ;;
+  poweroff) label='Shut down' ;;
+  pending)
+    # Colours are interpolated into markup, so accept only #RRGGBB.
+    (($# == 3)) && [[ "$2" == --markup && "$3" =~ ^#[0-9A-Fa-f]{6}$ ]] || usage
+    markup=1 alert_colour=$3
+    ;;
   *) usage ;;
 esac
-
-markup=''
-if (($# == 4)) && [[ "$2" == --markup ]]; then
-  # Colours are interpolated into markup, so accept only #RRGGBB.
-  [[ "$3" =~ ^#[0-9A-Fa-f]{6}$ && "$4" =~ ^#[0-9A-Fa-f]{6}$ ]] || usage
-  markup=1 glyph_colour=$3 alert_colour=$4
-  # The shut-down glyph is always rose, as in the Quickshell power tiles.
-  [[ "$1" == poweroff ]] && glyph_colour=$alert_colour
-elif (($# != 1)); then
-  usage
-fi
+[[ -n "$markup" ]] || (($# == 1)) || usage
 
 file="${XDG_RUNTIME_DIR:-/run/user/$UID}/leo-lock-power.json"
 state=''
@@ -42,7 +38,8 @@ if [[ -f "$file" && ! -L "$file" ]]; then
 fi
 
 if [[ "$state" =~ \"action\"[[:space:]]*:[[:space:]]*\"(reboot|poweroff)\" ]] \
-    && [[ "${BASH_REMATCH[1]}" == "$1" ]] \
+    && { [[ -n "$markup" ]] || [[ "${BASH_REMATCH[1]}" == "$1" ]]; } \
+    && action=${BASH_REMATCH[1]} \
     && [[ "$state" =~ \"at\"[[:space:]]*:[[:space:]]*([0-9]+)(\.([0-9]+))? ]]; then
   seconds=${BASH_REMATCH[1]}
   fraction=${BASH_REMATCH[3]:-0}00
@@ -55,6 +52,7 @@ if [[ "$state" =~ \"action\"[[:space:]]*:[[:space:]]*\"(reboot|poweroff)\" ]] \
     fraction=${uptime#*.}00
     now=$((10#$seconds * 100 + 10#${fraction:0:2}))
     age=$((now - armed_at))
+    # The writer accepts the second click for three seconds.
     if ((age >= 0 && age < 300)); then
       armed=1
     fi
@@ -64,13 +62,14 @@ fi
 if [[ -z "$markup" ]]; then
   [[ "$armed" == 1 ]] && label="Confirm $label"
   printf '%s\n' "$label"
+elif [[ "$armed" == 1 ]]; then
+  # The alert glyph uses the proportional Nerd Font slightly above text size.
+  icon="<span font_family=\"JetBrainsMono Nerd Font Propo\" size=\"115%\">"$'\U000F0026'"</span>"
+  case "$action" in
+    reboot) verb=restart ;;
+    poweroff) verb='shut down' ;;
+  esac
+  printf '<span foreground="%s">%s Click again to %s</span>\n' "$alert_colour" "$icon" "$verb"
 else
-  # Glyphs use the proportional Nerd Font slightly above text size, as in the
-  # bar and the SDDM theme.
-  icon="<span font_family=\"JetBrainsMono Nerd Font Propo\" size=\"115%\">$glyph</span>"
-  if [[ "$armed" == 1 ]]; then
-    printf '<span foreground="%s">%s Confirm</span>\n' "$alert_colour" "$icon"
-  else
-    printf '<span foreground="%s">%s</span> %s\n' "$glyph_colour" "$icon" "$label"
-  fi
+  echo
 fi

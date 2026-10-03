@@ -26,4 +26,7 @@ Use the existing wallpaper and the graphite/jade desktop design in `DESIGN.md`.
 The shared theme is `dot/.config/leo/theme/palette.json`. Leo approved a darkened
 wallpaper behind both authentication screens and a centred form with a clock
 and date above it. He requested larger text after finding the original widget
-text too small.
+text too small. He later removed the bar from both screens (it made no sense
+before a session), asked for fewer words (no "press Enter" hints) and a
+display face other than JetBrains Mono for the large type; Mona Sans was
+chosen. Session, layout and power controls sit in the bottom corners.

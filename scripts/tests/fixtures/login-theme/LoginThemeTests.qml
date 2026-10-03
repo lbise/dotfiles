@@ -65,6 +65,7 @@ Item {
             fixture.height = 720;
             theme.busy = false;
             theme.failure = "";
+            theme.notice = "";
             sddm.canSuspend = true;
             sddm.canReboot = true;
             sddm.canPowerOff = true;
@@ -83,29 +84,46 @@ Item {
             wait(10);
         }
         function test_geometry() {
-            var card = findChild(theme, "loginCard");
-            compare(card.width, 400);
-            compare(card.height, 240);
-            compare(card.y + 120, theme.height / 2 + 100);
+            var centre = theme.height / 2;
+            function middle(item) { return item.mapToItem(theme, 0, 0).y + item.height / 2; }
+            // The shared grid with hyprlock.conf: box centres from screen centre.
             var clock = findChild(theme, "clock");
-            compare(clock.y + clock.height / 2, theme.height / 2 - 160);
-            compare(clock.font.pixelSize, 72);
+            compare(middle(clock), centre - 150);
+            compare(clock.font.pixelSize, 120);
+            compare(clock.font.family, "Mona Sans Display SemiExpanded");
             var date = findChild(theme, "date");
-            compare(date.y + date.height / 2, theme.height / 2 - 90);
-            compare(username.height, 48);
+            compare(middle(date), centre - 60);
+            verify(date.text.length > 0);
+            compare(middle(username), centre + 56);
+            compare(middle(password), centre + 110);
+            compare(password.width, 320);
             compare(password.height, 48);
-            compare(username.width, 344);
-            compare(password.width, 344);
-            compare(findChild(theme, "signIn").width, 344);
-            compare(findChild(theme, "signIn").height, 48);
-            // The password field sits on the card's centre line, as in Hyprlock.
-            compare(password.mapToItem(card, 0, 0).y + password.height / 2, card.height / 2);
-            // Session and power controls sit outside the card, below it.
-            verify(session.mapToItem(theme, 0, 0).y > card.y + card.height);
-            verify(findChild(theme, "powerOff").mapToItem(theme, 0, 0).y > card.y + card.height);
+            compare(username.width, 320);
+            fuzzyCompare(password.mapToItem(theme, password.width / 2, 0).x, theme.width / 2, 1);
+            // No bar and no card: nothing else sits above the clock.
+            compare(findChild(theme, "bar"), null);
+            compare(findChild(theme, "loginCard"), null);
+            // Corner controls: 36px tall, 24px in from the bottom edges.
+            var sessionPos = session.mapToItem(theme, 0, 0);
+            compare(sessionPos.x, 24);
+            compare(sessionPos.y + session.height, theme.height - 24);
+            compare(session.height, 36);
+            var powerOff = findChild(theme, "powerOff");
+            var powerPos = powerOff.mapToItem(theme, 0, 0);
+            compare(powerPos.x + powerOff.width, theme.width - 24);
+            compare(powerPos.y + powerOff.height, theme.height - 24);
+            compare(powerOff.width, 36);
         }
         function test_initialFocusAndTab() {
             verify(password.activeFocus);
+            // The sign-in arrow appears only once there is a password.
+            verify(!findChild(theme, "signIn").visible);
+            keyClick(Qt.Key_Tab);
+            verify(session.activeFocus);
+            keyClick(Qt.Key_Backtab, Qt.ShiftModifier);
+            verify(password.activeFocus);
+            password.text = "synthetic-test-value";
+            verify(findChild(theme, "signIn").visible);
             keyClick(Qt.Key_Tab);
             verify(findChild(theme, "signIn").activeFocus);
             keyClick(Qt.Key_Tab);
@@ -124,6 +142,14 @@ Item {
             verify(username.activeFocus);
             keyClick(Qt.Key_Backtab, Qt.ShiftModifier);
             verify(findChild(theme, "powerOff").activeFocus);
+        }
+        function test_signInArrowSubmits() {
+            password.text = "synthetic-test-value";
+            var signIn = findChild(theme, "signIn");
+            verify(signIn.visible);
+            signIn.clicked();
+            compare(sddm.loginCalls, 1);
+            verify(sddm.submittedExpectedSecret);
         }
         function test_enterAndDuplicateSubmission() {
             password.text = "synthetic-test-value";
@@ -147,6 +173,12 @@ Item {
             verify(theme.failure.length > 0);
             compare(password.text.length, 0);
             verify(password.activeFocus);
+            // The failure reads inside the field until typing starts.
+            var hint = findChild(theme, "passwordHint");
+            compare(hint.text, theme.failure);
+            verify(hint.visible);
+            password.text = "x";
+            compare(theme.failure, "");
         }
         function test_userChangeClearsPassword() {
             password.text = "synthetic-test-value";
@@ -171,7 +203,8 @@ Item {
             username.text = "  ";
             theme.submit();
             compare(sddm.loginCalls, 0);
-            verify(theme.failure.length > 0);
+            verify(theme.notice.length > 0);
+            verify(findChild(theme, "feedback").visible);
             verify(username.activeFocus);
         }
         function test_successKeepsDisabled() {
@@ -202,6 +235,9 @@ Item {
             session.forceActiveFocus();
             keyClick(Qt.Key_Space);
             tryCompare(session.popup, "opened", true);
+            // The list rises 8px above the chip, left edges aligned.
+            tryCompare(session.popup, "y", session.y - 8 - session.popup.height);
+            compare(session.popup.x, session.x);
             keyClick(Qt.Key_Down);
             keyClick(Qt.Key_Return);
             tryCompare(session.popup, "opened", false);
@@ -211,7 +247,7 @@ Item {
             session.currentIndex = -1;
             theme.submit();
             compare(sddm.loginCalls, 0);
-            verify(theme.failure.length > 0);
+            verify(theme.notice.length > 0);
         }
         function test_busyBlocksPower() {
             theme.busy = true;
@@ -255,15 +291,27 @@ Item {
             keyClick(Qt.Key_Tab);
             verify(username.activeFocus);
         }
-        function test_smallViewportFeedbackAvoidsPowerControls() {
+        function test_smallViewportFeedbackStaysOnScreen() {
             fixture.width = 800;
             fixture.height = 600;
-            theme.submit();
-            sddm.loginFailed();
+            keyboard.capsLock = true;
             var feedback = findChild(theme, "feedback");
-            var card = findChild(theme, "loginCard");
-            verify(feedback.text.length > 0);
-            verify(feedback.y + feedback.height <= card.y - 14);
+            verify(feedback.visible);
+            compare(feedback.text, "Caps Lock");
+            // Clear of the corner controls even at 800×600.
+            verify(feedback.y + feedback.height <= session.y - 16);
+            var clock = findChild(theme, "clock");
+            verify(clock.y >= 16);
+        }
+        function test_powerConfirmRisesFromButtons() {
+            var dialog = findChild(theme, "powerDialog");
+            var row = findChild(theme, "powerRow");
+            theme.requestPower("poweroff", findChild(theme, "powerOff"));
+            tryCompare(dialog, "opened", true);
+            tryCompare(dialog, "y", row.y - 8 - dialog.height);
+            compare(dialog.x + dialog.width, theme.width - 24);
+            verify(findChild(theme, "powerOff").open);
+            dialog.close();
         }
         function saveCapture(name) {
             wait(100);
@@ -286,6 +334,9 @@ Item {
                 theme.focusForm();
                 saveCapture(prefix + "-login");
                 password.text = "synthetic-test-value";
+                saveCapture(prefix + "-typing");
+                password.text = "";
+                password.text = "synthetic-test-value";
                 theme.submit();
                 sddm.loginFailed();
                 saveCapture(prefix + "-error");
@@ -293,6 +344,10 @@ Item {
                 tryCompare(findChild(theme, "powerDialog"), "opened", true);
                 saveCapture(prefix + "-confirm");
                 findChild(theme, "powerDialog").close();
+                session.popup.open();
+                tryCompare(session.popup, "opened", true);
+                saveCapture(prefix + "-session");
+                session.popup.close();
             }
         }
     }

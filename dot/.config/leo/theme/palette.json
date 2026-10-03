@@ -14,7 +14,9 @@
   "font": {
     "family": "JetBrainsMono Nerd Font",
     "size": 14,
-    "weight": 400
+    "weight": 400,
+    "display": "Mona Sans Display SemiExpanded",
+    "text": "Mona Sans SemiExpanded"
   },
   "shape": {
     "radius": 8,

@@ -38,10 +38,14 @@ DROP = 'etc/sddm.conf.d/99-leo-theme.conf'
 MAIN = 'etc/sddm.conf'
 KEYS = {'Theme': {'Current': 'leo'},
         'General': {'InputMethod': '', 'GreeterEnvironment': 'QT_IM_MODULE='}}
-# Regular, Medium (clock) and SemiBold (Sign in, dialog titles); Propo for glyphs.
+# JetBrains Mono for the corner controls (Propo for glyphs; the other weights
+# stay so older backups still roll back). Mona Sans for the large type: the
+# Light clock, Regular date and field, Medium name.
 FONT_NAMES = {'JetBrainsMonoNerdFont-Regular.ttf', 'JetBrainsMonoNerdFont-Medium.ttf',
               'JetBrainsMonoNerdFont-SemiBold.ttf', 'JetBrainsMonoNerdFont-Bold.ttf',
-              'JetBrainsMonoNerdFontPropo-Regular.ttf'}
+              'JetBrainsMonoNerdFontPropo-Regular.ttf',
+              'MonaSansDisplaySemiExpanded-Light.ttf', 'MonaSansSemiExpanded-Regular.ttf',
+              'MonaSansSemiExpanded-Medium.ttf'}
 
 
 def allowed(name):

@@ -26,6 +26,14 @@ typography:
     fontFamily: "JetBrainsMono Nerd Font"
     fontSize: "12px"
     fontWeight: 400
+  auth-clock:
+    fontFamily: "Mona Sans Display SemiExpanded"
+    fontSize: "120px"
+    fontWeight: 300
+  auth-text:
+    fontFamily: "Mona Sans SemiExpanded"
+    fontSize: "20px"
+    fontWeight: 400
   glyph:
     fontFamily: "JetBrainsMono Nerd Font Propo"
     fontSize: "17px"
@@ -112,7 +120,7 @@ The source of truth is `dot/.config/leo/theme/palette.json`. Quickshell reads it
 **Key Characteristics:**
 - One accent, used only for the current or selected thing.
 - Neutral rule colour for every border and divider, including window borders.
-- Monospace everywhere, with Nerd Font Material Design glyphs as the only icon set.
+- Monospace everywhere on the desktop, with Nerd Font Material Design glyphs as the only icon set. Login and lock use Mona Sans for their large type (see Authentication).
 - Depth from tone (ground, inset, surface), with one soft shadow under popups.
 - Floating bar that lines up with Hyprland's window gaps.
 
@@ -148,7 +156,7 @@ A near-neutral charcoal family with pearl text and a single cool-green accent; s
 **Body Font:** JetBrainsMono Nerd Font (14px, weight 400)
 **Glyph Font:** JetBrainsMono Nerd Font Propo (proportional glyph widths)
 
-**Character:** one monospaced family for text and numbers keeps readings aligned and matches the terminal next to it. Hierarchy comes from size, weight and the muted colour, not from a second face.
+**Character:** one monospaced family for text and numbers keeps readings aligned and matches the terminal next to it. Hierarchy comes from size, weight and the muted colour, not from a second face. The one exception is login and lock, where display-size type uses Mona Sans.
 
 ### Hierarchy
 - **Title** (600, 17px): popup titles such as "Sound" or "Wi-Fi".
@@ -195,13 +203,23 @@ Other apps follow the same roles through `system-theme-apply.py`: Walker (ground
 
 ### Authentication
 
-SDDM login and native Hyprlock share the graphite Quickshell palette over the existing user-selected wallpaper, never a screenshot of the open session. The form card is centred horizontally, with its centre 100px below screen centre. It is 400×240px with the card radius of 14px and a rule border; the password field is 344×48px. Above it, the clock is 72px and the date is 18px in pearl after contrast review. Form text is 18px; hints are 16px. These larger sizes are specific to authentication, not replacements for the desktop typography tokens.
+SDDM login and native Hyprlock are one screen: the time, the account and one field over the existing user-selected wallpaper (darkened and lightly blurred, never a screenshot of the open session). There is no bar, no card and no instruction text. Session and power controls sit in the bottom corners.
 
-Both cards share one row grid: 36px padding and three 48px rows with 12px gaps, so the password field sits on the card's centre line in both. Row 1 is the account (the editable username at login; the name in SemiBold over a muted "Locked at HH:MM" on the lock screen). Row 3 is the jade Sign in pill at login and a muted Enter hint on the lock screen. Field text and hints are centred, because Hyprlock cannot align its input otherwise. The focused field carries a 1px jade ring, so Hyprlock's always-focused field is jade at rest. Both cards cast the popup lift; Hyprlock has no shadow offset, so a dark copy of the card 10px lower casts it.
+**Type.** Large type uses Mona Sans, from `font.display` and `font.text` in palette.json: the clock in Mona Sans Display SemiExpanded Light at 120px, the date (muted, "Saturday 3 October") and the account name (Medium) in Mona Sans SemiExpanded at 20px, field text at 18px. The corner controls keep the desktop bar's JetBrains Mono at 14px with 17px Nerd Font glyphs. These sizes and faces are specific to authentication; the desktop tokens above are unchanged.
 
-System controls sit outside the card in bar groups (ground, rule outline, 11px radius, 44px tall) 24px from the bottom corners, with bar-button glyphs from the proportional Nerd Font at about 18px, one 10px space before the label. Bottom right: Suspend, Restart and Shut down, with the shut-down glyph in rose. Bottom left: the session selector at login (it opens upward as a popup card) and the plain keyboard layout readout on the lock screen. Feedback (sign-in failure, Caps Lock, fingerprint prompt) appears centred 16px under the card.
+**Grid.** Both screens place every element by its box centre relative to the screen centre: clock −150px, date −60px, name +56px, field +110px, the one feedback line +164px. Hyprlock offsets point up, so `hyprlock.conf` uses the same numbers with the opposite sign.
 
-Hyprlock uses native point-sized labels, calibrated by the generator, with a 54pt clock matching roughly 72px and Pango placeholder sizes converted from pixels. It displays `$USER` and submits with Enter, not a fake button. SDDM has an editable remembered username, a session selector and a real Sign in button. Armed lock-screen actions read "Confirm" in rose, like the Quickshell power tiles; the login modal uses a rose disc, Cancel and a danger pill. Restart and shutdown require confirmation, using a three-second second click on the lock screen and a modal with Cancel focused by default at login. See [login and lock](docs/login-lock.md) for operation and validation limits.
+**Field.** A 320×48 ground pill with a 1px outline: jade while focused (Hyprlock's field is always focused, so it is jade at rest), rose after a failed attempt, amber with Caps Lock. Text and placeholder are centred, because Hyprlock cannot align its input otherwise. Failure ("Wrong password") and progress ("Checking…" when locked, "Signing in…" at login) read inside the field. At login a 36px jade disc with an arrow appears at the field's right end once something is typed; it is the real Sign in button. Hyprlock submits with Enter and shows no button or hint.
+
+**Account.** The lock screen shows `$USER`. At login the same slot is SDDM's remembered username as an editable field that looks like the name until it is hovered (text at 8%) or focused (ground pill, jade ring); empty, it shows the pill with a "Username" placeholder.
+
+**Corners.** 24px in from the bottom edges, 36px tall, filled with text at 8% (12% hover, 16% pressed or open) like the desktop pill buttons. Bottom left: the session chip (monitor glyph and name) at login, the keyboard layout (keyboard glyph and short code, "ch") when locked, where a click cycles layouts. Bottom right: Suspend, Restart and Shut down discs, 8px apart, the last glyph in rose.
+
+**Popups and confirmation.** At login, icons name themselves in a small tooltip above them; the session list and the restart/shutdown confirmation rise 8px above their control, with the Quickshell fade and a 6px rise. The confirmation card is desktop chrome in JetBrains Mono, like the chip it rises from. It shows a rose disc with "Restart now?" or "Shut down now?", then Cancel (focused) and a danger pill. Restart counts as destructive, as on the desktop's Restart tile, so both confirmations use rose. The card blocks input but does not dim the screen. Hyprlock cannot draw hover states or popups, so restart and shutdown need a second click within three seconds, and while one is armed a rose line ("Click again to restart") sits 12px above the buttons, right-aligned with them. Suspend needs no confirmation.
+
+**Feedback line.** At login, Caps Lock (amber) and form problems such as a blank username (rose) appear as one short line under the field. On the lock screen the same slot shows the fingerprint prompt when a reader exists.
+
+Hyprlock sizes are points (pixels × 0.75, generated) and Pango units for markup. Hyprlock reads `font_family` as a Pango description, so the generator ends the Mona Sans family names with a comma to stop "SemiExpanded" being read as a stretch. Hyprlock draws outlines outside a shape's size, so its field is declared 318×46 to render 320×48. See [login and lock](docs/login-lock.md) for operation and validation limits.
 
 ## Do's and Don'ts
 
