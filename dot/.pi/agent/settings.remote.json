@@ -24,5 +24,7 @@
   "packages": ["npm:pi-context-view", "npm:pi-footer"],
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
-  "tuiMode": "fullscreen"
+  "tuiMode": "fullscreen",
+  "defaultProjectTrust": "always",
+  "defaultTools": ["+codemode"]
 }

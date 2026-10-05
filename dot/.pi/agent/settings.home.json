@@ -31,9 +31,11 @@
     "npm:pi-footer",
     "npm:@pi-plugins/claude-oauth"
   ],
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",
+  "defaultProjectTrust": "always",
+  "defaultTools": ["+codemode"]
   "warnings": {
     "anthropicExtraUsage": false
   },
