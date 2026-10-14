@@ -39,7 +39,7 @@ time: Escape or a click elsewhere closes it, and clicking another bar button
 switches to that popup. Keybinds can open them through IPC, for example
 `quickshell ipc -p ~/.config/quickshell/leo-shell call leo.popup toggle audio`.
 The ids are `menu`, `calendar`, `ai`, `sys`, `printers`, `bluetooth`, `audio`,
-`wifi`, `media`, `notifications` and `apps`. The popups are built from shared components in `leo-shell/`
+`wifi`, `garmin`, `media`, `notifications` and `apps`. The popups are built from shared components in `leo-shell/`
 (`PopupCard`, `Section`, `ListRow`, `Meter`, `PillSlider`, `PillButton` and
 others); `Theme`, `Icons` and `Popups` are singletons. After adding a new
 singleton, restart the service: a hot reload does not register it.
@@ -101,6 +101,46 @@ It checks reachability from the device URI. Host URIs (`ipp`, `socket`, `lpd`,
 ...) get a TCP connection to the print port, then a ping. Canon `cnijnet:/MAC`
 URIs look up the MAC in `ip neigh` and ping that address. `dnssd://` URIs are
 resolved with `avahi-browse`. USB and PDF queues show as local.
+
+A watch icon appears after Bluetooth while a Garmin watch (USB vendor `091e`)
+is plugged in. Its popup shows storage and the music on the watch by artist.
+Click an artist to list its tracks; click a track to show Edit and Delete.
+Delete artist and Delete track need a second click ("Confirm") within three
+seconds.
+
+The watch's player shows tags (artist, title, album), not folder names, so
+every upload is tagged. Add music opens a `zenity` file picker, then the popup
+comes back with one row per file: Title, Artist and Album, filled from the
+file's tags, then from its name ("01. Artist - Title (Official Video)" gives
+Artist and Title; downloader prefixes, bitrates and YouTube ids are dropped).
+All files sets the artist and album of every row at once. Add writes the tags
+into a temporary copy with `ffmpeg`, never into the original file: MP3 gets
+ID3v2.3, M4A MP4 tags; raw AAC is remuxed to M4A, and FLAC, Ogg, Opus and WAV
+are converted to MP3 (LAME V2). The copy goes to
+`Music/<Artist>/<Album>/<Title>.mp3`, the watch's own layout, with "Unknown
+Artist" and "Unknown" for empty fields. A file already on the watch is skipped.
+Closing the popup keeps the list; a dot on the icon means it is waiting.
+
+Edit on a track downloads it to read its tags (about 3 MB/s, so a two-hour
+mix takes a minute), then Save writes the new tags and uploads it to the path
+they give. The original is deleted only after the new copy has arrived with
+the right size, and emptied album and artist folders are removed. When the
+path does not change, the original is renamed aside while the copy uploads,
+and renamed back if the upload fails. Edit artist retags every track of an
+artist (and optionally sets one album), keeping each title. The bar shows the
+progress of an upload or retag, and turns red if a file fails until the popup
+has been opened and closed.
+
+KDE's `kmtpd` (inside `kiod6`) holds the watch's USB interface, so libmtp
+tools report it as busy. `scripts/system/system-garmin-music.py` uses kmtpd's
+D-Bus API instead (`org.kde.kmtpd5`, started on demand), which lets Dolphin
+browse the watch at the same time. Its `watch` command stays running and
+reports plug and unplug from udev and kmtpd's `devicesChanged` signal, without
+polling. `list`, `probe`, `probe-remote`, `add`, `retag` and `rm` print JSON
+(see the script's usage); `add` and `retag` take a JSON manifest on stdin, and
+`retag` and `rm` only accept paths inside `/Music`. A download made to read
+tags is kept for an hour in `~/.cache/leo/garmin-music/` so Save does not
+download it again.
 
 The AI usage widget (robot icon) has its own copied collectors in
 `scripts/system/ai-usage-*.py`. The wrapper at

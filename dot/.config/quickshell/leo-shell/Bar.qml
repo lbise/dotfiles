@@ -73,6 +73,7 @@ PanelWindow {
 
       Printers {}
       Bluetooth {}
+      Garmin {}
       Audio {}
       Wifi {}
       Battery {}

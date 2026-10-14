@@ -65,5 +65,12 @@ Singleton {
   readonly property string skipNext: "\u{F04AD}"
   readonly property string skipPrevious: "\u{F04AE}"
   readonly property string music: "\u{F075A}"
+  readonly property string musicNote: "\u{F0387}"
+  readonly property string accountMusic: "\u{F0803}"
+  readonly property string watch: "\u{F0589}"
+  readonly property string plus: "\u{F0415}"
+  readonly property string deleteOutline: "\u{F09E7}"
+  readonly property string pencilOutline: "\u{F0CB6}"
+  readonly property string fileMusic: "\u{F0E2A}"
   readonly property string ethernet: "\u{F0200}"
 }

@@ -170,7 +170,7 @@ A near-neutral charcoal family with pearl text and a single cool-green accent; s
 ## Layout
 
 - The bar is a layer surface across the top edge. The visible bar floats 8px from the top and 10px from each side (Hyprland's `gaps_out`); it reserves 42px so windows sit 10px under it, the same gap as at the sides.
-- Bar content: Arch menu and workspaces on the left, clock centred, status buttons on the right, one divider between the monitoring group (media, keep-awake reminder, AI usage, system stats) and the device group (printers, Bluetooth, sound, network, battery, notifications), then the apps chevron.
+- Bar content: Arch menu and workspaces on the left, clock centred, status buttons on the right, one divider between the monitoring group (media, keep-awake reminder, AI usage, system stats) and the device group (printers, Bluetooth, Garmin watch while plugged in, sound, network, battery, notifications), then the apps chevron.
 - Popups open 8px under the bar, aligned to the edge of their button (the calendar is centred). Widths are 300 to 420px. The body scrolls past about 620px.
 - Inside a card: 6px card padding, 12px between sections, 6px between a section heading and its body, 12px padding in a section body (4px for lists), 10px between row elements.
 
