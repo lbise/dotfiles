@@ -7,12 +7,23 @@ function list(text) {
   }
 }
 
+// What the copy button puts on the clipboard: summary, a blank line, body.
+function copyText(summary, body) {
+  return [summary, body].filter(function(part) { return part !== "" }).join("\n\n")
+}
+
 function entry(item, active) {
+  var summary = String(item.summary || "").trim()
+  var body = String(item.body || "").trim()
   return {
     id: Number(item.id) || 0,
     app: String(item.app_name || ""),
-    summary: String(item.summary || ""),
-    body: String(item.body || "").replace(/\s*\n\s*/g, " "),
+    summary: summary,
+    // `body` keeps its line breaks for the expanded row; `preview` is one
+    // paragraph for the collapsed row.
+    body: body,
+    preview: body.replace(/\s*\n\s*/g, " "),
+    copyText: copyText(summary, body),
     critical: item.urgency === "critical",
     active: active
   }
@@ -48,5 +59,5 @@ function unread(entries, seenId) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { parse: parse, maxId: maxId, unread: unread }
+  module.exports = { parse: parse, maxId: maxId, unread: unread, copyText: copyText }
 }

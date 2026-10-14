@@ -2,13 +2,31 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 // Notification history from mako. The bell shows how many arrived since the
 // popup was last open. Right-click toggles Do not disturb.
+// Click a notification to show all of it; the copy button puts its summary
+// and body on the clipboard.
 BarButton {
   id: root
 
   readonly property var recent: Mako.entries.slice(0, 20)
+  // Keyed by notification id, so a refresh that shifts the list keeps them.
+  property int expandedId: -1
+  property int copiedId: -1
+
+  function copy(item) {
+    Quickshell.execDetached(["wl-copy", "--", item.copyText])
+    copiedId = item.id
+    copiedReset.restart()
+  }
+
+  Timer {
+    id: copiedReset
+    interval: 1500
+    onTriggered: root.copiedId = -1
+  }
 
   icon: Mako.dnd ? Icons.bellOff : Icons.bell
   label: Mako.unread > 0 ? String(Mako.unread) : ""
@@ -30,7 +48,10 @@ BarButton {
     title: "Notifications"
     subtitle: Mako.dnd ? "Do not disturb" : ""
 
-    onOpened: Mako.markSeen()
+    onOpened: {
+      root.expandedId = -1
+      Mako.markSeen()
+    }
 
     tools: [
       IconButton {
@@ -75,12 +96,28 @@ BarButton {
           id: row
 
           required property int index
-          readonly property var item: root.recent[index] || ({ app: "", summary: "", body: "", critical: false, active: false })
+          readonly property var item: root.recent[index] || ({ id: -1, app: "", summary: "", body: "", preview: "", copyText: "", critical: false, active: false })
+          readonly property bool expanded: item.id === root.expandedId
+          readonly property bool truncated: summaryLabel.truncated || bodyLabel.truncated
 
           Layout.fillWidth: true
           implicitHeight: content.implicitHeight + 16
           radius: Theme.radius + 1
-          color: "transparent"
+          color: expanded ? Theme.alpha(Theme.foreground, 0.08)
+            : hover.hovered && truncated ? Theme.alpha(Theme.foreground, 0.06)
+            : "transparent"
+
+          Behavior on color { ColorAnimation { duration: 100 } }
+
+          HoverHandler { id: hover }
+
+          // Under the content, so the copy button takes its own clicks.
+          MouseArea {
+            anchors.fill: parent
+            enabled: row.expanded || row.truncated
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.expandedId = row.expanded ? -1 : row.item.id
+          }
 
           ColumnLayout {
             id: content
@@ -111,23 +148,36 @@ BarButton {
                 text: "Showing"
                 tone: "accent"
               }
+
+              // Kept in the layout while hidden, so hovering doesn't resize the row.
+              IconButton {
+                implicitWidth: 22
+                implicitHeight: 22
+                icon: root.copiedId === row.item.id ? Icons.check : Icons.copy
+                opacity: hover.hovered || row.expanded || root.copiedId === row.item.id ? 1 : 0
+                enabled: opacity > 0
+                onClicked: root.copy(row.item)
+              }
             }
 
             Label {
+              id: summaryLabel
               Layout.fillWidth: true
               visible: text !== ""
               text: row.item.summary
               strong: true
+              wrapMode: row.expanded ? Text.Wrap : Text.NoWrap
             }
 
             Label {
+              id: bodyLabel
               Layout.fillWidth: true
               visible: text !== ""
-              text: row.item.body
+              text: row.expanded ? row.item.body : row.item.preview
               muted: true
               wrapMode: Text.Wrap
-              maximumLineCount: 2
-              elide: Text.ElideRight
+              maximumLineCount: row.expanded ? undefined : 2
+              elide: row.expanded ? Text.ElideNone : Text.ElideRight
             }
           }
         }

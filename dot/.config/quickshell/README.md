@@ -123,7 +123,10 @@ so the meters do not redraw when data refreshes.
 
 The bell opens the notification history from mako, read through `makoctl`
 (`Mako.qml` polls every 5 seconds). The number beside the bell counts
-notifications that arrived since the popup was last open. Right-click the bell,
+notifications that arrived since the popup was last open. Long notifications
+are cut to two lines; click one to show all of it, click again to collapse.
+The copy button on a hovered or expanded notification puts its summary and
+body on the clipboard with `wl-copy`. Right-click the bell,
 or use the switch in the popup, to turn Do not disturb on; critical
 notifications still show. The mode and `max-history=30` live in
 `dot/.config/mako/config`. Mako cannot clear its history, so the popup only

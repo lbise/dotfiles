@@ -35,6 +35,7 @@ Singleton {
   readonly property string calendar: "\u{F00ED}"
   readonly property string apps: "\u{F003B}"
   readonly property string clipboard: "\u{F0192}"
+  readonly property string copy: "\u{F018F}"
   readonly property string power: "\u{F0425}"
   readonly property string lock: "\u{F033E}"
   readonly property string sleep: "\u{F04B2}"
