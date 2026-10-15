@@ -35,6 +35,22 @@ export function percentTone(percentUsed: number): Tone {
   return "success";
 }
 
+/** Nerd Font glyphs, so usage reads like the footer's other "<icon> value" widgets. */
+export const ICONS = {
+  hours: "\u{f0150}", // md-clock_outline
+  days: "\u{f00ed}", // md-calendar
+  week: "\u{f0a33}", // md-calendar_week
+  month: "\u{f0e17}", // md-calendar_month
+  reset: "\u{f0450}", // md-refresh
+  money: "\u{f0114}", // md-cash
+} as const;
+
+/** "14.8k" style count for large quotas. */
+export function formatCount(value: number): string {
+  if (Math.abs(value) < 1000) return formatAmount(Math.round(value * 10) / 10);
+  return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+}
+
 export function formatBar(percentUsed: number, tone?: Tone): Segment[] {
   const display = Math.max(0, percentUsed);
   const clamped = Math.min(100, display);
@@ -48,47 +64,53 @@ export function formatBar(percentUsed: number, tone?: Tone): Segment[] {
   ];
 }
 
+/** "<icon> ████░░░░ 53.9% 14.8k/27.5k" */
 export function formatWindow(window: UsageWindow): Segment[] {
-  const segments: Segment[] = [{ text: `${window.label} `, tone: "dim" }, ...formatBar(window.usedPercent, window.tone)];
+  const color = window.tone ?? percentTone(Math.max(0, window.usedPercent));
+  const segments: Segment[] = [{ text: `${window.icon} `, tone: color }, ...formatBar(window.usedPercent, window.tone)];
   if (window.used !== undefined && window.limit !== undefined) {
-    segments.push({ text: ` (${formatAmount(window.used)}/${formatAmount(window.limit)})`, tone: "dim" });
+    segments.push({ text: ` ${formatCount(window.used)}/${formatCount(window.limit)}`, tone: "dim" });
   }
-  if (window.note?.length) segments.push({ text: " · ", tone: "dim" }, ...window.note);
+  if (window.note?.length) segments.push({ text: " " }, ...window.note);
   return segments;
 }
 
-/** "Reset 2h 15m (25.09)" style text, or null when the time is unknown. */
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * "<icon> 2h15m 14:30" within a day, "<icon> 17d 01.11" beyond, or null when
+ * the time is unknown.
+ */
 export function formatReset(resetsAt: number | undefined, now = Date.now()): string | null {
   if (resetsAt === undefined) return null;
   const parsed = new Date(resetsAt);
   if (Number.isNaN(parsed.getTime())) return null;
 
   const remaining = Math.max(0, resetsAt - now);
-  let relative: string;
+  const time = `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  const date = `${pad(parsed.getDate())}.${pad(parsed.getMonth() + 1)}`;
+  let text: string;
   if (remaining === 0) {
-    relative = "Reset now";
+    text = "now";
   } else if (remaining < HOUR_MS) {
-    relative = `Reset ${Math.max(1, Math.ceil(remaining / MINUTE_MS))}m`;
+    text = `${Math.max(1, Math.ceil(remaining / MINUTE_MS))}m ${time}`;
   } else if (remaining < DAY_MS) {
     const hours = Math.floor(remaining / HOUR_MS);
     const mins = Math.round((remaining % HOUR_MS) / MINUTE_MS);
-    relative = `Reset ${hours}h${mins > 0 ? ` ${mins}m` : ""}`;
+    text = `${hours}h${mins > 0 ? `${mins}m` : ""} ${time}`;
   } else {
-    const days = Math.ceil(remaining / DAY_MS);
-    relative = `Reset ${days} day${days === 1 ? "" : "s"}`;
+    text = `${Math.ceil(remaining / DAY_MS)}d ${date}`;
   }
-
-  const date = `${String(parsed.getDate()).padStart(2, "0")}.${String(parsed.getMonth() + 1).padStart(2, "0")}`;
-  return `${relative} (${date})`;
+  return `${ICONS.reset} ${text}`;
 }
 
-/** Label for a rolling window given its length in minutes. */
-export function windowLabel(minutes: number | undefined, fallback: string): string {
-  if (!minutes || minutes <= 0) return fallback;
-  if (minutes >= 7 * 24 * 60 - 60) return "week";
-  if (minutes >= 24 * 60) return `${Math.round(minutes / (24 * 60))}d`;
-  if (minutes >= 60) return `${Math.round(minutes / 60)}h`;
-  return `${minutes}m`;
+/** Icon for a rolling window given its length in minutes. */
+export function windowIcon(minutes: number | undefined, fallbackMinutes: number): string {
+  const length = minutes && minutes > 0 ? minutes : fallbackMinutes;
+  if (length >= 28 * 24 * 60) return ICONS.month;
+  if (length >= 7 * 24 * 60 - 60) return ICONS.week;
+  if (length >= 24 * 60) return ICONS.days;
+  return ICONS.hours;
 }
 
 export function renderSegments(

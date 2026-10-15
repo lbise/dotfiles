@@ -4,6 +4,10 @@
  * Shows usage for the active model's provider (Codex, Claude, Copilot) by
  * publishing ctx.ui.setStatus() values for pi-footer External Status widgets.
  * Only one provider is active at a time, so the status keys are generic.
+ *
+ * Refresh points: session start, model switch, prompt start/end, provider
+ * response headers, a TTL-throttled fetch after each turn for providers
+ * without headers, and a poll for providers that book usage late (Copilot).
  * /usage-refresh forces a fetch.
  */
 
@@ -12,7 +16,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { formatReset, formatWindow, renderSegments } from "./format.ts";
+import { formatReset, formatWindow, ICONS, renderSegments } from "./format.ts";
 import { anthropicProvider } from "./providers/anthropic.ts";
 import { codexProvider } from "./providers/codex.ts";
 import { copilotProvider } from "./providers/copilot.ts";
@@ -46,10 +50,14 @@ export const PROVIDERS: UsageProvider[] = [codexProvider, anthropicProvider, cop
 type ProviderState = {
   snapshot: UsageSnapshot | null;
   fetchedAt: number;
+  inflight?: Promise<UsageSnapshot | null>;
   tracker?: PromptTracker;
-  /** Replaces snapshot.extra after a tracked prompt ends. */
+  /** Replaces snapshot.extra from prompt start until the next prompt. */
   promptExtra?: Segment[];
 };
+
+/** How often the poll checks whether a provider's pollIntervalMs has elapsed. */
+const POLL_TICK_MS = 30 * 1000;
 
 type Ctx = Pick<ExtensionContext, "ui" | "model" | "modelRegistry">;
 
@@ -81,6 +89,7 @@ function authSource(ctx: Ctx): AuthSource {
 
 export default function (pi: ExtensionAPI) {
   const states = new Map<string, ProviderState>();
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
 
   function stateFor(provider: UsageProvider): ProviderState {
     let state = states.get(provider.id);
@@ -105,6 +114,7 @@ export default function (pi: ExtensionAPI) {
       const text = formatReset(at);
       return text ? [{ text, tone: "dim" }] : undefined;
     };
+    const extra = state.promptExtra ?? snapshot?.extra;
 
     set(
       ctx,
@@ -114,7 +124,21 @@ export default function (pi: ExtensionAPI) {
     set(ctx, STATUS_KEYS.primaryReset, reset(snapshot?.primary?.resetsAt));
     set(ctx, STATUS_KEYS.secondary, snapshot?.secondary ? formatWindow(snapshot.secondary) : undefined);
     set(ctx, STATUS_KEYS.secondaryReset, reset(snapshot?.secondary?.resetsAt));
-    set(ctx, STATUS_KEYS.extra, state.promptExtra ?? snapshot?.extra);
+    set(ctx, STATUS_KEYS.extra, extra?.length ? [{ text: `${ICONS.money} `, tone: "dim" }, ...extra] : undefined);
+  }
+
+  async function fetchInto(ctx: Ctx, provider: UsageProvider, state: ProviderState): Promise<UsageSnapshot | null> {
+    try {
+      state.snapshot = await provider.fetchUsage(authSource(ctx));
+      state.fetchedAt = Date.now();
+      publish(ctx, provider, state);
+      return state.snapshot;
+    } catch (err: any) {
+      state.fetchedAt = 0;
+      clear(ctx);
+      set(ctx, STATUS_KEYS.primary, [{ text: `${provider.name} · ${err?.message || "fetch failed"}`, tone: "error" }]);
+      return null;
+    }
   }
 
   async function refresh(ctx: Ctx, model: unknown, options: { force?: boolean } = {}): Promise<UsageSnapshot | null> {
@@ -130,17 +154,36 @@ export default function (pi: ExtensionAPI) {
       return state.snapshot;
     }
 
-    try {
-      state.snapshot = await provider.fetchUsage(authSource(ctx));
-      state.fetchedAt = Date.now();
-      publish(ctx, provider, state);
-      return state.snapshot;
-    } catch (err: any) {
-      state.fetchedAt = 0;
-      clear(ctx);
-      set(ctx, STATUS_KEYS.primary, [{ text: `${provider.name} · ${err?.message || "fetch failed"}`, tone: "error" }]);
-      return null;
-    }
+    // Turn-end and poll refreshes run unawaited; share one request between them.
+    state.inflight ??= fetchInto(ctx, provider, state).finally(() => {
+      state.inflight = undefined;
+    });
+    return state.inflight;
+  }
+
+  /** Detached refresh: a failure must not surface as an unhandled rejection. */
+  function refreshInBackground(ctx: Ctx, model: unknown, options: { force?: boolean } = {}) {
+    refresh(ctx, model, options).catch(() => undefined);
+  }
+
+  function stopPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = undefined;
+  }
+
+  function startPolling(ctx: Ctx) {
+    stopPolling();
+    pollTimer = setInterval(() => {
+      try {
+        const provider = providerForModel(ctx.model);
+        if (!provider?.pollIntervalMs) return;
+        if (Date.now() - stateFor(provider).fetchedAt < provider.pollIntervalMs) return;
+        refreshInBackground(ctx, ctx.model, { force: true });
+      } catch {
+        // A ctx invalidated by session replacement throws; session_shutdown stops the timer.
+      }
+    }, POLL_TICK_MS);
+    pollTimer.unref?.();
   }
 
   pi.registerCommand("usage-refresh", {
@@ -159,7 +202,12 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     for (const key of LEGACY_STATUS_KEYS) ctx.ui.setStatus(key, undefined);
+    startPolling(ctx);
     await refresh(ctx, ctx.model);
+  });
+
+  pi.on("session_shutdown", async () => {
+    stopPolling();
   });
 
   pi.on("model_select", async (event, ctx) => {
@@ -170,16 +218,12 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("agent_start", async (_event, ctx) => {
     const provider = providerForModel(ctx.model);
-    if (!provider?.createPromptTracker) {
-      await refresh(ctx, ctx.model);
-      return;
+    if (provider?.createPromptTracker) {
+      const state = stateFor(provider);
+      state.tracker = provider.createPromptTracker();
+      state.promptExtra = state.tracker.segments();
     }
-
-    // Trackers need a fresh baseline to compute the prompt's quota delta.
-    const state = stateFor(provider);
-    state.tracker = provider.createPromptTracker();
-    state.promptExtra = undefined;
-    state.tracker.start(await refresh(ctx, ctx.model, { force: true }));
+    await refresh(ctx, ctx.model);
   });
 
   pi.on("after_provider_response", async (event, ctx) => {
@@ -196,18 +240,21 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("turn_end", async (event, ctx) => {
     const provider = providerForModel(ctx.model);
-    if (provider) stateFor(provider).tracker?.turnEnd(event.message);
-  });
-
-  pi.on("agent_end", async (_event, ctx) => {
-    const snapshot = await refresh(ctx, ctx.model, { force: true });
-    const provider = providerForModel(ctx.model);
     if (!provider) return;
 
     const state = stateFor(provider);
-    if (!state.tracker) return;
-    state.promptExtra = state.tracker.end(snapshot);
-    state.tracker = undefined;
-    if (snapshot) publish(ctx, provider, state);
+    if (state.tracker) {
+      state.tracker.turnEnd(event.message);
+      state.promptExtra = state.tracker.segments();
+      publish(ctx, provider, state);
+    }
+    // Without response headers, the TTL-limited fetch is the only mid-prompt update.
+    if (!provider.usageFromHeaders) refreshInBackground(ctx, ctx.model);
+  });
+
+  pi.on("agent_end", async (_event, ctx) => {
+    const provider = providerForModel(ctx.model);
+    if (provider) stateFor(provider).tracker = undefined;
+    await refresh(ctx, ctx.model, { force: true });
   });
 }

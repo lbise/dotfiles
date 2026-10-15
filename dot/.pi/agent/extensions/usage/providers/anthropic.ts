@@ -8,7 +8,7 @@
  * what pi actually consumes.
  */
 
-import { formatAmount, formatBar, numberValue } from "../format.ts";
+import { formatAmount, formatBar, numberValue, windowIcon } from "../format.ts";
 import type { AuthSource, Segment, UsageProvider, UsageSnapshot, UsageWindow } from "../types.ts";
 
 const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
@@ -31,11 +31,11 @@ type UsagePayload = {
   extra_usage?: ExtraUsageRaw;
 };
 
-function windowFromRaw(raw: WindowRaw | undefined, label: string): UsageWindow | undefined {
+function windowFromRaw(raw: WindowRaw | undefined, minutes: number): UsageWindow | undefined {
   const usedPercent = numberValue(raw?.utilization);
   if (usedPercent === undefined) return undefined;
   const resetsAt = raw?.resets_at ? Date.parse(raw.resets_at) : NaN;
-  return { label, usedPercent, resetsAt: Number.isNaN(resetsAt) ? undefined : resetsAt };
+  return { icon: windowIcon(minutes, minutes), usedPercent, resetsAt: Number.isNaN(resetsAt) ? undefined : resetsAt };
 }
 
 function formatMoney(minor: number, decimals: number, currency: string | null | undefined): string {
@@ -46,9 +46,9 @@ function formatMoney(minor: number, decimals: number, currency: string | null | 
 
 function extraSegments(extra: ExtraUsageRaw | undefined): Segment[] | undefined {
   if (!extra) return undefined;
-  if (!extra.is_enabled) return [{ text: "extra off", tone: "warning" }];
+  if (!extra.is_enabled) return [{ text: "off", tone: "warning" }];
 
-  const segments: Segment[] = [{ text: "extra ", tone: "dim" }];
+  const segments: Segment[] = [];
   const utilization = numberValue(extra.utilization);
   if (utilization !== undefined) {
     segments.push(...formatBar(utilization, extra.spend_limit_reached ? "error" : undefined));
@@ -61,16 +61,16 @@ function extraSegments(extra: ExtraUsageRaw | undefined): Segment[] | undefined 
     const text =
       formatMoney(used, decimals, extra.currency) +
       (limit !== undefined ? `/${formatMoney(limit, decimals, extra.currency)}` : "");
-    segments.push({ text: utilization !== undefined ? ` (${text})` : text, tone: "dim" });
+    segments.push({ text: utilization !== undefined ? ` ${text}` : text, tone: "dim" });
   }
   return segments;
 }
 
 export function snapshotFromPayload(payload: UsagePayload): UsageSnapshot {
-  const primary = windowFromRaw(payload.five_hour, "5h");
+  const primary = windowFromRaw(payload.five_hour, 5 * 60);
   return {
     primary,
-    secondary: windowFromRaw(payload.seven_day, "week"),
+    secondary: windowFromRaw(payload.seven_day, 7 * 24 * 60),
     summary: primary ? undefined : [{ text: "active", tone: "dim" }],
     extra: extraSegments(payload.extra_usage),
   };

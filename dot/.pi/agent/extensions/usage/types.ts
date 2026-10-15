@@ -5,8 +5,8 @@ export type Tone = "dim" | "success" | "warning" | "error";
 export type Segment = { text: string; tone?: Tone; bold?: boolean };
 
 export type UsageWindow = {
-  /** Short window name shown before the bar, e.g. "5h", "week", "month". */
-  label: string;
+  /** Nerd Font glyph shown before the bar; see ICONS and windowIcon(). */
+  icon: string;
   usedPercent: number;
   /** Epoch milliseconds. */
   resetsAt?: number;
@@ -24,7 +24,7 @@ export type UsageSnapshot = {
   secondary?: UsageWindow;
   /** Shown in place of the primary window when the provider reports none (e.g. "unlimited"). */
   summary?: Segment[];
-  /** Provider-specific extras: credits balance, extra usage, ... */
+  /** Provider-specific extras: credits balance, extra usage, ... Rendered after a money icon. */
   extra?: Segment[];
 };
 
@@ -45,10 +45,10 @@ export type AuthSource = {
 
 /** Per-prompt accounting, created fresh at each agent_start. */
 export interface PromptTracker {
-  start(snapshot: UsageSnapshot | null): void;
+  /** Accounts one finished turn's assistant message. */
   turnEnd(message: unknown): void;
-  /** Returns segments for the extra status, replacing snapshot.extra until the next prompt. */
-  end(snapshot: UsageSnapshot | null): Segment[] | undefined;
+  /** Extra status segments for the prompt so far; replaces snapshot.extra until the next prompt. */
+  segments(): Segment[];
 }
 
 export interface UsageProvider {
@@ -61,4 +61,9 @@ export interface UsageProvider {
   /** Update usage from provider response headers without an extra request. */
   usageFromHeaders?(headers: Record<string, string>, previous: UsageSnapshot | null): UsageSnapshot | null;
   createPromptTracker?(): PromptTracker;
+  /**
+   * Re-fetch at this interval even between prompts, for providers that book
+   * usage with a delay.
+   */
+  pollIntervalMs?: number;
 }

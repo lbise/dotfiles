@@ -4,6 +4,7 @@ import test, { afterEach } from "node:test";
 import { anthropicProvider } from "../providers/anthropic.ts";
 import { codexProvider } from "../providers/codex.ts";
 import { copilotProvider, createCopilotPromptTracker } from "../providers/copilot.ts";
+import { ICONS } from "../format.ts";
 import type { AuthSource, Segment } from "../types.ts";
 
 const text = (segments: Segment[] | undefined) => segments?.map((s) => s.text).join("");
@@ -48,18 +49,18 @@ test("anthropic maps 5h and weekly windows", async () => {
   assert.equal(captured.headers?.Authorization, "Bearer sk-ant-oat01-abc");
   assert.equal(captured.headers?.["anthropic-beta"], "oauth-2025-04-20");
   assert.deepEqual(snapshot.primary, {
-    label: "5h",
+    icon: ICONS.hours,
     usedPercent: 42,
     resetsAt: Date.parse("2026-09-25T17:40:00.443Z"),
   });
-  assert.equal(snapshot.secondary?.label, "week");
+  assert.equal(snapshot.secondary?.icon, ICONS.week);
   assert.equal(snapshot.secondary?.usedPercent, 3);
 });
 
 test("anthropic flags disabled extra usage", async () => {
   stubFetch(anthropicPayload);
   const snapshot = await anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" }));
-  assert.equal(text(snapshot.extra), "extra off");
+  assert.equal(text(snapshot.extra), "off");
   assert.equal(snapshot.extra?.[0].tone, "warning");
 });
 
@@ -69,7 +70,7 @@ test("anthropic shows enabled extra usage as bar and money", async () => {
     extra_usage: { is_enabled: true, utilization: 25, used_credits: 1250, monthly_limit: 5000, currency: "USD", decimal_places: 2 },
   });
   const snapshot = await anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" }));
-  assert.equal(text(snapshot.extra), "extra ██░░░░░░ 25% ($12.5/$50)");
+  assert.equal(text(snapshot.extra), "██░░░░░░ 25% $12.5/$50");
 });
 
 test("anthropic rejects missing or non-subscription tokens", async () => {
@@ -98,10 +99,10 @@ test("codex sends account id from the JWT and maps windows", async () => {
   const snapshot = await codexProvider.fetchUsage(auth({ "openai-codex": token }));
 
   assert.equal(captured.headers?.["chatgpt-account-id"], "acct-1");
-  assert.deepEqual(snapshot.primary, { label: "5h", usedPercent: 12, resetsAt: 1_800_000_000_000 });
-  assert.equal(snapshot.secondary?.label, "week");
+  assert.deepEqual(snapshot.primary, { icon: ICONS.hours, usedPercent: 12, resetsAt: 1_800_000_000_000 });
+  assert.equal(snapshot.secondary?.icon, ICONS.week);
   assert.ok(snapshot.secondary!.resetsAt! >= before + 3_600_000);
-  assert.equal(text(snapshot.extra), "4.5 credits");
+  assert.equal(text(snapshot.extra), "4.5cr");
 });
 
 test("codex falls back to auth.json account id", async () => {
@@ -114,12 +115,12 @@ test("codex falls back to auth.json account id", async () => {
 });
 
 test("codex headers update windows and keep previous extras", () => {
-  const previous = { secondary: { label: "week", usedPercent: 5 }, extra: [{ text: "4 credits" }] };
+  const previous = { secondary: { icon: ICONS.week, usedPercent: 5 }, extra: [{ text: "4 credits" }] };
   const snapshot = codexProvider.usageFromHeaders!(
     { "X-Codex-Primary-Used-Percent": "33", "x-codex-primary-window-minutes": "300", "x-codex-primary-reset-at": "100" },
     previous
   );
-  assert.deepEqual(snapshot?.primary, { label: "5h", usedPercent: 33, resetsAt: 100_000 });
+  assert.deepEqual(snapshot?.primary, { icon: ICONS.hours, usedPercent: 33, resetsAt: 100_000 });
   assert.equal(snapshot?.secondary?.usedPercent, 5);
   assert.equal(text(snapshot?.extra), "4 credits");
   assert.equal(codexProvider.usageFromHeaders!({}, previous), null);
@@ -138,7 +139,7 @@ test("copilot maps premium quota to a monthly window", async () => {
   );
 
   assert.equal(captured.headers?.Authorization, "Bearer gho_x");
-  assert.equal(snapshot.primary?.label, "month");
+  assert.equal(snapshot.primary?.icon, ICONS.month);
   assert.equal(snapshot.primary?.usedPercent, 20);
   assert.equal(snapshot.primary?.used, 60);
   assert.equal(snapshot.primary?.limit, 300);
@@ -169,21 +170,12 @@ test("copilot parses quota headers", () => {
   assert.equal(snapshot?.primary?.used, 30);
 });
 
-test("copilot tracker prefers token cost and shows quota reconciliation", () => {
+test("copilot tracker sums pi's per-turn cost as estimated credits", () => {
   const tracker = createCopilotPromptTracker();
-  tracker.start({ primary: { label: "month", usedPercent: 10, used: 30 } });
-  tracker.turnEnd({ usage: { cost: { total: 0.02 } } });
-  tracker.turnEnd({ usage: { cost: { total: 0.01 } } });
-  const out = text(tracker.end({ primary: { label: "month", usedPercent: 11, used: 33 } }));
-  assert.match(out!, /^💸 3 credits \(~0\.03CHF\) · 33-30 = 3 AI credits$/);
-});
-
-test("copilot tracker falls back to quota delta, then nothing", () => {
-  const withDelta = createCopilotPromptTracker();
-  withDelta.start({ primary: { label: "month", usedPercent: 10, used: 30 } });
-  assert.match(text(withDelta.end({ primary: { label: "month", usedPercent: 10, used: 31 } }))!, /^💸 1 credits/);
-
-  const empty = createCopilotPromptTracker();
-  empty.start(null);
-  assert.equal(empty.end(null), undefined);
+  assert.equal(text(tracker.segments()), "~0cr");
+  tracker.turnEnd({ usage: { cost: { total: 0.178 } } });
+  assert.equal(text(tracker.segments()), "~17.8cr");
+  tracker.turnEnd({ usage: { cost: { total: 0.023 } } });
+  tracker.turnEnd({ usage: {} });
+  assert.equal(text(tracker.segments()), "~20.1cr");
 });

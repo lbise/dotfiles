@@ -5,11 +5,13 @@
  * Codex also sends x-codex-{primary,secondary}-* headers on every response.
  */
 
-import { getHeader, numberValue, windowLabel } from "../format.ts";
+import { getHeader, numberValue, windowIcon } from "../format.ts";
 import type { AuthSource, Segment, UsageProvider, UsageSnapshot, UsageWindow } from "../types.ts";
 
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const JWT_CLAIM_PATH = "https://api.openai.com/auth";
+const FIVE_HOURS = 5 * 60;
+const WEEK = 7 * 24 * 60;
 
 type WindowRaw = {
   used_percent?: number;
@@ -42,7 +44,7 @@ function accountIdFromJwt(token: string): string | undefined {
   }
 }
 
-function windowFromRaw(raw: WindowRaw | null | undefined, fallbackLabel: string, now: number): UsageWindow | undefined {
+function windowFromRaw(raw: WindowRaw | null | undefined, fallbackMinutes: number, now: number): UsageWindow | undefined {
   const usedPercent = numberValue(raw?.used_percent);
   if (usedPercent === undefined) return undefined;
 
@@ -51,7 +53,7 @@ function windowFromRaw(raw: WindowRaw | null | undefined, fallbackLabel: string,
   const resetAfter = numberValue(raw?.reset_after_seconds);
 
   return {
-    label: windowLabel(seconds !== undefined && seconds > 0 ? Math.ceil(seconds / 60) : undefined, fallbackLabel),
+    icon: windowIcon(seconds !== undefined && seconds > 0 ? Math.ceil(seconds / 60) : undefined, fallbackMinutes),
     usedPercent,
     resetsAt: resetAt !== undefined ? resetAt * 1000 : resetAfter !== undefined ? now + resetAfter * 1000 : undefined,
   };
@@ -60,27 +62,27 @@ function windowFromRaw(raw: WindowRaw | null | undefined, fallbackLabel: string,
 function creditsSegments(credits: CreditsRaw | null | undefined): Segment[] | undefined {
   if (credits?.unlimited) return [{ text: "unlimited", tone: "success" }];
   if (credits?.has_credits && credits.balance !== undefined && credits.balance !== null) {
-    return [{ text: `${credits.balance} credits`, tone: "dim" }];
+    return [{ text: `${credits.balance}cr`, tone: "dim" }];
   }
   return undefined;
 }
 
 export function snapshotFromPayload(payload: UsagePayload, now = Date.now()): UsageSnapshot {
-  const primary = windowFromRaw(payload.rate_limit?.primary_window, "5h", now);
+  const primary = windowFromRaw(payload.rate_limit?.primary_window, FIVE_HOURS, now);
   return {
     primary,
-    secondary: windowFromRaw(payload.rate_limit?.secondary_window, "week", now),
+    secondary: windowFromRaw(payload.rate_limit?.secondary_window, WEEK, now),
     summary: primary ? undefined : [{ text: payload.plan_type || "active", tone: "dim" }],
     extra: creditsSegments(payload.credits),
   };
 }
 
-function windowFromHeaders(headers: Record<string, string>, prefix: string, fallbackLabel: string): UsageWindow | undefined {
+function windowFromHeaders(headers: Record<string, string>, prefix: string, fallbackMinutes: number): UsageWindow | undefined {
   const usedPercent = numberValue(getHeader(headers, `${prefix}-used-percent`));
   if (usedPercent === undefined) return undefined;
   const resetAt = numberValue(getHeader(headers, `${prefix}-reset-at`));
   return {
-    label: windowLabel(numberValue(getHeader(headers, `${prefix}-window-minutes`)), fallbackLabel),
+    icon: windowIcon(numberValue(getHeader(headers, `${prefix}-window-minutes`)), fallbackMinutes),
     usedPercent,
     resetsAt: resetAt !== undefined ? resetAt * 1000 : undefined,
   };
@@ -111,8 +113,8 @@ export const codexProvider: UsageProvider = {
   },
 
   usageFromHeaders(headers, previous) {
-    const primary = windowFromHeaders(headers, "x-codex-primary", "5h");
-    const secondary = windowFromHeaders(headers, "x-codex-secondary", "week");
+    const primary = windowFromHeaders(headers, "x-codex-primary", FIVE_HOURS);
+    const secondary = windowFromHeaders(headers, "x-codex-secondary", WEEK);
     if (!primary && !secondary) return null;
     return {
       ...previous,

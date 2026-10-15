@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
-import test, { afterEach } from "node:test";
+import test, { afterEach, mock } from "node:test";
 
+import { ICONS } from "../format.ts";
 import extension, { STATUS_KEYS, providerForModel } from "../index.ts";
 
 const realFetch = globalThis.fetch;
+const realEnv = { HOME: process.env.HOME, GITHUB_TOKEN: process.env.GITHUB_TOKEN };
 afterEach(() => {
   globalThis.fetch = realFetch;
+  mock.timers.reset();
+  for (const [key, value] of Object.entries(realEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 });
+
+/** Lets unawaited refreshes started by handlers or timers settle. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 type Handler = (event: any, ctx: any) => Promise<void>;
 
@@ -65,11 +75,11 @@ test("session start publishes every generic status key", async () => {
   h.statuses.set("copilot-usage", "stale");
   await h.emit("session_start");
 
-  assert.equal(h.statuses.get(STATUS_KEYS.primary), "5h ███░░░░░ 42%");
-  assert.match(h.statuses.get(STATUS_KEYS.primaryReset)!, /^Reset (60m|1h)/);
-  assert.equal(h.statuses.get(STATUS_KEYS.secondary), "week █░░░░░░░ 3%");
-  assert.match(h.statuses.get(STATUS_KEYS.secondaryReset)!, /^Reset 3 days/);
-  assert.equal(h.statuses.get(STATUS_KEYS.extra), "extra off");
+  assert.equal(h.statuses.get(STATUS_KEYS.primary), `${ICONS.hours} ███░░░░░ 42%`);
+  assert.match(h.statuses.get(STATUS_KEYS.primaryReset)!, new RegExp(`^${ICONS.reset} (60m|1h) \\d\\d:\\d\\d$`));
+  assert.equal(h.statuses.get(STATUS_KEYS.secondary), `${ICONS.week} █░░░░░░░ 3%`);
+  assert.match(h.statuses.get(STATUS_KEYS.secondaryReset)!, new RegExp(`^${ICONS.reset} 3d \\d\\d\\.\\d\\d$`));
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} off`);
   assert.equal(h.statuses.has("copilot-usage"), false);
 });
 
@@ -106,4 +116,70 @@ test("/usage-refresh forces a fetch and explains untracked models", async () => 
   h.ctx.model = { provider: "openai", id: "gpt-5" };
   await h.command("usage-refresh");
   assert.equal(h.notifications[1], "Usage is only shown for Codex, Claude, Copilot models");
+});
+
+test("turns refresh header-less providers once the cache TTL has passed", async () => {
+  mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  const h = setup(payload);
+  await h.emit("session_start");
+  await h.emit("turn_end", { message: {} });
+  await settle();
+  assert.equal(h.fetches(), 1);
+
+  mock.timers.tick(61_000);
+  await h.emit("turn_end", { message: {} });
+  await h.emit("turn_end", { message: {} });
+  await settle();
+  assert.equal(h.fetches(), 2);
+});
+
+const copilotPayload = {
+  quota_reset_date_utc: "2026-11-01T00:00:00Z",
+  quota_snapshots: { premium_interactions: { entitlement: 27500, remaining: 12698.7 } },
+};
+
+function setupCopilot() {
+  process.env.GITHUB_TOKEN = "gho_test";
+  process.env.HOME = "/nonexistent";
+  const h = setup(copilotPayload);
+  h.ctx.model = { provider: "github-copilot", id: "claude-opus-5.5" };
+  return h;
+}
+
+test("copilot shows the running prompt estimate and keeps it after the prompt", async () => {
+  const h = setupCopilot();
+  await h.emit("session_start");
+  assert.equal(h.statuses.get(STATUS_KEYS.primary), `${ICONS.month} ████░░░░ 53.8% 14.8k/27.5k`);
+  assert.equal(h.statuses.has(STATUS_KEYS.extra), false);
+
+  await h.emit("agent_start");
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~0cr`);
+  await h.emit("turn_end", { message: { usage: { cost: { total: 0.178 } } } });
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~17.8cr`);
+  await h.emit("turn_end", { message: { usage: { cost: { total: 0.023 } } } });
+  await h.emit("agent_end");
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~20.1cr`);
+
+  await h.emit("agent_start");
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~0cr`);
+});
+
+test("copilot polls for late-booked usage until shutdown", async () => {
+  mock.timers.enable({ apis: ["Date", "setInterval"], now: 1_000_000 });
+  const h = setupCopilot();
+  await h.emit("session_start");
+  assert.equal(h.fetches(), 1);
+
+  mock.timers.tick(90_000);
+  await settle();
+  assert.equal(h.fetches(), 1);
+
+  mock.timers.tick(30_000);
+  await settle();
+  assert.equal(h.fetches(), 2);
+
+  await h.emit("session_shutdown");
+  mock.timers.tick(600_000);
+  await settle();
+  assert.equal(h.fetches(), 2);
 });

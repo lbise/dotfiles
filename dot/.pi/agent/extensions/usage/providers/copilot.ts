@@ -7,21 +7,22 @@
  * Token source, in order: pi's github-copilot refresh token (the GitHub OAuth
  * token), GITHUB_TOKEN, GitHub CLI's hosts.yml.
  *
- * The prompt tracker reports the last prompt's cost in AI credits, from pi's
- * token-priced USD cost at GitHub's documented 1 credit = $0.01, with the
- * account-level quota delta shown for reconciliation.
+ * GitHub books token-billed usage in batches a few minutes after the requests,
+ * so the quota lags behind a running prompt. The prompt tracker fills the gap
+ * with pi's token-priced USD cost at GitHub's documented 1 AI credit = $0.01,
+ * which matched the booked quota delta exactly when measured. Polling picks
+ * up the booked value once it lands.
  */
 
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { formatAmount, getHeader, numberValue } from "../format.ts";
-import type { AuthSource, PromptTracker, Segment, UsageProvider, UsageSnapshot } from "../types.ts";
+import { formatAmount, getHeader, ICONS, numberValue } from "../format.ts";
+import type { AuthSource, PromptTracker, UsageProvider, UsageSnapshot } from "../types.ts";
 
 const USAGE_URL = "https://api.github.com/copilot_internal/user";
-const DEFAULT_CREDIT_USD = 0.01;
-const DEFAULT_USD_TO_CHF = 0.89;
+const CREDIT_USD = 0.01;
 
 const COPILOT_HEADERS = {
   Accept: "application/json",
@@ -101,7 +102,7 @@ function snapshotFromQuota(quota: Quota | null, plan?: string, fallbackResetDate
   const resetsAt = resetDate ? Date.parse(resetDate) : NaN;
   return {
     primary: {
-      label: "month",
+      icon: ICONS.month,
       usedPercent: Math.max(0, usedPercent),
       resetsAt: Number.isNaN(resetsAt) ? undefined : resetsAt,
       used,
@@ -145,53 +146,17 @@ export function snapshotFromHeaders(headers: Record<string, string>): UsageSnaps
   });
 }
 
-function creditSegments(credits: number, quotaStart?: number, quotaEnd?: number): Segment[] {
-  const tone = credits >= 10 ? "error" : credits >= 3 ? "warning" : "success";
-  const usdPerCredit = numberValue(process.env.COPILOT_CREDIT_USD) ?? DEFAULT_CREDIT_USD;
-  const usdToChf = numberValue(process.env.COPILOT_USD_TO_CHF) ?? DEFAULT_USD_TO_CHF;
-  const chf = credits * usdPerCredit * usdToChf;
-  const money = chf > 0 && chf < 0.01 ? "<0.01" : chf.toFixed(2);
-  const reconciliation =
-    quotaStart !== undefined && quotaEnd !== undefined
-      ? `${formatAmount(quotaEnd)}-${formatAmount(quotaStart)} = ${formatAmount(quotaEnd - quotaStart)} AI credits`
-      : "🥧 estimate";
-
-  return [
-    { text: `💸 ${formatAmount(credits)} credits`, tone, bold: true },
-    { text: ` (~${money}CHF) · ${reconciliation}`, tone: "dim" },
-  ];
-}
-
+/** Estimated AI credits of the running prompt, summed from pi's per-turn cost. */
 export function createCopilotPromptTracker(): PromptTracker {
-  let startUsed: number | undefined;
-  let tokenUsd = 0;
-  let hasTokenUsd = false;
-
+  let usd = 0;
   return {
-    start(snapshot) {
-      startUsed = snapshot?.primary?.used;
-    },
     turnEnd(message) {
       const cost = numberValue((message as any)?.usage?.cost?.total);
-      if (cost !== undefined && cost >= 0) {
-        tokenUsd += cost;
-        hasTokenUsd = true;
-      }
+      if (cost !== undefined && cost > 0) usd += cost;
     },
-    end(snapshot) {
-      const endUsed = snapshot?.primary?.used;
-      let delta: number | undefined;
-      if (startUsed !== undefined && endUsed !== undefined) {
-        const diff = endUsed - startUsed;
-        if (diff > 0.001 && diff < 10000) delta = diff;
-      }
-      const quotaStart = delta !== undefined ? startUsed : undefined;
-      const quotaEnd = delta !== undefined ? endUsed : undefined;
-
-      const usdPerCredit = numberValue(process.env.COPILOT_CREDIT_USD) ?? DEFAULT_CREDIT_USD;
-      if (hasTokenUsd && usdPerCredit > 0) return creditSegments(tokenUsd / usdPerCredit, quotaStart, quotaEnd);
-      if (delta !== undefined) return creditSegments(delta, quotaStart, quotaEnd);
-      return undefined;
+    segments() {
+      const credits = Math.round((usd / CREDIT_USD) * 10) / 10;
+      return [{ text: `~${formatAmount(credits)}cr` }];
     },
   };
 }
@@ -199,7 +164,8 @@ export function createCopilotPromptTracker(): PromptTracker {
 export const copilotProvider: UsageProvider = {
   id: "github-copilot",
   name: "Copilot",
-  cacheTtlMs: 5 * 60 * 1000,
+  cacheTtlMs: 2 * 60 * 1000,
+  pollIntervalMs: 2 * 60 * 1000,
 
   async fetchUsage(auth: AuthSource): Promise<UsageSnapshot> {
     const token = await getGitHubToken(auth);
