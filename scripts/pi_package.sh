@@ -242,13 +242,35 @@ verify_package_source_unchanged() {
     [[ "$current_hash" == "$MANIFEST_HASH" ]] || error "Packages changed in $PACKAGE_SOURCE_PATH while the bundle was being built. Rerun $(basename "$0") so the archive includes the current settings."
 }
 
+resolve_managed_pi_package_dir() {
+    # Pi >= 1.x installs itself as a managed release:
+    #   ~/.pi/agent/install/current-version
+    #   ~/.pi/agent/install/releases/<version>/node_modules/@earendil-works/pi-coding-agent
+    # with its dependencies hoisted into the release node_modules directory.
+    local install_root="${PI_MANAGED_INSTALL_ROOT:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/install}"
+    local current_file="$install_root/current-version"
+    [[ -f "$current_file" ]] || return 1
+
+    local current_version=""
+    IFS= read -r current_version < "$current_file" || true
+    [[ -n "$current_version" ]] || return 1
+
+    local candidate="$install_root/releases/$current_version/node_modules/@earendil-works/pi-coding-agent"
+    [[ -f "$candidate/package.json" ]] || return 1
+    printf '%s\n' "$candidate"
+}
+
 resolve_pi_package_dir() {
+    if resolve_managed_pi_package_dir; then
+        return 0
+    fi
+
     if command -v npm >/dev/null 2>&1; then
         local npm_root
         npm_root="$(npm root -g 2>/dev/null || true)"
         if [[ -n "$npm_root" ]]; then
             local candidate="$npm_root/@earendil-works/pi-coding-agent"
-            if [[ -d "$candidate" ]]; then
+            if [[ -f "$candidate/package.json" ]]; then
                 printf '%s\n' "$candidate"
                 return 0
             fi
@@ -587,6 +609,27 @@ copy_pi_runtime() {
     log "Copying pi package from $PI_PACKAGE_DIR"
     mkdir -p "$STAGE_DIR/pi"
     cp -a "$PI_PACKAGE_DIR"/. "$STAGE_DIR/pi"/
+    copy_hoisted_pi_dependencies
+}
+
+copy_hoisted_pi_dependencies() {
+    # Managed installs (and flat npm installs) hoist pi's dependencies next to
+    # the package instead of nesting them under pi/node_modules. Copy that
+    # sibling tree into pi/node_modules so the bundled runtime stays
+    # self-contained and Node resolves dependencies from pi/dist.
+    local scope_dir hoisted_root
+    scope_dir="$(dirname "$PI_PACKAGE_DIR")"
+    hoisted_root="$(dirname "$scope_dir")"
+    [[ "$(basename "$hoisted_root")" == node_modules ]] || return 0
+    [[ -d "$hoisted_root/@earendil-works/pi-ai" ]] || return 0
+
+    log "Copying hoisted pi dependencies from $hoisted_root"
+    local target="$STAGE_DIR/pi/node_modules"
+    mkdir -p "$target"
+    cp -a "$hoisted_root"/. "$target"/
+
+    # Drop the self-reference and its bin link; pi itself lives at pi/.
+    rm -rf "$target/@earendil-works/pi-coding-agent" "$target/.bin/pi"
 }
 
 copy_configured_extensions() {
@@ -611,13 +654,22 @@ copy_configured_extensions() {
 
 expose_pi_peer_packages() {
     local global_root="$STAGE_DIR/node/lib/node_modules"
-    mkdir -p "$global_root/@earendil-works" "$global_root/@sinclair"
-
+    mkdir -p "$global_root/@earendil-works"
     ln -sfn "../../../../pi" "$global_root/@earendil-works/pi-coding-agent"
-    ln -sfn "../../../../pi/node_modules/@earendil-works/pi-ai" "$global_root/@earendil-works/pi-ai"
-    ln -sfn "../../../../pi/node_modules/@earendil-works/pi-agent-core" "$global_root/@earendil-works/pi-agent-core"
-    ln -sfn "../../../../pi/node_modules/@earendil-works/pi-tui" "$global_root/@earendil-works/pi-tui"
-    ln -sfn "../../../../pi/node_modules/@sinclair/typebox" "$global_root/@sinclair/typebox"
+
+    # Host-provided packages that pi extensions import as peers. Only link the
+    # ones present in this pi release (typebox moved from @sinclair/typebox).
+    local peer link_prefix
+    for peer in @earendil-works/pi-ai @earendil-works/pi-agent-core @earendil-works/pi-tui typebox @sinclair/typebox; do
+        [[ -d "$STAGE_DIR/pi/node_modules/$peer" ]] || continue
+        if [[ "$peer" == @*/* ]]; then
+            mkdir -p "$global_root/${peer%%/*}"
+            link_prefix="../../../.."
+        else
+            link_prefix="../../.."
+        fi
+        ln -sfn "$link_prefix/pi/node_modules/$peer" "$global_root/$peer"
+    done
 }
 
 verify_bundled_pi_runtime() {
@@ -760,7 +812,7 @@ install_package_into_bundled_npm() {
     npm_config_cache="$TEMP_DIR/npm-cache" \
     npm_config_audit=false \
     npm_config_fund=false \
-    "$NPM_BIN" install -g --omit=dev --prefix "$STAGE_DIR/node" "$tarball_path"
+    "$NPM_BIN" install -g --omit=dev --legacy-peer-deps --prefix "$STAGE_DIR/node" "$tarball_path"
 
     verify_installed_pi_package "$package_name" "$label"
     rm -f "$tarball_path"
