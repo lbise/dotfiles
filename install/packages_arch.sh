@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+# Apps and tools, rerun on every Arch machine whenever the lists change.
+# One-time system setup (session, services, fonts) lives in setup_arch.sh.
 set -Eeuo pipefail
 
-PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock quickshell man-db man-pages iwd impala fcitx5 fcitx5-configtool fcitx5-gtk brightnessctl jq grim slurp satty wl-clipboard tesseract tesseract-data-eng hyprpicker"
+PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock quickshell man-db man-pages iwd impala fcitx5 fcitx5-configtool fcitx5-gtk brightnessctl jq grim slurp satty wl-clipboard tesseract tesseract-data-eng hyprpicker playerctl libnotify pavucontrol bluetui"
 YAY_PKGS="neovim ghostty zen-browser-bin eza fd fzf ripgrep xdg-terminal-exec elephant-all-bin walker dropbox"
 
 migrate_legacy_tree_sitter_cli() {
@@ -34,10 +36,3 @@ migrate_legacy_tree_sitter_cli
 # Only install packages if needed
 sudo pacman -S --noconfirm --needed $PACMAN_PKGS
 yay -S  --noconfirm --needed $YAY_PKGS
-
-# Start Wi-Fi at boot instead of waiting for the first client to activate iwd.
-sudo systemctl enable --now iwd.service
-
-# Start elephant
-elephant service enable
-systemctl --user start elephant.service

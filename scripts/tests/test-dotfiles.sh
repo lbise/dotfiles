@@ -190,6 +190,26 @@ SCRIPT
     assert_file_contains "$log" ran
 }
 
+# Setup runs the one-time Arch script and refuses other systems.
+test_setup_runs_arch_setup_only_on_arch() {
+    local repo="$TMP_DIR/setup-repo"
+    local log="$TMP_DIR/setup.log"
+    mkdir -p "$repo/install"
+    cat > "$repo/install/setup_arch.sh" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\\n' ran >> '$log'
+SCRIPT
+    chmod +x "$repo/install/setup_arch.sh"
+
+    DOTFILES_OS_ID=arch DOTFILES_DIR="$repo" "$DOTFILES_BIN" setup >/dev/null
+    assert_file_contains "$log" ran
+
+    if DOTFILES_OS_ID=ubuntu DOTFILES_DIR="$repo" "$DOTFILES_BIN" setup >/dev/null 2>&1; then
+        fail "setup ran on Ubuntu"
+    fi
+    [[ $(wc -l < "$log") == 1 ]] || fail "setup ran the Arch script on Ubuntu"
+}
+
 # Fleet updates ignore comments and invoke the same command on each host.
 test_fleet_updates_configured_hosts() {
     local fake_bin="$TMP_DIR/fleet-bin"
@@ -220,6 +240,7 @@ test_apps_default_skips_maintenance
 test_update_syncs_before_apps
 test_system_updates_ubuntu_packages
 test_bootstrap_runs_full_installer
+test_setup_runs_arch_setup_only_on_arch
 test_fleet_updates_configured_hosts
 
 echo "PASS: dotfiles CLI"

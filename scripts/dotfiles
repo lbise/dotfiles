@@ -21,6 +21,7 @@ Commands:
               Update the default version-aware apps or only the named apps
   update      Run sync followed by apps
   system      Upgrade system packages and install declared packages
+  setup       Run the one-time Arch setup (session, services, fonts)
   bootstrap   Run the complete installer for a new machine
   help        Show this help
 EOF
@@ -149,6 +150,11 @@ main() {
         system)
             [[ $# -eq 0 ]] || error "system does not accept arguments"
             update_system
+            ;;
+        setup)
+            [[ $# -eq 0 ]] || error "setup does not accept arguments"
+            [[ $(platform_id) == arch ]] || error "setup only supports Arch Linux"
+            "$DOTFILES_DIR/install/setup_arch.sh"
             ;;
         bootstrap)
             [[ $# -eq 0 ]] || error "bootstrap does not accept arguments"

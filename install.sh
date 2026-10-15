@@ -24,6 +24,11 @@ $SCRIPT_DIR/install/symlinks.sh
 echo ">> Installing external apps..."
 source $SCRIPT_DIR/install/apps/all_apps.sh
 
+if is_arch && ! is_work; then
+    echo ">> Running one-time Arch setup..."
+    $SCRIPT_DIR/install/setup_arch.sh
+fi
+
 echo "********************************************************************************"
 echo "Installation completed"
 echo "********************************************************************************"

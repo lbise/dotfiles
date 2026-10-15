@@ -1,7 +1,8 @@
 # Updating machines
 
 The installer and updater have separate jobs. Use the complete installer on a
-new machine. Use the cheaper update commands for routine work.
+new machine (see `new-arch-machine.md` for Arch). Use the cheaper update
+commands for routine work.
 
 ## Commands
 
@@ -21,8 +22,12 @@ dotfiles apps herdr fzf
 # Pull, apply configuration, then check user applications.
 dotfiles update
 
-# Upgrade system packages. This is the only routine command that uses sudo.
+# Upgrade system packages and install packages newly added to
+# install/packages_<os>.sh. This is the only routine command that uses sudo.
 dotfiles system
+
+# Rerun the one-time Arch setup after adding a step to install/setup_arch.sh.
+dotfiles setup
 
 # Run the complete installer on a new machine.
 dotfiles bootstrap
