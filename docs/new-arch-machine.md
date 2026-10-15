@@ -14,7 +14,8 @@ Turns a bare Arch install (login shell only) into the full Hyprland desktop.
 `setup_arch.sh` installs the stack the dotfiles assume: Hyprland with uwsm,
 SDDM, the Hyprland portal, PipeWire, NetworkManager with iwd as its Wi-Fi
 backend, BlueZ and UPower. It also enables Color, ParallelDownloads and
-multilib in pacman, enables the system services, enables the elephant user
+multilib in pacman, sets the X11 keymap to Swiss French so SDDM's login
+screen matches Hyprland, enables the system services, enables the elephant user
 service, installs the fonts, and installs the SDDM theme. On a machine with a
 battery it adds power-profiles-daemon.
 

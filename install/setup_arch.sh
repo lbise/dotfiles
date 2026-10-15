@@ -19,6 +19,12 @@ source "$SCRIPT_DIR/helpers.sh"
 PACMAN_CONF=${PACMAN_CONF:-/etc/pacman.conf}
 NM_WIFI_BACKEND_CONF=${NM_WIFI_BACKEND_CONF:-/etc/NetworkManager/conf.d/wifi-backend.conf}
 
+# Swiss French. SDDM's greeter runs on X11 and falls back to US without this.
+# Keep in step with kb_layout, kb_model and kb_variant in hypr/hyprland.lua.
+X11_LAYOUT=ch
+X11_MODEL=pc105
+X11_VARIANT=fr
+
 SYSTEM_PKGS=(
     # Session: Hyprland started by uwsm from SDDM
     hyprland uwsm
@@ -102,6 +108,20 @@ configure_network() {
     fi
 }
 
+# localectl writes /etc/X11/xorg.conf.d/00-keyboard.conf, which X11 reads.
+configure_keyboard() {
+    local status
+    status=$(localectl status)
+    if grep -qE "X11 Layout: $X11_LAYOUT\$" <<< "$status" &&
+        grep -qE "X11 Model: $X11_MODEL\$" <<< "$status" &&
+        grep -qE "X11 Variant: $X11_VARIANT\$" <<< "$status"; then
+        echo "X11 keymap already configured"
+    else
+        sudo localectl set-x11-keymap "$X11_LAYOUT" "$X11_MODEL" "$X11_VARIANT"
+        echo "Set X11 keymap to $X11_LAYOUT $X11_MODEL $X11_VARIANT"
+    fi
+}
+
 enable_services() {
     local services=("${SYSTEM_SERVICES[@]}")
     if is_laptop; then
@@ -140,6 +160,8 @@ main() {
     install_system_packages
     step "Configuring NetworkManager"
     configure_network
+    step "Configuring the X11 keymap for SDDM"
+    configure_keyboard
     step "Enabling system services"
     enable_services
     step "Enabling user services"

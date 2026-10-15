@@ -162,7 +162,9 @@ hl.animation({ leaf = "zoomFactor",    enabled = true, speed = 7,    bezier = "q
 
 hl.config({
     input = {
-        -- Keep the $LAYOUT list in hyprlock.conf in step with kb_layout.
+        -- Keep the $LAYOUT list in hyprlock.conf in step with kb_layout, and
+        -- the X11 keymap for SDDM in install/setup_arch.sh with layout, model
+        -- and variant.
         kb_layout  = "ch",
         kb_variant = "fr",
         kb_model   = "pc105",
