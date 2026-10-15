@@ -4,12 +4,12 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 helper="$repo_root/scripts/system/system-restart-quickshell.sh"
 idle="$repo_root/dot/.config/hypr/hypridle.conf"
-hypr="$repo_root/dot/.config/hypr/hyprland.conf"
+hypr="$repo_root/dot/.config/hypr/hyprland.lua"
 unit="$repo_root/dot/.config/systemd/user/leo-quickshell.service"
 symlinks="$repo_root/install/symlinks.sh"
 
-grep -Eq 'after_sleep_cmd[[:space:]]*=[[:space:]]*hyprctl dispatch dpms on && system-restart-quickshell.sh' "$idle"
-grep -Eq 'exec-once[[:space:]]*=[[:space:]]*systemctl --user start leo-quickshell.service' "$hypr" || { echo 'FAIL: Hyprland starts an unsupervised bar' >&2; exit 1; }
+grep -Fq "after_sleep_cmd = hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })' && system-restart-quickshell.sh" "$idle"
+grep -Fq 'hl.exec_cmd("systemctl --user start leo-quickshell.service")' "$hypr" || { echo 'FAIL: Hyprland starts an unsupervised bar' >&2; exit 1; }
 grep -Fq '".config/systemd/user/leo-quickshell.service"' "$symlinks"
 grep -Eq '^ExecStart=.*quickshell -n -p ' "$unit"
 grep -qx 'Restart=always' "$unit"

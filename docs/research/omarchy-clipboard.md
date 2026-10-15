@@ -17,14 +17,14 @@ Inspected checkout `b5589faaf80c6f87c07d4560fca37c4a81722f28`. This differs from
 
 ## What this repo had at investigation time
 
-- [Hyprland](../../dot/.config/hypr/hyprland.conf) already binds Super+C/V/X, but sends the Insert copy/paste chords to every application. Its history shortcut still invokes `omarchy-launch-walker -m clipboard`.
+- [Hyprland](../../dot/.config/hypr/hyprland.lua) already binds Super+C/V/X, but sends the Insert copy/paste chords to every application. Its history shortcut still invokes `omarchy-launch-walker -m clipboard`.
 - [Ghostty](../../dot/.config/ghostty/config) already maps both Insert chords and permits clipboard reads/writes. [Tmux](../../dot/.tmux.conf) enables OSC 52. [Neovim](../../dot/.config/nvim/lua/core/config.lua) sets `unnamedplus`, with a [tmux provider override](../../dot/.config/nvim/lua/core/tmux.lua) inside tmux. Preserve that SSH-aware setup. Neovim visual selections and tmux copy-mode selections still use their own yank commands, not Ghostty's screen-selection copy command.
 - [Walker](../../dot/.config/walker/config.toml) already exposes clipboard history through the `$` prefix. [The Arch installer](../../install/packages_arch.sh) installs `elephant-all-bin` and Walker, then enables and starts Elephant.
 - Read-only checks on this machine found Walker 2.17.0, Elephant clipboard 2.22.0, and wl-clipboard 2.3.0 installed. `elephant.service` was enabled and running with a `wl-paste --watch` child. `omarchy-launch-walker` was absent from PATH. These checks establish that the backend is running, not that every copy/paste path works end to end.
 
 ## Original proposal
 
-1. Replace the missing launcher in `dot/.config/hypr/hyprland.conf`:
+1. Replace the missing launcher in `dot/.config/hypr/hyprland.lua`:
 
    ```ini
    bindd = SUPER CTRL, V, Clipboard manager, exec, walker -m clipboard

@@ -24,7 +24,7 @@ The script lives in `scripts/system/` and is on `PATH` as `~/.scripts/system/sys
 
 `system-theme-apply.py` rewrites these files completely. Do not edit them by hand.
 
-- `leo/theme/hyprland.conf` contains the theme settings sourced by Hyprland.
+- `leo/theme/hyprland.lua` contains the theme settings loaded by Hyprland.
 - `leo/theme/hyprlock.conf` contains theme variables only. Native layout and authentication stay in `hypr/hyprlock.conf`.
 - `leo/login/theme.conf.user` contains the full SDDM `[General]` theme configuration. The QML theme lives in `leo/login/Main.qml`, with defaults in `theme.conf` and registration in `metadata.desktop`.
 

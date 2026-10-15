@@ -49,8 +49,9 @@ RowLayout {
         visible: button.focused
       }
 
-      onClicked: Hyprland.dispatch("workspace " + modelData)
-      onWheel: function(delta) { Hyprland.dispatch(delta > 0 ? "workspace e-1" : "workspace e+1") }
+      // Hyprland's Lua config takes dispatchers as Lua expressions.
+      onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + modelData + " })")
+      onWheel: function(delta) { Hyprland.dispatch('hl.dsp.focus({ workspace = "' + (delta > 0 ? "e-1" : "e+1") + '" })') }
     }
   }
 }

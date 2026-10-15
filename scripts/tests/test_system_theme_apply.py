@@ -121,11 +121,11 @@ class RenderTest(unittest.TestCase):
             '''))
 
     def test_hyprland_uses_rule_for_borders(self) -> None:
-        conf = theme.hyprland_conf(self.palette)
-        self.assertTrue(conf.startswith('# Generated from palette.json by system-theme-apply.py'))
-        self.assertIn('$activeBorderColor = rgb(303030)', conf)
-        self.assertIn('$inactiveBorderColor = rgba(30303080)', conf)
-        self.assertIn('col.border_active = $activeBorderColor', conf)
+        lua = theme.hyprland_lua(self.palette)
+        self.assertTrue(lua.startswith('-- Generated from palette.json by system-theme-apply.py'))
+        self.assertIn('local active_border = "rgb(303030)"', lua)
+        self.assertIn('local inactive_border = "rgba(30303080)"', lua)
+        self.assertIn('border_active = active_border', lua)
 
     def test_hyprlock_variables_come_from_palette(self) -> None:
         conf = theme.hyprlock_conf(self.palette)
@@ -222,7 +222,7 @@ class CommandTest(unittest.TestCase):
 
         applied = self._run()
         self.assertEqual(applied.returncode, 0, applied.stderr)
-        self.assertIn('rgb(303030)', (self.root / 'leo/theme/hyprland.conf').read_text())
+        self.assertIn('rgb(303030)', (self.root / 'leo/theme/hyprland.lua').read_text())
         self.assertIn('$lock_accent = rgb(00FF88)', (self.root / 'leo/theme/hyprlock.conf').read_text())
         self.assertIn('accent=#00FF88', (self.root / 'leo/login/theme.conf.user').read_text())
 
@@ -236,7 +236,7 @@ class CommandTest(unittest.TestCase):
         result = self._run('--palette', str(self.root / 'other.json'))
         self.assertEqual(result.returncode, 1)
         self.assertIn('colors.rule', result.stderr)
-        self.assertFalse((self.root / 'leo/theme/hyprland.conf').exists())
+        self.assertFalse((self.root / 'leo/theme/hyprland.lua').exists())
 
     def test_unknown_argument_is_rejected(self) -> None:
         self.assertEqual(self._run('--explode').returncode, 2)

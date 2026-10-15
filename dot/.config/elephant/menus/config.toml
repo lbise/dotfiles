@@ -10,7 +10,7 @@ fixed_order = true
 [[entries]]
 text = "Hyprland"
 icon = "text-x-generic-symbolic"
-actions = { "edit" = "system-exec-term.sh nvim ~/.config/hypr/hyprland.conf" }
+actions = { "edit" = "system-exec-term.sh nvim ~/.config/hypr/hyprland.lua" }
 
 [[entries]]
 text = "Walker"

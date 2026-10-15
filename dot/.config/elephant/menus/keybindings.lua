@@ -1,5 +1,6 @@
 -- Live list of Hyprland keybindings, built from `hyprctl binds -j` on every open.
--- Selecting a row runs the same dispatcher the key would. Reached from Learn > Keybindings.
+-- Selecting a row runs the same dispatcher the key would, looked up by description in the
+-- keybind_actions table that hyprland.lua fills. Reached from Learn > Keybindings.
 Name = "keybindings"
 Parent = "learn"
 NamePretty = "Keybindings"
@@ -9,7 +10,6 @@ HideFromProviderlist = true
 Description = "Hyprland keybindings"
 
 local MODS = { { 64, "SUPER" }, { 1, "SHIFT" }, { 4, "CTRL" }, { 8, "ALT" } }
-local DIRECTIONS = { l = "left", r = "right", u = "up", d = "down" }
 
 -- Lua 5.1 has no bit operators.
 local function has(mask, bit)
@@ -32,24 +32,12 @@ local function combo(bind)
     return table.concat(parts, " + ")
 end
 
--- Binds declared with `bindd` carry a description; describe the rest from the dispatcher.
-local function describe(bind)
-    if bind.description ~= "" then
-        return bind.description
+-- Workspace binds are described "Workspace N" / "Move window to workspace N" in hyprland.lua.
+local function numbered(bind)
+    local prefix, number = bind.description:match("^(.-)(%d+)$")
+    if prefix == "Workspace " or prefix == "Move window to workspace " then
+        return prefix, tonumber(number)
     end
-    local d, arg = bind.dispatcher, bind.arg
-    if d == "exec" then
-        return (arg:gsub("^uwsm%-app %-%- ", ""))
-    elseif d == "workspace" then
-        return "Workspace " .. arg
-    elseif d == "movetoworkspace" then
-        return "Move window to workspace " .. arg
-    elseif d == "movefocus" then
-        return "Focus " .. (DIRECTIONS[arg] or arg)
-    elseif d == "killactive" then
-        return "Close window"
-    end
-    return (d .. " " .. arg):gsub("%s+$", "")
 end
 
 function GetEntries()
@@ -69,20 +57,19 @@ function GetEntries()
     -- Numbered workspace binds (SUPER + 1..0) collapse into one row per modifier set.
     local groups, order = {}, {}
     for _, bind in ipairs(binds) do
-        if not bind.mouse then
-            local numbered = (bind.dispatcher == "workspace" or bind.dispatcher == "movetoworkspace")
-                and bind.arg:match("^%d+$")
-            if numbered then
-                local id = bind.dispatcher .. ":" .. bind.modmask
+        if not bind.mouse and bind.description ~= "" then
+            local prefix, number = numbered(bind)
+            if prefix then
+                local id = prefix .. bind.modmask
                 if not groups[id] then
-                    groups[id] = {}
+                    groups[id] = { prefix = prefix, binds = {} }
                     table.insert(order, id)
                 end
-                table.insert(groups[id], bind)
+                table.insert(groups[id].binds, { bind = bind, number = number })
             else
                 table.insert(entries, {
-                    Text = string.format("%-22s %s", combo(bind), describe(bind)),
-                    Value = bind.dispatcher .. "\t" .. bind.arg,
+                    Text = string.format("%-22s %s", combo(bind), bind.description),
+                    Value = bind.description,
                     Icon = "input-keyboard-symbolic",
                 })
             end
@@ -91,11 +78,11 @@ function GetEntries()
 
     for _, id in ipairs(order) do
         local group = groups[id]
-        table.sort(group, function(a, b) return tonumber(a.arg) < tonumber(b.arg) end)
-        local first, last = group[1], group[#group]
-        local range = { modmask = first.modmask, keycode = 0, key = first.key .. "-" .. last.key }
+        table.sort(group.binds, function(a, b) return a.number < b.number end)
+        local first, last = group.binds[1], group.binds[#group.binds]
+        local range = { modmask = first.bind.modmask, keycode = 0, key = first.bind.key .. "-" .. last.bind.key }
         table.insert(entries, {
-            Text = string.format("%-22s %s", combo(range), describe(first):gsub("%d+$", first.arg .. "-" .. last.arg)),
+            Text = string.format("%-22s %s%d-%d", combo(range), group.prefix, first.number, last.number),
             Value = "",
             Icon = "input-keyboard-symbolic",
         })
@@ -104,9 +91,9 @@ function GetEntries()
 end
 
 function Run(value, args, query)
-    local dispatcher, arg = value:match("^([^\t]*)\t(.*)$")
-    if not dispatcher then
+    if value == "" then
         return
     end
-    os.execute("sleep 0.2; hyprctl dispatch " .. shell_quote(dispatcher) .. " " .. shell_quote(arg))
+    local action = string.format("keybind_actions[%q]", value)
+    os.execute("sleep 0.2; hyprctl dispatch " .. shell_quote(action))
 end

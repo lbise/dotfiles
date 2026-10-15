@@ -23,8 +23,11 @@ shift
 mkdir -p "$OUT"
 WORK=$(mktemp -d)
 MONITOR=leo-render
-NESTED_CONF="$WORK/hypr.conf"
-printf '%s\n' 'monitor = , 1600x1400@60, 0x0, 1' 'misc { disable_hyprland_logo = true; vfr = true }' > "$NESTED_CONF"
+NESTED_CONF="$WORK/hyprland.lua"
+cat > "$NESTED_CONF" <<'LUA'
+hl.monitor({ output = "", mode = "1600x1400@60", position = "0x0", scale = 1 })
+hl.config({ misc = { disable_hyprland_logo = true, vfr = true } })
+LUA
 
 cleanup() {
     pkill -f "^Hyprland -c $NESTED_CONF" 2>/dev/null || true
@@ -38,18 +41,18 @@ sockets() { find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'wayland-[0-9]*' ! -name '
 
 hyprctl output create headless "$MONITOR" >/dev/null
 sleep 1
-hyprctl keyword monitor "$MONITOR,1700x1500@60,20000x0,1" >/dev/null
-hyprctl keyword workspace "98,monitor:$MONITOR,default:true" >/dev/null
+hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"1700x1500@60\", position = \"20000x0\", scale = 1 })" >/dev/null
+hyprctl eval "hl.workspace_rule({ workspace = \"98\", monitor = \"$MONITOR\", default = true })" >/dev/null
 
 before=$(sockets)
-hyprctl dispatch exec "[workspace 98 silent; float; size 1600 1400; move 20050 50] env HYPRLAND_NO_CRASHREPORTER=1 Hyprland -c $NESTED_CONF" >/dev/null
+hyprctl dispatch "hl.dsp.exec_cmd(\"env HYPRLAND_NO_CRASHREPORTER=1 Hyprland -c $NESTED_CONF\", { workspace = \"98 silent\", float = true, size = { 1600, 1400 } })" >/dev/null
 sleep 5
 
 # The virtual output's active workspace is not necessarily 98; put the window on the visible one.
 ws=$(hyprctl monitors -j | jq -r --arg m "$MONITOR" '.[] | select(.name == $m) | .activeWorkspace.id')
-hyprctl dispatch movetoworkspacesilent "$ws,class:aquamarine" >/dev/null
+hyprctl dispatch "hl.dsp.window.move({ workspace = $ws, follow = false, window = \"class:aquamarine\" })" >/dev/null
 sleep 1
-hyprctl dispatch movewindowpixel "exact 20050 50,class:aquamarine" >/dev/null
+hyprctl dispatch 'hl.dsp.window.move({ x = 20050, y = 50, window = "class:aquamarine" })' >/dev/null
 sleep 2
 
 nested=$(comm -13 <(echo "$before") <(sockets) | head -1)

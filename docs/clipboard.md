@@ -11,14 +11,14 @@
 
 In history, Enter copies the selected entry. Press Super+V after the picker closes to paste it. Opening Walker and typing `$` also searches history. History selection does not auto-paste.
 
-Super+C/V use Ctrl+C/V in GUI applications. In Ghostty they use Ctrl+Insert and Shift+Insert, which Ghostty maps to its clipboard actions. This avoids sending Ctrl+C to the shell. Other terminal emulators need explicit support in `scripts/system/system-clipboard.sh` before using these shortcuts safely.
+Super+C/V use Ctrl+C/V in GUI applications. In Ghostty they use Ctrl+Insert and Shift+Insert, which Ghostty maps to its clipboard actions; in kitty they use Ctrl+Shift+C/V. This avoids sending Ctrl+C to the shell. Before using these shortcuts in another terminal emulator, add its window class to `terminal_clipboard` in `hyprland.lua`. The chord goes to whatever has keyboard focus, so it also works in Walker and Quickshell panels.
 
 Super+X retains the shell's Ctrl+X behavior in a terminal; it does not cut terminal selections. In tmux copy mode or a Neovim visual selection, use the application's yank command. Super+C copies Ghostty's own screen selection, not those selections.
 
 ## Components
 
-- `dot/.config/hypr/hyprland.conf` defines the shortcuts.
-- `scripts/system/system-clipboard.sh` selects the copy/paste chord for the active window.
+- `dot/.config/hypr/hyprland.lua` defines the shortcuts and picks the chord for the active window natively, the way Omarchy does.
+- `scripts/system/system-clipboard.sh` does the same job for the legacy `hyprland.conf`. Delete both when `.conf` support goes away.
 - Walker provides the history picker; Elephant's clipboard provider records text and images through `wl-clipboard`.
 - The Arch installer installs the provider and enables `elephant.service`. Hyprland starts Walker. No Omarchy installation is needed.
 

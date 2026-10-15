@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run a TUI in a floating terminal (see the org.leo.menu window rule in hyprland.conf).
+# Run a TUI in a floating terminal (see the org.leo.menu window rule in hyprland.lua).
 # Usage: system-exec-float.sh <title> <command> [args..]
 
 if [[ $# -lt 2 ]]; then

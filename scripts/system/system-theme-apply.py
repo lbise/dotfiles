@@ -8,7 +8,7 @@ Usage:
   --check         write nothing; print a diff and exit 1 if any output is out of date
   --reload        after writing, reload Mako and print how to reload the other apps
 
-leo/theme/hyprland.conf is regenerated entirely. Walker, Mako and Ghostty keep
+leo/theme/hyprland.lua is regenerated entirely. Walker, Mako and Ghostty keep
 their own config files; only the lines between the leo-theme:begin and
 leo-theme:end markers are generated.
 """
@@ -117,25 +117,21 @@ def hex_digits(color: str) -> str:
     return color.lstrip('#')
 
 
-def hyprland_conf(palette: dict) -> str:
+def hyprland_lua(palette: dict) -> str:
     rule = hex_digits(palette['colors']['rule'])
     return (
-        '# Generated from palette.json by system-theme-apply.py. Do not edit by hand:\n'
-        '# change ~/.config/leo/theme/palette.json and run system-theme-apply.py.\n'
-        '# https://wiki.hypr.land/Configuring/Variables/#variable-types for info about colors\n'
+        '-- Generated from palette.json by system-theme-apply.py. Do not edit by hand:\n'
+        '-- change ~/.config/leo/theme/palette.json and run system-theme-apply.py.\n'
+        '-- Colour formats: https://wiki.hypr.land/Configuring/Basics/Variables/\n'
         '\n'
-        '# Window borders use the rule colour, not the accent.\n'
-        f'$activeBorderColor = rgb({rule})\n'
-        f'$inactiveBorderColor = rgba({rule}80)\n'
+        '-- Window borders use the rule colour, not the accent.\n'
+        f'local active_border = "rgb({rule})"\n'
+        f'local inactive_border = "rgba({rule}80)"\n'
         '\n'
-        'general {\n'
-        '    col.active_border = $activeBorderColor\n'
-        '    col.inactive_border = $inactiveBorderColor\n'
-        '}\n'
-        '\n'
-        'group {\n'
-        '    col.border_active = $activeBorderColor\n'
-        '}\n'
+        'hl.config({\n'
+        '    general = { col = { active_border = active_border, inactive_border = inactive_border } },\n'
+        '    group = { col = { border_active = active_border } },\n'
+        '})\n'
     )
 
 
@@ -333,7 +329,7 @@ def ghostty_config(palette: dict, text: str) -> str:
 def targets(root: Path) -> list[tuple[Path, Callable[[dict, str], str], bool]]:
     """(path, render(palette, current_text), whole_file)."""
     return [
-        (root / 'leo/theme/hyprland.conf', lambda palette, _text: hyprland_conf(palette), True),
+        (root / 'leo/theme/hyprland.lua', lambda palette, _text: hyprland_lua(palette), True),
         (root / 'leo/theme/hyprlock.conf', lambda palette, _text: hyprlock_conf(palette), True),
         (root / 'leo/login/theme.conf.user', lambda palette, _text: login_config(palette), True),
         (root / 'walker/themes/leo/style.css', walker_css, False),
