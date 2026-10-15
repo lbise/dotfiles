@@ -1,10 +1,12 @@
 {
-  "lastChangelogVersion": "1.0.3",
+  "lastChangelogVersion": "1.2.0",
   "defaultProvider": "github-copilot",
   "defaultModel": "gpt-5.6-luna",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
-  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
+  "extensions": [
+    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
+  ],
   "enabledModels": [
     "github-copilot/claude-opus-5.5",
     "github-copilot/gpt-6-luna",
@@ -24,11 +26,16 @@
       }
     }
   },
-  "packages": ["npm:pi-context-view", "npm:pi-footer"],
+  "packages": [
+    "npm:pi-context-view",
+    "npm:pi-footer"
+  ],
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",
   "defaultProjectTrust": "always",
   "fullscreenScrollbar": "auto",
-  "defaultTools": ["+codemode"]
+  "defaultTools": [
+    "+codemode"
+  ]
 }
