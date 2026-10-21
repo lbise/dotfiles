@@ -44,8 +44,16 @@ export PATH="$TMP_DIR/bin:$PATH"
 
 export PACMAN_CONF="$TMP_DIR/pacman.conf"
 export NM_WIFI_BACKEND_CONF="$TMP_DIR/NetworkManager/conf.d/wifi-backend.conf"
+export IWD_MAIN_CONF="$TMP_DIR/iwd/main.conf"
+export IWD_WAIT_DROPIN="$TMP_DIR/systemd/iwd.service.d/wait-for-wlan0.conf"
 # shellcheck source=../../install/setup_arch.sh
 source "$ROOT/install/setup_arch.sh"
+
+# Pretend to be a desktop or a laptop regardless of the machine running the test.
+FAKE_LAPTOP=0
+is_laptop() {
+    (( FAKE_LAPTOP ))
+}
 
 # Pacman gets colour, parallel downloads and multilib; testing repos stay off.
 test_configure_pacman() {
@@ -71,11 +79,26 @@ EOF
     configure_pacman | grep -q 'already configured' || fail "second run rewrote pacman.conf"
 }
 
-# NetworkManager uses iwd for Wi-Fi, written once.
+# NetworkManager uses iwd for Wi-Fi, and iwd keeps the kernel's interface, written once.
+# A desktop gets no wlan0 wait, so iwd doesn't stall at boot without a Wi-Fi card.
 test_configure_network() {
+    FAKE_LAPTOP=0
+    mkdir -p "$(dirname "$IWD_MAIN_CONF")"
+    printf '[General]\nEnableNetworkConfiguration=true\n' > "$IWD_MAIN_CONF"
     configure_network >/dev/null 2>&1
-    [[ $(<"$NM_WIFI_BACKEND_CONF") == $'[device]\nwifi.backend=iwd' ]] || fail "unexpected NetworkManager config"
-    configure_network 2>/dev/null | grep -q 'already configured' || fail "second run rewrote the NetworkManager config"
+    [[ $(<"$NM_WIFI_BACKEND_CONF") == $'[device]\nwifi.backend=iwd\nwifi.iwd.autoconnect=false' ]] || fail "unexpected NetworkManager config"
+    [[ $(<"$IWD_MAIN_CONF") == $'[DriverQuirks]\nDefaultInterface=*' ]] || fail "unexpected iwd config"
+    [[ $(configure_network 2>/dev/null | grep -c 'already configured') == 2 ]] || fail "second run rewrote the network config"
+    [[ ! -e "$IWD_WAIT_DROPIN" ]] || fail "desktop got the wlan0 wait"
+}
+
+# A laptop's iwd waits for wlan0, written once.
+test_configure_network_laptop() {
+    FAKE_LAPTOP=1
+    configure_network >/dev/null 2>&1
+    local unit=sys-subsystem-net-devices-wlan0.device
+    [[ $(<"$IWD_WAIT_DROPIN") == "[Unit]"$'\n'"Wants=$unit"$'\n'"After=$unit" ]] || fail "unexpected iwd drop-in"
+    [[ $(configure_network 2>/dev/null | grep -c 'already configured') == 3 ]] || fail "second laptop run rewrote the network config"
 }
 
 # The X11 keymap SDDM's greeter uses matches Hyprland's, set once.
@@ -89,6 +112,7 @@ test_configure_keyboard() {
 
 test_configure_pacman
 test_configure_network
+test_configure_network_laptop
 test_configure_keyboard
 
 echo "PASS: setup_arch"

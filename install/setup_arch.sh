@@ -18,6 +18,8 @@ source "$SCRIPT_DIR/helpers.sh"
 
 PACMAN_CONF=${PACMAN_CONF:-/etc/pacman.conf}
 NM_WIFI_BACKEND_CONF=${NM_WIFI_BACKEND_CONF:-/etc/NetworkManager/conf.d/wifi-backend.conf}
+IWD_MAIN_CONF=${IWD_MAIN_CONF:-/etc/iwd/main.conf}
+IWD_WAIT_DROPIN=${IWD_WAIT_DROPIN:-/etc/systemd/system/iwd.service.d/wait-for-wlan0.conf}
 
 # Swiss French. SDDM's greeter runs on X11 and falls back to US without this.
 # Keep in step with kb_layout, kb_model and kb_variant in hypr/hyprland.lua.
@@ -37,6 +39,8 @@ SYSTEM_PKGS=(
     pipewire pipewire-alsa pipewire-pulse wireplumber
     # Network: NetworkManager for the bar, iwd as its Wi-Fi backend for impala
     networkmanager iwd
+    # Regulatory database, otherwise Wi-Fi falls back to the restricted world domain
+    wireless-regdb
     # Bluetooth
     bluez bluez-utils
     # Battery and desktop plumbing
@@ -99,7 +103,30 @@ install_system_packages() {
 }
 
 configure_network() {
-    printf '[device]\nwifi.backend=iwd\n' | write_root_file "$NM_WIFI_BACKEND_CONF"
+    # Only NetworkManager starts connections. Left to iwd, autoconnect fires
+    # while NetworkManager is still starting, gets aborted mid-authentication,
+    # and the ath10k driver then refuses every connection until iwd restarts.
+    printf '[device]\nwifi.backend=iwd\nwifi.iwd.autoconnect=false\n' |
+        write_root_file "$NM_WIFI_BACKEND_CONF"
+
+    # By default iwd destroys and recreates the kernel's Wi-Fi interface at
+    # startup. That races with udev: on the Latitude 5420 (ath10k) it left both
+    # wlan0 and wlan1 on one card. Overwriting the whole file also drops
+    # EnableNetworkConfiguration, which an iwd-only base install may set;
+    # NetworkManager handles DHCP.
+    printf '[DriverQuirks]\nDefaultInterface=*\n' | write_root_file "$IWD_MAIN_CONF"
+
+    # With DefaultInterface, iwd only adopts an interface that exists when it
+    # starts, and it can start before the driver has created wlan0. So on
+    # laptops iwd waits for wlan0. Wants, not BindsTo, so iwd keeps running if
+    # wlan0 goes away and comes back. Desktops skip this: with no Wi-Fi card,
+    # iwd would wait 90 s at every boot for a device that never appears.
+    # iwd's udev rule keeps kernel names, so the interface is always wlan0.
+    if is_laptop; then
+        local unit=sys-subsystem-net-devices-wlan0.device
+        printf '[Unit]\nWants=%s\nAfter=%s\n' "$unit" "$unit" |
+            write_root_file "$IWD_WAIT_DROPIN"
+    fi
 
     if systemctl is-enabled --quiet systemd-networkd.service 2>/dev/null; then
         echo "WARNING: systemd-networkd is enabled and will fight NetworkManager." >&2

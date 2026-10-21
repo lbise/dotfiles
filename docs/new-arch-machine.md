@@ -13,7 +13,13 @@ Turns a bare Arch install (login shell only) into the full Hyprland desktop.
 
 `setup_arch.sh` installs the stack the dotfiles assume: Hyprland with uwsm,
 SDDM, the Hyprland portal, PipeWire, NetworkManager with iwd as its Wi-Fi
-backend, BlueZ and UPower. It also enables Color, ParallelDownloads and
+backend, the Wi-Fi regulatory database, BlueZ and UPower. It sets iwd to keep
+the kernel's Wi-Fi interface instead of recreating it, which raced with udev and
+broke Wi-Fi at boot on the Latitude 5420. On a laptop, iwd also waits for
+`wlan0` before starting, since it can otherwise start before the driver has
+created the interface and then manage no device. iwd's own autoconnect is off,
+so only NetworkManager starts Wi-Fi connections; letting both do it also broke
+Wi-Fi at boot there. It also enables Color, ParallelDownloads and
 multilib in pacman, sets the X11 keymap to Swiss French so SDDM's login
 screen matches Hyprland, enables the system services, enables the elephant user
 service, installs the fonts, and installs the SDDM theme. On a machine with a
@@ -56,3 +62,6 @@ These need you:
 - Add a `monitor =` line to `dot/.config/hypr/hyprland.conf` if the
   `preferred,auto` fallback is wrong for the screen.
 - Install hardware drivers the base install missed (GPU, microcode).
+- On a Dell laptop, Wi-Fi turns off whenever Ethernet is plugged in. To keep
+  both, disable LAN/WLAN switching (`WlanAutoSense`) in the BIOS power
+  management settings.
