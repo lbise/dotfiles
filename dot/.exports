@@ -3,8 +3,7 @@ export PATH=$HOME/.local/bin:$PATH
 # Bun runtime
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
-# Add opencode
-export PATH=$PATH:$HOME/.scripts:$HOME/.opencode/bin
+export PATH=$PATH:$HOME/.scripts:$HOME/.opencode/bin:$HOME/.pi/agent/bin
 export EDITOR='nvim'
 export VISUAL='nvim'
 export ANDROMEDA_ROOT="$HOME/andromeda"

@@ -1,17 +1,21 @@
 {
-  "lastChangelogVersion": "1.2.0",
+  "lastChangelogVersion": "1.3.0",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
-  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
+  "extensions": [
+    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
+  ],
   "enabledModels": [
     "anthropic/claude-opus-5-5",
     "anthropic/claude-sonnet-5-5",
     "openai/gpt-6.1-sol"
   ],
   "delegate": {
-    "extensions": ["npm:@pi-plugins/claude-oauth"],
+    "extensions": [
+      "npm:@pi-plugins/claude-oauth"
+    ],
     "agents": {
       "explore": {
         "model": "openai-codex/gpt-6-luna",
@@ -31,7 +35,9 @@
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",
   "defaultProjectTrust": "always",
-  "defaultTools": ["+codemode"],
+  "defaultTools": [
+    "+codemode"
+  ],
   "warnings": {
     "anthropicExtraUsage": false
   },
