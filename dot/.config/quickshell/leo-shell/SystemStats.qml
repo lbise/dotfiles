@@ -4,7 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import "SystemStatsModel.js" as Model
 
-// Processor, memory and disk readings. Data is read once a second, and only
+// Processor, memory and per-drive disk readings. Data is read once a second, and only
 // while the popup is open.
 BarButton {
   id: root
@@ -81,7 +81,7 @@ BarButton {
 
     Section {
       title: "Temperatures"
-      visible: stats.cpuTemperature >= 0 || stats.gpuTemperature >= 0 || stats.diskTemperatures.length > 0
+      visible: stats.cpuTemperature >= 0 || stats.gpuTemperature >= 0
 
       Meter {
         visible: stats.cpuTemperature >= 0
@@ -97,22 +97,6 @@ BarButton {
         value: root.degrees(stats.gpuTemperature)
         fraction: stats.gpuTemperature / 100
         tone: root.temperatureTone(stats.gpuTemperature, 80, 90)
-      }
-
-      Repeater {
-        model: stats.diskTemperatures.length
-
-        Meter {
-          id: driveTemperature
-
-          required property int index
-          readonly property real reading: stats.diskTemperatures[index] || 0
-
-          label: stats.diskTemperatures.length > 1 ? "Disk " + (index + 1) : "Disk"
-          value: root.degrees(reading)
-          fraction: reading / 100
-          tone: root.temperatureTone(reading, 70, 80)
-        }
       }
     }
 
@@ -139,24 +123,63 @@ BarButton {
       }
     }
 
-    Section {
-      title: "Disk"
-      visible: stats.disks.length > 0
+    // One section per physical drive: its mounted filesystems with usage,
+    // then swap and unmounted partitions in a line each.
+    Repeater {
+      model: stats.drives.length
 
-      Repeater {
-        model: stats.disks.length
+      Section {
+        id: drive
 
-        Meter {
-          id: disk
+        required property int index
+        readonly property var entry: stats.drives[index] || ({
+          name: "", model: "", size: 0, temperature: -1, filesystems: [], swap: [], unmounted: []
+        })
 
-          required property int index
-          readonly property var entry: stats.disks[index] || ({ mount: "", total: 1, used: 0 })
+        title: entry.model || entry.name
+        status: entry.temperature >= 0 ? root.degrees(entry.temperature) : ""
+        statusTone: entry.temperature >= 0 ? root.temperatureTone(entry.temperature, 70, 80) : ""
+        named: true
 
-          label: entry.mount
-          value: root.percent(entry.used / entry.total)
-          fraction: entry.used / entry.total
-          detail: Model.gib(entry.used) + " of " + Model.gib(entry.total)
-          tone: root.usageTone(entry.used / entry.total)
+        Label {
+          Layout.fillWidth: true
+          text: Model.driveSummary(drive.entry)
+          muted: true
+          small: true
+        }
+
+        Repeater {
+          model: drive.entry.filesystems.length
+
+          Meter {
+            required property int index
+            readonly property var fs: drive.entry.filesystems[index] || ({ mounts: [], total: 1, used: 0 })
+            readonly property real usage: fs.total > 0 ? fs.used / fs.total : 0
+
+            label: fs.mounts.join(", ")
+            value: root.percent(usage)
+            fraction: usage
+            detail: Model.filesystemDetail(fs)
+            tone: root.usageTone(usage)
+          }
+        }
+
+        Label {
+          Layout.fillWidth: true
+          visible: drive.entry.swap.length > 0
+          text: "Swap: " + Model.swapList(drive.entry)
+          muted: true
+          small: true
+          wrapMode: Text.Wrap
+        }
+
+        Label {
+          Layout.fillWidth: true
+          visible: drive.entry.unmounted.length > 0
+          text: "Not mounted: " + Model.unmountedList(drive.entry)
+          muted: true
+          small: true
+          wrapMode: Text.Wrap
         }
       }
     }

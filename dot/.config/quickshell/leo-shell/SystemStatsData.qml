@@ -14,8 +14,8 @@ Item {
   property var memory: null
   property real cpuTemperature: -1
   property real gpuTemperature: -1
-  property var diskTemperatures: []
-  property var disks: []
+  // One entry per physical drive, see Model.drives().
+  property var drives: []
   property string uptime: ""
 
   function refresh() {
@@ -46,7 +46,7 @@ Item {
     onTriggered: root.refresh()
   }
 
-  // Disk usage and temperatures change slowly and need a helper process.
+  // Drives, disk usage and temperatures change slowly and need a helper process.
   Timer {
     interval: 5000
     repeat: true
@@ -56,20 +56,26 @@ Item {
 
   Process {
     id: probeProcess
+    // Three sections split by "---" lines: hwmon chips, drive sensors (nvme
+    // and drivetemp hang off the block device), then lsblk JSON.
     command: [
       "sh", "-c",
       "for d in /sys/class/hwmon/hwmon*; do "
         + "echo \"$(cat $d/name 2>/dev/null) $(cat $d/temp1_input 2>/dev/null)\"; "
-        + "done; echo ---; df -B1 --output=size,used,target / /home 2>/dev/null"
+        + "done; echo ---; "
+        + "for b in /sys/block/*; do "
+        + "for t in $b/device/hwmon*/temp1_input $b/device/hwmon/hwmon*/temp1_input; do "
+        + "[ -r \"$t\" ] && echo \"${b##*/} $(cat \"$t\" 2>/dev/null)\" && break; "
+        + "done; done; echo ---; "
+        + "lsblk -J -b -e 7 -o NAME,TYPE,SIZE,MODEL,TRAN,ROTA,RM,FSTYPE,LABEL,MOUNTPOINTS,FSSIZE,FSUSED 2>/dev/null"
     ]
     stdout: StdioCollector {
       onStreamFinished: {
-        var parts = text.split("---")
+        var parts = Model.sections(text, 3)
         var temperatures = Model.temperatures(parts[0])
         root.cpuTemperature = temperatures.cpu
         root.gpuTemperature = temperatures.gpu
-        root.diskTemperatures = temperatures.disks
-        root.disks = Model.disks(parts[1] || "")
+        root.drives = Model.drives(parts[2], parts[1])
       }
     }
   }

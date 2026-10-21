@@ -66,14 +66,22 @@ needs attention. The network applet and the input method are hidden because
 the bar covers them; edit `hiddenIds` in `Tray.qml` to change the list.
 
 Click the CPU icon to open System. It shows uptime under the title, then
-processor usage and load, CPU, GPU and disk temperatures, RAM and swap, and disk use for `/` and
-`/home`. Usage, RAM and load refresh every second and disk and temperature every
+processor usage and load, CPU and GPU temperatures, RAM and swap, and one
+section per physical drive. A drive section is titled with the model and shows
+its temperature, then transport, SSD or HDD, size and device name. Each mounted
+filesystem on it gets a usage bar labelled with its mount points, including
+ones behind LUKS or LVM. Swap partitions and unmounted partitions are listed
+below the bars. The drive holding `/` comes first. Loop and zram devices are
+left out, and so are network and other mounts without a block device.
+Usage, RAM and load refresh every second and drives and temperatures every
 5 seconds, only while the popup is open. Usage needs two samples, so it shows
 "…" for the first second. RAM is total minus `MemAvailable`. Load is the 1 minute
 average divided by the core count, so a full bar means every core is busy; the
 5 and 15 minute averages are listed below it. Readings come from `/proc`, the
-temperatures from `/sys/class/hwmon` (`k10temp`/`coretemp`, `amdgpu` and
-`nvme`), and disks from `df`. A temperature is hidden when its sensor is missing.
+temperatures from `/sys/class/hwmon` (`k10temp`/`coretemp` and `amdgpu`),
+drive temperatures from the hwmon device under `/sys/block/<drive>/device`
+(`nvme`, or `drivetemp` for SATA once that module is loaded), and drives from
+`lsblk`. A temperature is hidden when its sensor is missing.
 Click outside, press Escape, or use the close button to dismiss it.
 
 Click the clock to open a calendar. The arrows change month, Today returns to
