@@ -5,6 +5,7 @@ set -Eeuo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 DOTFILES_BIN="$ROOT/scripts/dotfiles"
 DOTFILES_FLEET_BIN="$ROOT/scripts/dotfiles-fleet"
+KEYS_PUSH_BIN="$ROOT/scripts/keys-push"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -235,6 +236,36 @@ SCRIPT
     [[ $(wc -l < "$log") == 2 ]] || fail "fleet invoked unexpected hosts"
 }
 
+# keys-push runs the real remote command per host, backing up and replacing ~/.keys owner-only.
+test_keys_push_replaces_remote_keys() {
+    local fake_bin="$TMP_DIR/keys-bin"
+    local hosts="$TMP_DIR/keys-hosts"
+    local local_home="$TMP_DIR/keys-local"
+    local remotes="$TMP_DIR/keys-remotes"
+    mkdir -p "$fake_bin" "$local_home" "$remotes/host-a" "$remotes/host-b"
+    printf '# fleet\nhost-a\n\nhost-b\n' > "$hosts"
+    echo 'export NEW=1' > "$local_home/.keys"
+    echo 'export OLD=1' > "$remotes/host-a/.keys"
+    chmod 644 "$remotes/host-a/.keys"
+    cat > "$fake_bin/ssh" <<SCRIPT
+#!/usr/bin/env bash
+HOME='$remotes'/"\$1" sh -c "\$2"
+SCRIPT
+    chmod +x "$fake_bin/ssh"
+
+    PATH="$fake_bin:$PATH" HOME="$local_home" DOTFILES_HOSTS="$hosts" "$KEYS_PUSH_BIN" >/dev/null
+
+    local host
+    for host in host-a host-b; do
+        assert_file_contains "$remotes/$host/.keys" 'export NEW=1'
+        [[ $(stat -c %a "$remotes/$host/.keys") == 600 ]] || fail "$host ~/.keys is not 0600"
+        [[ ! -e "$remotes/$host/.keys.tmp" ]] || fail "$host left ~/.keys.tmp behind"
+    done
+    assert_file_contains "$remotes/host-a/.keys.bak" 'export OLD=1'
+    [[ $(stat -c %a "$remotes/host-a/.keys.bak") == 600 ]] || fail "host-a backup is not 0600"
+    [[ ! -e "$remotes/host-b/.keys.bak" ]] || fail "host-b got a backup without an existing file"
+}
+
 test_sync_pulls_and_applies_once
 test_apps_default_skips_maintenance
 test_update_syncs_before_apps
@@ -242,5 +273,6 @@ test_system_updates_ubuntu_packages
 test_bootstrap_runs_full_installer
 test_setup_runs_arch_setup_only_on_arch
 test_fleet_updates_configured_hosts
+test_keys_push_replaces_remote_keys
 
 echo "PASS: dotfiles CLI"

@@ -6,7 +6,7 @@ Default behavior: copy only the github-copilot credential and merge it into each
 remote ~/.pi/agent/auth.json, preserving any other remote providers.
 
 Examples:
-  # After /login on this machine, push Copilot auth to hosts in ~/.scripts/work_machines.txt
+  # After /login on this machine, push Copilot auth to hosts in $DOTFILES_HOSTS or ~/.config/dotfiles/hosts
   python3 scripts/pi-auth-sync.py
 
   # Or pass hosts explicitly
@@ -40,7 +40,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-DEFAULT_HOSTS_FILE = "~/.scripts/work_machines.txt"
+DEFAULT_HOSTS_FILE = os.environ.get("DOTFILES_HOSTS", "~/.config/dotfiles/hosts")
 
 REMOTE_SCRIPT = r'''
 import datetime as dt

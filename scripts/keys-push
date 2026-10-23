@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+HOSTS_FILE=${DOTFILES_HOSTS:-$HOME/.config/dotfiles/hosts}
+KEYS_FILE=$HOME/.keys
+# Back up the remote file, then replace it atomically. umask keeps every file owner-only.
+REMOTE_CMD='umask 077 && if [ -f ~/.keys ]; then cp ~/.keys ~/.keys.bak && chmod 600 ~/.keys.bak; fi && cat > ~/.keys.tmp && chmod 600 ~/.keys.tmp && mv ~/.keys.tmp ~/.keys'
+
+error() {
+    echo "keys-push: $*" >&2
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: keys-push
+
+Copies ~/.keys over SSH to each destination in $DOTFILES_HOSTS or
+~/.config/dotfiles/hosts. Blank lines and comments are ignored. The remote
+~/.keys is backed up to ~/.keys.bak and written with mode 0600.
+EOF
+}
+
+main() {
+    local host
+    local failed=()
+    case "${1:-}" in
+        "") ;;
+        help|--help|-h)
+            usage
+            return 0
+            ;;
+        *) error "unexpected argument: $1" ;;
+    esac
+
+    [[ -r "$KEYS_FILE" ]] || error "keys file is not readable: $KEYS_FILE"
+    [[ -r "$HOSTS_FILE" ]] || error "hosts file is not readable: $HOSTS_FILE"
+
+    shopt -s extglob
+    while IFS= read -r host || [[ -n "$host" ]]; do
+        host=${host##+([[:space:]])}
+        host=${host%%+([[:space:]])}
+        [[ -z "$host" || "$host" == \#* ]] && continue
+        [[ "$host" != *[[:space:]]* ]] || error "invalid SSH destination in $HOSTS_FILE: $host"
+
+        echo "===== $host ====="
+        # ssh reads the keys file, not the hosts list being iterated.
+        if ssh "$host" "$REMOTE_CMD" < "$KEYS_FILE"; then
+            echo "updated ~/.keys"
+        else
+            failed+=("$host")
+        fi
+    done < "$HOSTS_FILE"
+
+    [[ ${#failed[@]} -eq 0 ]] || error "failed hosts: ${failed[*]}"
+}
+
+main "$@"
