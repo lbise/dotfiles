@@ -1,7 +1,7 @@
 /**
  * Subscription usage for pi.
  *
- * Shows usage for the active model's provider (Codex, Claude, Copilot) by
+ * Shows usage for the active model's provider (Codex, Claude, Copilot, Azure Foundry) by
  * publishing ctx.ui.setStatus() values for pi-footer External Status widgets.
  * Only one provider is active at a time, so the status keys are generic.
  *
@@ -18,6 +18,7 @@ import { join } from "node:path";
 
 import { formatReset, formatWindow, ICONS, renderSegments } from "./format.ts";
 import { anthropicProvider } from "./providers/anthropic.ts";
+import { azureFoundryProvider } from "./providers/azure-foundry.ts";
 import { codexProvider } from "./providers/codex.ts";
 import { copilotProvider } from "./providers/copilot.ts";
 import type { AuthSource, PiAuthEntry, PromptTracker, Segment, UsageProvider, UsageSnapshot } from "./types.ts";
@@ -45,7 +46,7 @@ const LEGACY_STATUS_KEYS = [
   "copilot-ai-credits",
 ];
 
-export const PROVIDERS: UsageProvider[] = [codexProvider, anthropicProvider, copilotProvider];
+export const PROVIDERS: UsageProvider[] = [codexProvider, anthropicProvider, copilotProvider, azureFoundryProvider];
 
 type ProviderState = {
   snapshot: UsageSnapshot | null;

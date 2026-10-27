@@ -115,7 +115,7 @@ test("/usage-refresh forces a fetch and explains untracked models", async () => 
 
   h.ctx.model = { provider: "openai", id: "gpt-5" };
   await h.command("usage-refresh");
-  assert.equal(h.notifications[1], "Usage is only shown for Codex, Claude, Copilot models");
+  assert.equal(h.notifications[1], "Usage is only shown for Codex, Claude, Copilot, Azure Foundry models");
 });
 
 test("turns refresh header-less providers once the cache TTL has passed", async () => {

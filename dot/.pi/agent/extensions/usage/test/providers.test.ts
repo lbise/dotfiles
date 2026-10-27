@@ -179,3 +179,54 @@ test("copilot tracker sums pi's per-turn cost as estimated credits", () => {
   tracker.turnEnd({ usage: {} });
   assert.equal(text(tracker.segments()), "~20.1cr");
 });
+
+// Azure Foundry
+
+function sessionLine(id: string, at: string, cost: number, tokens: number, provider = "azure-foundry") {
+  const message = { role: "assistant", provider, timestamp: Date.parse(at), usage: { totalTokens: tokens, cost: { total: cost } } };
+  return JSON.stringify({ type: "message", id, timestamp: at, message });
+}
+
+async function azureFixture() {
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "azure-usage-"));
+  await mkdir(join(dir, "--a--"));
+  await mkdir(join(dir, "--b--"));
+  const shared = sessionLine("m1", "2026-10-02T10:00:00Z", 1.5, 1000);
+  await writeFile(
+    join(dir, "--a--", "one.jsonl"),
+    [shared, sessionLine("m2", "2026-09-30T10:00:00Z", 4, 5000), sessionLine("x", "2026-10-03T10:00:00Z", 99, 99, "anthropic"), '{"message":{"provider":"azure-foundry"'].join("\n")
+  );
+  // A fork copies m1 into a new file and adds one message.
+  await writeFile(join(dir, "--b--", "fork.jsonl"), [shared, sessionLine("m3", "2026-10-05T10:00:00Z", 0.5, 500)].join("\n"));
+  return dir;
+}
+
+test("azure totals sum azure-foundry messages once, split by UTC month", async () => {
+  const { totalsFromSessions } = await import("../providers/azure-foundry.ts");
+  const totals = await totalsFromSessions(await azureFixture(), Date.parse("2026-10-10T00:00:00Z"));
+  assert.deepEqual(totals, { monthCost: 2, monthTokens: 1500, totalCost: 6, totalTokens: 6500 });
+});
+
+test("azure totals are empty when there are no sessions", async () => {
+  const { totalsFromSessions } = await import("../providers/azure-foundry.ts");
+  assert.equal((await totalsFromSessions("/nonexistent/sessions")).totalCost, 0);
+});
+
+test("azure snapshot shows a budget bar, or a plain month summary without one", async () => {
+  const { snapshotFromTotals } = await import("../providers/azure-foundry.ts");
+  const totals = { monthCost: 12.5, monthTokens: 2_500_000, totalCost: 40, totalTokens: 9_000_000 };
+  const now = Date.parse("2026-10-10T00:00:00Z");
+
+  const withBudget = snapshotFromTotals(totals, 50, now);
+  assert.equal(withBudget.primary?.usedPercent, 25);
+  assert.equal(withBudget.primary?.resetsAt, Date.parse("2026-11-01T00:00:00Z"));
+  assert.equal(text(withBudget.primary?.note), "$12.50/$50.00");
+  assert.equal(text(withBudget.extra), "9.0M tok · $40.00 total");
+
+  const noBudget = snapshotFromTotals(totals, undefined, now);
+  assert.equal(noBudget.primary, undefined);
+  assert.equal(text(noBudget.summary), `${ICONS.month} $12.50 month`);
+});
