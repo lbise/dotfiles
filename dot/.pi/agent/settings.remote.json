@@ -21,7 +21,7 @@
       }
     }
   },
-  "packages": ["npm:pi-context-view", "npm:pi-footer"],
+  "packages": ["npm:pi-context-view", "npm:pi-footer", "npm:@pi-plugins/claude-oauth"],
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",
