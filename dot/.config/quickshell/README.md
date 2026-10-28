@@ -57,6 +57,13 @@ the device reports it. Click a device to connect or disconnect it. Scan shows
 nearby devices to pair until the popup closes. Settings, or a middle-click on
 the bar icon, opens `bluetui` in a terminal.
 
+Quickshell cannot answer BlueZ during pairing, so the bar's service pulls in
+`leo-bt-agent.service`, which runs `scripts/system/system-bt-agent.py` as the
+default pairing agent. It accepts passkey confirmations, sends 0000 for legacy
+PIN requests and rejects passkey entry, so devices that make you type a code
+(some keyboards) still need `bluetui`. It needs `python-gobject`. Logs:
+`journalctl --user -u leo-bt-agent.service -b`.
+
 The chevron at the right end opens the background apps (tray items), with their
 names alongside their original icons. Left-click activates an app, right-click
 shows its menu inside the popup (the arrow goes back, and submenus open in

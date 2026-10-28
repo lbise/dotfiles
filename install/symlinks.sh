@@ -41,6 +41,7 @@ DESKTOP_LINKS=(
     ".config/mako"
     ".config/quickshell"
     ".config/systemd/user/leo-quickshell.service"
+    ".config/systemd/user/leo-bt-agent.service"
     ".config/uwsm"
     ".config/walker"
     ".config/elephant/menus"

@@ -1,0 +1,11 @@
+[Unit]
+Description=Leo Bluetooth pairing agent
+Documentation=file://%h/.scripts/system/system-bt-agent.py
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/python3 %h/.scripts/system/system-bt-agent.py
+Restart=always
+RestartSec=2

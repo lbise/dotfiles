@@ -2,6 +2,8 @@
 Description=Leo Quickshell bar
 PartOf=graphical-session.target
 After=graphical-session.target
+# The Bluetooth popup's Pair button needs a pairing agent.
+Wants=leo-bt-agent.service
 
 [Service]
 Type=exec

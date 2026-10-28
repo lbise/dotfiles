@@ -43,6 +43,8 @@ SYSTEM_PKGS=(
     wireless-regdb
     # Bluetooth
     bluez bluez-utils
+    # system-bt-agent.py, the pairing agent behind the bar's Pair button
+    python-gobject
     # Battery and desktop plumbing
     upower xdg-user-dirs xdg-utils
     # Fonts installers and base fonts

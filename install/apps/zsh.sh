@@ -6,13 +6,13 @@ source "$SCRIPT_DIR/../helpers.sh"
 
 echo ">> Installing zsh..."
 
-if is_arch; then
-    echo "Skipped on arch linux, done using yay"
-    exit 0
-fi
-
+# On Arch, packages_arch.sh installs zsh with pacman. Still run the shell
+# change and oh-my-zsh install below.
 ZSH_PATH="$(command -v zsh || true)"
-if [[ -z "$ZSH_PATH" ]]; then
+if [[ -z "$ZSH_PATH" ]] && is_arch; then
+    echo "ERROR: zsh is not installed, run install/packages_arch.sh first" >&2
+    exit 1
+elif [[ -z "$ZSH_PATH" ]]; then
     echo "zsh is not installed, installing..."
 
     if command -v apt-get >/dev/null 2>&1; then
