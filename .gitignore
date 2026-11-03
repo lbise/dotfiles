@@ -1,7 +1,6 @@
 **.bak
 dot/.tmux/plugins/tmux-powerkit/
 **/lazy-lock.json
-dot/.config/fcitx5/conf/
 dot/.gnupg/.*
 dot/.gnupg/private-keys*
 dot/.gnupg/pubring.kbx*

@@ -24,10 +24,6 @@ hl.monitor({
 -------------------
 
 hl.on("hyprland.start", function()
-    -- Fixes AltGr combos in some apps:
-    -- https://github.com/ghostty-org/ghostty/issues/2981
-    -- https://github.com/ghostty-org/ghostty/discussions/8899
-    hl.exec_cmd("uwsm-app -- fcitx5")
     hl.exec_cmd("uwsm-app -- mako")
     hl.exec_cmd("uwsm-app -- swaybg -i ~/.config/leo/wallpaper/current.jpg -m fill")
     hl.exec_cmd("uwsm-app -- hypridle")
@@ -40,7 +36,7 @@ end)
 -------------------------------
 
 -- https://wiki.hypr.land/Configuring/Advanced-and-Cool/Environment-variables/
--- Input method variables live in ~/.config/environment.d/fcitx5.conf.
+-- GTK_IM_MODULE (dead keys in GTK apps) lives in ~/.config/environment.d/input.conf.
 
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")

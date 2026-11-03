@@ -24,7 +24,6 @@ COMMON_LINKS=(
     ".ssh/config"
     ".ssh/rc"
     ".gnupg/gpg-agent.conf"
-    ".config/fcitx5"
     ".config/environment.d"
     ".config/shell/ssh-auth-sock.sh"
     ".config/shell/herdr-display.sh"

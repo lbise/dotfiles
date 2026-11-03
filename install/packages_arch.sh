@@ -3,7 +3,7 @@
 # One-time system setup (session, services, fonts) lives in setup_arch.sh.
 set -Eeuo pipefail
 
-PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock quickshell man-db man-pages iwd impala fcitx5 fcitx5-configtool fcitx5-gtk brightnessctl jq grim slurp satty wl-clipboard tesseract tesseract-data-eng hyprpicker playerctl libnotify pavucontrol bluetui"
+PACMAN_PKGS="zsh tmux git git-delta tree-sitter-cli unzip swaybg mako hypridle hyprlock quickshell man-db man-pages iwd impala brightnessctl jq grim slurp satty wl-clipboard tesseract tesseract-data-eng hyprpicker playerctl libnotify pavucontrol bluetui"
 # Only the Elephant providers Walker uses. elephant-all-bin pulls in
 # proton-pass-cli, which builds from Rust source for a very long time.
 ELEPHANT_PKGS="elephant-bin elephant-desktopapplications-bin elephant-websearch-bin elephant-providerlist-bin elephant-files-bin elephant-symbols-bin elephant-calc-bin elephant-clipboard-bin elephant-menus-bin"
