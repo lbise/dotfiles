@@ -12,17 +12,31 @@
  * with pi's token-priced USD cost at GitHub's documented 1 AI credit = $0.01,
  * which matched the booked quota delta exactly when measured. Polling picks
  * up the booked value once it lands.
+ *
+ * Optional hard cap: set "usage": { "copilotCreditCap": 40000 } in pi's
+ * settings.json when the entitlement is raised in stages during the month. The
+ * secondary window then shows usage against the cap, a pace marker for an even
+ * spend over the month, and the projected month-end total.
  */
 
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { formatAmount, getHeader, ICONS, numberValue } from "../format.ts";
-import type { AuthSource, PromptTracker, UsageProvider, UsageSnapshot } from "../types.ts";
+import { formatAmount, formatCount, getHeader, ICONS, numberValue, percentTone } from "../format.ts";
+import type { AuthSource, PromptTracker, UsageProvider, UsageSnapshot, UsageWindow } from "../types.ts";
 
 const USAGE_URL = "https://api.github.com/copilot_internal/user";
 const CREDIT_USD = 0.01;
+/** Projections from the first days of the month swing too much to be useful. */
+const MIN_PROJECTION_MS = 2 * 24 * 60 * 60 * 1000;
+
+let creditCap: number | undefined;
+
+/** Set by index.ts from settings.json at session start. */
+export function setCopilotCreditCap(cap: number | undefined) {
+  creditCap = cap;
+}
 
 const COPILOT_HEADERS = {
   Accept: "application/json",
@@ -77,6 +91,23 @@ async function getGitHubToken(auth: AuthSource): Promise<string | null> {
   return null;
 }
 
+/** Usage against a hard monthly cap, with pace marker and month-end projection. */
+export function capWindow(used: number, cap: number, resetsAt: number | undefined, now = Date.now()): UsageWindow {
+  const window: UsageWindow = { icon: ICONS.month, usedPercent: (used / cap) * 100, used, limit: cap };
+  if (resetsAt === undefined) return window;
+
+  const start = new Date(resetsAt);
+  start.setUTCMonth(start.getUTCMonth() - 1);
+  const elapsedMs = now - start.getTime();
+  const elapsed = Math.min(1, Math.max(0, elapsedMs / (resetsAt - start.getTime())));
+  window.markerPercent = elapsed * 100;
+  if (elapsedMs >= MIN_PROJECTION_MS) {
+    const projected = used / elapsed;
+    window.note = [{ text: `→${formatCount(projected)}`, tone: percentTone((projected / cap) * 100) }];
+  }
+  return window;
+}
+
 function snapshotFromQuota(quota: Quota | null, plan?: string, fallbackResetDate?: string): UsageSnapshot {
   if (!quota) return { summary: [{ text: plan || "active", tone: "dim" }] };
   if (quota.unlimited || quota.entitlement === -1) return { summary: [{ text: "unlimited", tone: "success" }] };
@@ -99,17 +130,19 @@ function snapshotFromQuota(quota: Quota | null, plan?: string, fallbackResetDate
   if (usedPercent === undefined) return { summary: [{ text: plan || "active", tone: "dim" }] };
 
   const resetDate = quota.resetDate ?? fallbackResetDate;
-  const resetsAt = resetDate ? Date.parse(resetDate) : NaN;
+  const parsedReset = resetDate ? Date.parse(resetDate) : NaN;
+  const resetsAt = Number.isNaN(parsedReset) ? undefined : parsedReset;
   return {
     primary: {
       icon: ICONS.month,
       usedPercent: Math.max(0, usedPercent),
-      resetsAt: Number.isNaN(resetsAt) ? undefined : resetsAt,
+      resetsAt,
       used,
       limit: entitlement,
       tone: overage > 0 ? "error" : undefined,
       note: overage > 0 ? [{ text: `+${formatAmount(overage)} overage`, tone: "warning" }] : undefined,
     },
+    secondary: creditCap !== undefined && used !== undefined ? capWindow(used, creditCap, resetsAt) : undefined,
   };
 }
 

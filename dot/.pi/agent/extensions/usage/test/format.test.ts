@@ -19,6 +19,12 @@ test("bar shows at least one block for small usage and clamps above 100", () => 
   assert.equal(text(formatBar(120)), "████████ 120%");
 });
 
+test("bar draws the pace marker in the filled or empty part", () => {
+  assert.equal(text(formatBar(37, undefined, 50)), "███░│░░░ 37%");
+  assert.equal(text(formatBar(75, undefined, 25)), "██│███░░ 75%");
+  assert.equal(text(formatBar(0, undefined, 100)), "░░░░░░░│ 0%");
+});
+
 test("window starts with its icon and includes compact counts and note", () => {
   const out = text(
     formatWindow({ icon: ICONS.month, usedPercent: 53.9, used: 14802, limit: 27500, note: [{ text: "+2 overage" }] })

@@ -51,23 +51,29 @@ export function formatCount(value: number): string {
   return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
 }
 
-export function formatBar(percentUsed: number, tone?: Tone): Segment[] {
+export function formatBar(percentUsed: number, tone?: Tone, markerPercent?: number): Segment[] {
   const display = Math.max(0, percentUsed);
   const clamped = Math.min(100, display);
   const filled = clamped === 0 ? 0 : Math.min(BAR_WIDTH, Math.max(1, Math.round((clamped / 100) * BAR_WIDTH)));
   const color = tone ?? percentTone(display);
 
-  return [
+  const bar: Segment[] = [
     { text: "█".repeat(filled), tone: color },
     { text: "░".repeat(BAR_WIDTH - filled), tone: "dim" },
-    { text: ` ${formatAmount(display)}%`, tone: color },
   ];
+  if (markerPercent !== undefined) {
+    // Cells left of the marker are the budget so far.
+    const at = Math.min(BAR_WIDTH - 1, Math.floor((Math.max(0, markerPercent) / 100) * BAR_WIDTH));
+    const [segment, offset] = at < filled ? [bar[0], at] : [bar[1], at - filled];
+    segment.text = `${segment.text.slice(0, offset)}│${segment.text.slice(offset + 1)}`;
+  }
+  return [...bar, { text: ` ${formatAmount(display)}%`, tone: color }];
 }
 
 /** "<icon> ████░░░░ 53.9% 14.8k/27.5k" */
 export function formatWindow(window: UsageWindow): Segment[] {
   const color = window.tone ?? percentTone(Math.max(0, window.usedPercent));
-  const segments: Segment[] = [{ text: `${window.icon} `, tone: color }, ...formatBar(window.usedPercent, window.tone)];
+  const segments: Segment[] = [{ text: `${window.icon} `, tone: color }, ...formatBar(window.usedPercent, window.tone, window.markerPercent)];
   if (window.used !== undefined && window.limit !== undefined) {
     segments.push({ text: ` ${formatCount(window.used)}/${formatCount(window.limit)}`, tone: "dim" });
   }

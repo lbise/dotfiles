@@ -3,7 +3,7 @@ import test, { afterEach } from "node:test";
 
 import { anthropicProvider } from "../providers/anthropic.ts";
 import { codexProvider } from "../providers/codex.ts";
-import { copilotProvider, createCopilotPromptTracker } from "../providers/copilot.ts";
+import { capWindow, copilotProvider, createCopilotPromptTracker, setCopilotCreditCap } from "../providers/copilot.ts";
 import { ICONS } from "../format.ts";
 import type { AuthSource, Segment } from "../types.ts";
 
@@ -168,6 +168,41 @@ test("copilot parses quota headers", () => {
   );
   assert.equal(snapshot?.primary?.usedPercent, 10);
   assert.equal(snapshot?.primary?.used, 30);
+});
+
+test("copilot cap window shows pace and projection against the hard cap", () => {
+  const resetsAt = Date.parse("2026-11-01T00:00:00Z");
+  const mid = capWindow(14800, 40000, resetsAt, Date.parse("2026-10-16T12:00:00Z"));
+  assert.equal(mid.usedPercent, 37);
+  assert.equal(mid.limit, 40000);
+  assert.equal(mid.markerPercent, 50);
+  assert.equal(text(mid.note), "→29.6k");
+  assert.equal(mid.note?.[0].tone, "warning");
+
+  const early = capWindow(500, 40000, resetsAt, Date.parse("2026-10-02T00:00:00Z"));
+  assert.equal(early.note, undefined);
+  assert.equal(capWindow(500, 40000, undefined).markerPercent, undefined);
+});
+
+test("copilot adds the cap window only when a credit cap is set", async () => {
+  const body = {
+    quota_reset_date_utc: "2026-11-01T00:00:00Z",
+    quota_snapshots: { premium_models: { entitlement: 16000, remaining: 1200 } },
+  };
+  stubFetch(body);
+  assert.equal((await copilotProvider.fetchUsage(auth({}, async () => ({ refresh: "gho_x" })))).secondary, undefined);
+
+  setCopilotCreditCap(40000);
+  try {
+    stubFetch(body);
+    const snapshot = await copilotProvider.fetchUsage(auth({}, async () => ({ refresh: "gho_x" })));
+    assert.equal(snapshot.primary?.limit, 16000);
+    assert.equal(snapshot.secondary?.used, 14800);
+    assert.equal(snapshot.secondary?.usedPercent, 37);
+    assert.equal(snapshot.secondary?.resetsAt, undefined);
+  } finally {
+    setCopilotCreditCap(undefined);
+  }
 });
 
 test("copilot tracker sums pi's per-turn cost as estimated credits", () => {

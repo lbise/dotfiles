@@ -164,6 +164,30 @@ test("copilot shows the running prompt estimate and keeps it after the prompt", 
   assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~0cr`);
 });
 
+test("copilot reads the credit cap from settings.json", async () => {
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  let h = setupCopilot();
+  process.env.HOME = await mkdtemp(join(tmpdir(), "usage-home-"));
+  await mkdir(join(process.env.HOME, ".pi", "agent"), { recursive: true });
+  const settings = join(process.env.HOME, ".pi", "agent", "settings.json");
+
+  await writeFile(settings, JSON.stringify({ usage: { copilotCreditCap: 40000 } }));
+  await h.emit("session_start");
+  assert.match(h.statuses.get(STATUS_KEYS.secondary)!, /% 14\.8k\/40k/);
+
+  await h.emit("session_shutdown");
+  await writeFile(settings, JSON.stringify({ usage: { copilotCreditCap: "lots" } }));
+  const home = process.env.HOME;
+  h = setupCopilot();
+  process.env.HOME = home;
+  await h.emit("session_start");
+  assert.equal(h.statuses.has(STATUS_KEYS.secondary), false);
+  assert.equal(h.notifications.at(-1), "settings.json usage.copilotCreditCap must be a positive number");
+  await h.emit("session_shutdown");
+});
+
 test("copilot polls for late-booked usage until shutdown", async () => {
   mock.timers.enable({ apis: ["Date", "setInterval"], now: 1_000_000 });
   const h = setupCopilot();

@@ -13,6 +13,8 @@ export type UsageWindow = {
   /** Absolute usage, shown as "(used/limit)" when both are known. */
   used?: number;
   limit?: number;
+  /** Pace position in percent, drawn as "│" in the bar. */
+  markerPercent?: number;
   /** Overrides the percent-based bar color. */
   tone?: Tone;
   /** Extra segments appended after the bar. */

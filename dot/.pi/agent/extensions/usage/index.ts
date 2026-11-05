@@ -16,11 +16,11 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { formatReset, formatWindow, ICONS, renderSegments } from "./format.ts";
+import { formatReset, formatWindow, ICONS, numberValue, renderSegments } from "./format.ts";
 import { anthropicProvider } from "./providers/anthropic.ts";
 import { azureFoundryProvider } from "./providers/azure-foundry.ts";
 import { codexProvider } from "./providers/codex.ts";
-import { copilotProvider } from "./providers/copilot.ts";
+import { copilotProvider, setCopilotCreditCap } from "./providers/copilot.ts";
 import type { AuthSource, PiAuthEntry, PromptTracker, Segment, UsageProvider, UsageSnapshot } from "./types.ts";
 
 // Integration contract with pi-footer.json. Each independently renderable
@@ -76,6 +76,16 @@ async function readAuthEntry(provider: string): Promise<PiAuthEntry | undefined>
     return (JSON.parse(raw) as Record<string, PiAuthEntry>)[provider];
   } catch {
     return undefined;
+  }
+}
+
+/** The "usage" section of pi's global settings.json. */
+async function readUsageSettings(): Promise<Record<string, unknown>> {
+  try {
+    const raw = await readFile(join(homedir(), ".pi", "agent", "settings.json"), "utf8");
+    return JSON.parse(raw)?.usage ?? {};
+  } catch {
+    return {};
   }
 }
 
@@ -203,6 +213,13 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     for (const key of LEGACY_STATUS_KEYS) ctx.ui.setStatus(key, undefined);
+    const rawCap = (await readUsageSettings()).copilotCreditCap;
+    const cap = numberValue(rawCap);
+    const validCap = cap !== undefined && cap > 0 ? cap : undefined;
+    if (rawCap !== undefined && validCap === undefined) {
+      ctx.ui.notify("settings.json usage.copilotCreditCap must be a positive number", "warning");
+    }
+    setCopilotCreditCap(validCap);
     startPolling(ctx);
     await refresh(ctx, ctx.model);
   });

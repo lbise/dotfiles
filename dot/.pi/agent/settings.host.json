@@ -16,7 +16,8 @@
     "openai-codex/gpt-6-sol",
     "anthropic/claude-sonnet-5-5",
     "anthropic/claude-opus-5-5",
-    "azure-foundry/gpt-6-luna"
+    "azure-foundry/gpt-6-luna",
+    "azure-foundry/claude-opus-5-5"
   ],
   "delegate": {
     "extensions": [
@@ -37,6 +38,9 @@
     "npm:pi-footer",
     "npm:@pi-plugins/claude-oauth"
   ],
+  "usage": {
+    "copilotCreditCap": 40000
+  },
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",

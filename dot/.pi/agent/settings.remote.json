@@ -22,6 +22,7 @@
     }
   },
   "packages": ["npm:pi-context-view", "npm:pi-footer", "npm:@pi-plugins/claude-oauth"],
+  "usage": { "copilotCreditCap": 40000 },
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",
