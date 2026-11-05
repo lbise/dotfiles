@@ -53,7 +53,7 @@ Settings override `model` and `thinking` from an agent's Markdown frontmatter. I
 
 ## Child extensions
 
-Child sessions load no extensions by default. List package sources in `delegate.extensions` to load them into every child session. Use this for extensions that must shape provider requests, such as `@pi-plugins/claude-oauth`, whose `before_provider_request` hook rewrites Anthropic OAuth payloads:
+Child sessions load no extensions by default, but they inherit the providers that parent extensions registered. List package sources in `delegate.extensions` to load them into every child session. Use this for extensions that must shape provider requests, such as `@pi-plugins/claude-oauth`, whose `before_provider_request` hook rewrites Anthropic OAuth payloads:
 
 ```json
 {
@@ -116,7 +116,7 @@ Foreground delegation follows the parent tool's abort signal. Aborting the paren
 - No nested delegation.
 - No chain or workflow parameters. Pi can issue several `delegate` calls in one response for parallel work.
 - Child sessions load no extensions except those listed in `delegate.extensions`. Only Pi's built-in coding tools can pass through the parent and agent allowlists.
-- Children resolve authentication and provider configuration from Pi's files. Runtime-only API keys, provider registrations, and provider overrides from the parent are not inherited.
+- Children resolve authentication and provider configuration from Pi's files. Providers registered by parent extensions (for example `azure-foundry`) are copied into the child. Runtime-only API keys and provider overrides from the parent are not inherited.
 - An ephemeral parent gets an ephemeral child. Resuming with `task_id` requires a saved parent session.
 - Parallel writers share the same checkout unless the caller provides isolation outside this extension.
 

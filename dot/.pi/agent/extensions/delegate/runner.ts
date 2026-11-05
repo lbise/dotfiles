@@ -6,6 +6,7 @@ import {
   DefaultResourceLoader,
   getAgentDir,
   type ModelRegistry,
+  ModelRuntime,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -48,7 +49,10 @@ export type RunTaskRequest = {
   parentTools: string[];
   parentModel: Model<any> | undefined;
   parentThinking?: ThinkingLevel;
-  modelRegistry: Pick<ModelRegistry, "find">;
+  modelRegistry: Pick<
+    ModelRegistry,
+    "find" | "getRegisteredProviderIds" | "getRegisteredProviderConfig" | "getRegisteredNativeProvider"
+  >;
   projectTrusted: boolean;
   signal?: AbortSignal;
 };
@@ -93,6 +97,21 @@ async function childExtensionPaths(cwd: string, agentDir: string, settingsManage
     throw new Error(`delegate.extensions has no enabled extension for: ${missing.join(", ")}`);
   }
   return paths;
+}
+
+/**
+ * Child sessions load no parent extensions, so copy the providers they registered (e.g. azure-foundry).
+ * Without this the child runtime has no auth for those providers. Child extensions may re-register them.
+ */
+async function childModelRuntime(registry: RunTaskRequest["modelRegistry"]): Promise<ModelRuntime> {
+  const runtime = await ModelRuntime.create();
+  for (const id of registry.getRegisteredProviderIds()) {
+    const native = registry.getRegisteredNativeProvider(id);
+    const config = registry.getRegisteredProviderConfig(id);
+    if (native) runtime.registerNativeProvider(native);
+    else if (config) runtime.registerProvider(id, config);
+  }
+  return runtime;
 }
 
 function resolveModel(request: RunTaskRequest): ReturnType<ModelRegistry["find"]> {
@@ -160,6 +179,7 @@ export async function runTask(
   const { session } = await createAgentSession({
     cwd: request.cwd,
     model,
+    modelRuntime: await childModelRuntime(request.modelRegistry),
     thinkingLevel: (request.agent.thinking as ThinkingLevel | undefined) ??
       (request.agent.model ? undefined : request.parentThinking),
     tools: request.parentTools,
