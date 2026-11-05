@@ -51,6 +51,7 @@ EOF
 chmod +x "$fake_ssh"
 
 output=$(
+    env -u WAYLAND_DISPLAY -u XAUTHORITY \
     HERDR_REAL_SSH="$fake_ssh" \
     TEST_REMOTE_HOME="$remote_home" \
     TEST_AGENT_SOCK="$agent_sock" \
