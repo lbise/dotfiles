@@ -8,7 +8,7 @@ import "WifiModel.js" as Model
 
 // Network in the bar, read from nmcli. Shows Wi-Fi signal, or ethernet when
 // the machine is wired and Wi-Fi is not connected. The popup shows the
-// connection and lists nearby Wi-Fi networks; middle-click opens impala.
+// connection and lists nearby Wi-Fi networks; middle-click opens nmtui.
 BarButton {
   id: root
 
@@ -44,7 +44,7 @@ BarButton {
   onClicked: function(button) {
     if (button === Qt.MiddleButton) {
       Popups.close()
-      Quickshell.execDetached(["system-exec-term.sh", "impala"])
+      Quickshell.execDetached(["system-exec-term.sh", "nmtui", "connect"])
     } else {
       Popups.toggle("wifi", popup.screenName)
     }

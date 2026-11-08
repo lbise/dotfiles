@@ -46,14 +46,9 @@ export PACMAN_CONF="$TMP_DIR/pacman.conf"
 export NM_WIFI_BACKEND_CONF="$TMP_DIR/NetworkManager/conf.d/wifi-backend.conf"
 export IWD_MAIN_CONF="$TMP_DIR/iwd/main.conf"
 export IWD_WAIT_DROPIN="$TMP_DIR/systemd/iwd.service.d/wait-for-wlan0.conf"
+export ZRAM_CONF="$TMP_DIR/systemd/zram-generator.conf"
 # shellcheck source=../../install/setup_arch.sh
 source "$ROOT/install/setup_arch.sh"
-
-# Pretend to be a desktop or a laptop regardless of the machine running the test.
-FAKE_LAPTOP=0
-is_laptop() {
-    (( FAKE_LAPTOP ))
-}
 
 # Pacman gets colour, parallel downloads and multilib; testing repos stay off.
 test_configure_pacman() {
@@ -79,26 +74,17 @@ EOF
     configure_pacman | grep -q 'already configured' || fail "second run rewrote pacman.conf"
 }
 
-# NetworkManager uses iwd for Wi-Fi, and iwd keeps the kernel's interface, written once.
-# A desktop gets no wlan0 wait, so iwd doesn't stall at boot without a Wi-Fi card.
+# NetworkManager uses wpa_supplicant with power save off, written once, and the
+# iwd config left by older versions of the script is removed.
 test_configure_network() {
-    FAKE_LAPTOP=0
-    mkdir -p "$(dirname "$IWD_MAIN_CONF")"
-    printf '[General]\nEnableNetworkConfiguration=true\n' > "$IWD_MAIN_CONF"
+    mkdir -p "$(dirname "$NM_WIFI_BACKEND_CONF")" "$(dirname "$IWD_MAIN_CONF")" "$(dirname "$IWD_WAIT_DROPIN")"
+    printf '[device]\nwifi.backend=iwd\n' > "$NM_WIFI_BACKEND_CONF"
+    printf '[DriverQuirks]\nDefaultInterface=*\n' > "$IWD_MAIN_CONF"
+    printf '[Unit]\n' > "$IWD_WAIT_DROPIN"
     configure_network >/dev/null 2>&1
-    [[ $(<"$NM_WIFI_BACKEND_CONF") == $'[device]\nwifi.backend=iwd\nwifi.iwd.autoconnect=false' ]] || fail "unexpected NetworkManager config"
-    [[ $(<"$IWD_MAIN_CONF") == $'[DriverQuirks]\nDefaultInterface=*' ]] || fail "unexpected iwd config"
-    [[ $(configure_network 2>/dev/null | grep -c 'already configured') == 2 ]] || fail "second run rewrote the network config"
-    [[ ! -e "$IWD_WAIT_DROPIN" ]] || fail "desktop got the wlan0 wait"
-}
-
-# A laptop's iwd waits for wlan0, written once.
-test_configure_network_laptop() {
-    FAKE_LAPTOP=1
-    configure_network >/dev/null 2>&1
-    local unit=sys-subsystem-net-devices-wlan0.device
-    [[ $(<"$IWD_WAIT_DROPIN") == "[Unit]"$'\n'"Wants=$unit"$'\n'"After=$unit" ]] || fail "unexpected iwd drop-in"
-    [[ $(configure_network 2>/dev/null | grep -c 'already configured') == 3 ]] || fail "second laptop run rewrote the network config"
+    [[ $(<"$NM_WIFI_BACKEND_CONF") == $'[device]\nwifi.backend=wpa_supplicant\n\n[connection]\nwifi.powersave=2' ]] || fail "unexpected NetworkManager config"
+    [[ ! -e "$IWD_MAIN_CONF" && ! -e "$IWD_WAIT_DROPIN" ]] || fail "iwd config not removed"
+    [[ $(configure_network 2>/dev/null | grep -c 'already configured') == 1 ]] || fail "second run rewrote the network config"
 }
 
 # The X11 keymap SDDM's greeter uses matches Hyprland's, set once.
@@ -110,9 +96,16 @@ test_configure_keyboard() {
     [[ $(wc -l < "$LOCALECTL_LOG") == 1 ]] || fail "second run changed the keymap again"
 }
 
+# zram swap sized at half of RAM, written once.
+test_configure_zram() {
+    configure_zram >/dev/null
+    [[ $(<"$ZRAM_CONF") == $'[zram0]\nzram-size = ram / 2\ncompression-algorithm = zstd' ]] || fail "unexpected zram config"
+    configure_zram | grep -q 'already configured' || fail "second run rewrote the zram config"
+}
+
 test_configure_pacman
 test_configure_network
-test_configure_network_laptop
+test_configure_zram
 test_configure_keyboard
 
 echo "PASS: setup_arch"

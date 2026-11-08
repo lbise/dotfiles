@@ -1,5 +1,5 @@
 [Unit]
-Description=Leo Bluetooth pairing agent
+Description=Leo Bluetooth pairing agent and A2DP unsticker
 Documentation=file://%h/.scripts/system/system-bt-agent.py
 PartOf=graphical-session.target
 After=graphical-session.target

@@ -12,14 +12,13 @@ Turns a bare Arch install (login shell only) into the full Hyprland desktop.
 | `install/setup_arch.sh` (`dotfiles setup`) | Once per machine | System stack and one-time configuration |
 
 `setup_arch.sh` installs the stack the dotfiles assume: Hyprland with uwsm,
-SDDM, the Hyprland portal, PipeWire, NetworkManager with iwd as its Wi-Fi
-backend, the Wi-Fi regulatory database, BlueZ and UPower. It sets iwd to keep
-the kernel's Wi-Fi interface instead of recreating it, which raced with udev and
-broke Wi-Fi at boot on the Latitude 5420. On a laptop, iwd also waits for
-`wlan0` before starting, since it can otherwise start before the driver has
-created the interface and then manage no device. iwd's own autoconnect is off,
-so only NetworkManager starts Wi-Fi connections; letting both do it also broke
-Wi-Fi at boot there. It also enables Color, ParallelDownloads and
+SDDM, the Hyprland portal, PipeWire, NetworkManager with wpa_supplicant as its
+Wi-Fi backend, the Wi-Fi regulatory database, BlueZ and UPower. Wi-Fi power
+save is off, since it made the Latitude 5420 (ath10k) lose the access point.
+Earlier versions used iwd as the backend: it broke Wi-Fi at boot, and after a
+dropped link NetworkManager took iwd's failed reconnect for a wrong password
+and stopped reconnecting. Rerunning the script on such a machine removes the
+iwd config and disables iwd. It also enables Color, ParallelDownloads and
 multilib in pacman, sets the X11 keymap to Swiss French so SDDM's login
 screen matches Hyprland, enables the system services, enables the elephant user
 service, installs the fonts, and installs the SDDM theme. On a machine with a

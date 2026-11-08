@@ -8,9 +8,9 @@ fixed_order = true
 
 [[entries]]
 text = "Wi-Fi"
-subtext = "impala"
+subtext = "nmtui"
 icon = "network-wireless-symbolic"
-actions = { "open" = "system-exec-float.sh 'Wi-Fi' impala" }
+actions = { "open" = "system-exec-float.sh 'Wi-Fi' nmtui connect" }
 
 [[entries]]
 text = "Bluetooth"

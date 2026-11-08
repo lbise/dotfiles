@@ -100,7 +100,7 @@ machine is wired and Wi-Fi is not connected. Click it to see the connection,
 its address and gateway, and the Wi-Fi networks nearby; the popup scans when it
 opens and has a switch for the Wi-Fi radio. Open networks connect directly.
 Secured networks expand a password field, then connect through NetworkManager
-with `nmcli`. Middle-click opens Impala in a terminal.
+with `nmcli`. Middle-click opens nmtui in a terminal.
 
 The printer icon, placed just after the divider, lists every CUPS queue with its
 state, model, print jobs and network status. It turns red with an alert glyph

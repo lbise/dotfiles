@@ -64,7 +64,7 @@
     "tooltip-format-disconnected": "Disconnected",
     "interval": 3,
     "spacing": 1,
-    "on-click": "system-exec-term.sh impala",
+    "on-click": "system-exec-term.sh nmtui connect",
   },
   "battery": {
     "format": "{capacity}% {icon}",

@@ -40,5 +40,37 @@ class DecideTest(unittest.TestCase):
             self.assertEqual(agent.decide(method), ('accept', None))
 
 
+EARBUDS = '/org/bluez/hci0/dev_70_5A_6F_6B_63_6F'
+
+
+def objects(connected=True, uuids=(agent.A2DP_SINK,), transport=False):
+    tree = {EARBUDS: {'org.bluez.Device1': {'Connected': connected, 'UUIDs': list(uuids)}}}
+    if transport:
+        tree[EARBUDS + '/sep8/fd0'] = {'org.bluez.MediaTransport1': {}}
+    return tree
+
+
+class AudioStuckTest(unittest.TestCase):
+    def test_connected_headphones_without_a2dp_stream_are_stuck(self):
+        self.assertTrue(agent.audio_stuck(EARBUDS, objects()))
+
+    def test_a2dp_stream_means_audio_works(self):
+        self.assertFalse(agent.audio_stuck(EARBUDS, objects(transport=True)))
+
+    def test_disconnected_device_is_left_alone(self):
+        self.assertFalse(agent.audio_stuck(EARBUDS, objects(connected=False)))
+
+    def test_non_audio_device_is_left_alone(self):
+        self.assertFalse(agent.audio_stuck(EARBUDS, objects(uuids=())))
+
+    def test_vanished_device_is_left_alone(self):
+        self.assertFalse(agent.audio_stuck(EARBUDS, {}))
+
+    def test_other_device_transport_does_not_count(self):
+        tree = objects()
+        tree[EARBUDS + '0/sep1/fd0'] = {'org.bluez.MediaTransport1': {}}
+        self.assertTrue(agent.audio_stuck(EARBUDS, tree))
+
+
 if __name__ == '__main__':
     unittest.main()
