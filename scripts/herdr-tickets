@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""Dispatch Redmine tickets to pi agents on Herdr machines.
+
+Herdr is the source of truth: a ticket is active on a machine when that
+machine has a workspace labelled ``rm-<ticket>``. The pi agent and its session
+use the same name, so a ticket can be resumed by starting it again.
+
+Config lives in $XDG_CONFIG_HOME/herdr-tickets/:
+  machines.json     {"<herdr machine label>": {"family": "PEVB", "repo": "/abs/path"}}
+  start-prompt.md   first prompt sent to the agent, "{ticket}" is replaced
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "herdr-tickets"
+DEFAULT_PROMPT = "Start working on Redmine ticket #{ticket}: fetch it and do an analysis of what is required."
+LABEL_RE = re.compile(r"^rm-(\d+)$")
+
+
+class Error(RuntimeError):
+    pass
+
+
+def ticket_name(ticket: int | str) -> str:
+    return f"rm-{ticket}"
+
+
+def load_machines() -> dict[str, dict]:
+    path = CONFIG_DIR / "machines.json"
+    try:
+        machines = json.loads(path.read_text())
+    except FileNotFoundError:
+        raise Error(f"missing {path}") from None
+    for label, machine in machines.items():
+        # Herdr does not expand "~" in remote paths, it silently falls back to $HOME.
+        if not str(machine.get("repo", "")).startswith("/"):
+            raise Error(f"{path}: {label}.repo must be an absolute path")
+    return machines
+
+
+def render_prompt(ticket: int | str) -> str:
+    path = CONFIG_DIR / "start-prompt.md"
+    template = path.read_text().strip() if path.exists() else DEFAULT_PROMPT
+    return template.replace("{ticket}", str(ticket))
+
+
+def herdr(machine: str, *args: str) -> dict:
+    cmd = [os.environ.get("HERDR_BIN_PATH", "herdr"), "--machine", machine, *args]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip()
+        raise Error(f"{' '.join(cmd[1:])}: {detail}")
+    return json.loads(proc.stdout).get("result", {}) if proc.stdout.strip() else {}
+
+
+def active_tickets(workspaces: list[dict]) -> dict[str, dict]:
+    """Map ticket number -> workspace for workspaces labelled rm-<ticket>."""
+    active = {}
+    for ws in workspaces:
+        match = LABEL_RE.match(ws.get("label", ""))
+        if match:
+            active[match.group(1)] = ws
+    return active
+
+
+def scan(machines: dict[str, dict]) -> dict[str, dict | str]:
+    """Return machine -> {ticket: workspace}, or an error string when unreachable."""
+
+    def one(label: str) -> dict | str:
+        try:
+            return active_tickets(herdr(label, "workspace", "list").get("workspaces", []))
+        except (Error, json.JSONDecodeError) as exc:
+            return str(exc)
+
+    with ThreadPoolExecutor() as pool:
+        return dict(zip(machines, pool.map(one, machines)))
+
+
+def find_ticket(state: dict[str, dict | str], ticket: str) -> tuple[str, dict] | None:
+    for machine, tickets in state.items():
+        if isinstance(tickets, dict) and ticket in tickets:
+            return machine, tickets[ticket]
+    return None
+
+
+def my_tickets() -> list[dict]:
+    url, key = os.environ.get("REDMINE_URL"), os.environ.get("REDMINE_API_KEY")
+    if not url or not key:
+        raise Error("REDMINE_URL and REDMINE_API_KEY must be set")
+    req = urllib.request.Request(
+        f"{url.rstrip('/')}/issues.json?assigned_to_id=me&status_id=open&sort=updated_on:desc&limit=100",
+        headers={"X-Redmine-API-Key": key},
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.load(resp)["issues"]
+
+
+def send_prompt(machine: str, name: str, text: str) -> None:
+    # pi can drop a prompt that arrives while it is still starting up; herdr reports
+    # that as agent_prompt_stalled (no working state within 5s), so retry once.
+    args = ("agent", "prompt", name, text, "--wait", "--until", "working", "--until", "blocked", "--timeout", "20000")
+    try:
+        herdr(machine, *args)
+    except Error as exc:
+        if "stalled" not in str(exc):
+            raise
+        time.sleep(3)
+        herdr(machine, *args)
+
+
+def start(ticket: str, machine: str, machines: dict, state: dict, resume: bool = False) -> None:
+    if machine not in machines:
+        raise Error(f"unknown machine {machine!r}, see {CONFIG_DIR / 'machines.json'}")
+    if isinstance(state.get(machine), str):
+        raise Error(f"{machine} is unreachable: {state[machine]}")
+    found = find_ticket(state, ticket)
+    if found:
+        raise Error(f"#{ticket} is already running on {found[0]}")
+    if state[machine]:
+        # shortcut: one ticket per machine, lift once andromeda works with git worktrees.
+        raise Error(f"{machine} is busy with #{next(iter(state[machine]))}")
+
+    name = ticket_name(ticket)
+    created = herdr(machine, "workspace", "create", "--cwd", machines[machine]["repo"], "--label", name, "--no-focus")
+    ws_id = created["workspace"]["workspace_id"]
+    try:
+        # The new pane needs a moment before its shell prompt is ready.
+        for attempt in range(10):
+            try:
+                herdr(machine, "agent", "start", name, "--kind", "pi", "--pane", created["root_pane"]["pane_id"],
+                      "--timeout", "60000", "--", "--session-id", name)
+                break
+            except Error as exc:
+                if "agent_pane_busy" not in str(exc) or attempt == 9:
+                    raise
+                time.sleep(1)
+        if not resume:
+            send_prompt(machine, name, render_prompt(ticket))
+    except Error:
+        # Do not leave a half-started workspace that marks the machine busy.
+        herdr(machine, "workspace", "close", ws_id)
+        raise
+    print(f"#{ticket} started on {machine} ({ws_id})")
+
+
+def focus(ticket: str, state: dict) -> None:
+    found = find_ticket(state, ticket)
+    if not found:
+        raise Error(f"#{ticket} is not running on any machine")
+    machine, ws = found
+    herdr(machine, "workspace", "focus", ws["workspace_id"])
+
+
+def fzf(lines: list[str], prompt: str) -> str | None:
+    proc = subprocess.run(["fzf", "--no-height", "--reverse", "--prompt", prompt],
+                          input="\n".join(lines), stdout=subprocess.PIPE, text=True)
+    return proc.stdout.strip() or None
+
+
+def machine_line(label: str, machine: dict, tickets: dict | str) -> str:
+    if isinstance(tickets, str):
+        busy = "offline: " + tickets.rsplit(": ", 1)[-1].strip(' "}')
+    else:
+        busy = ", ".join(f"#{t} {ws.get('agent_status', '?')}" for t, ws in tickets.items()) or "free"
+    return f"{label:<12} {machine.get('family', ''):<8} {busy}"
+
+
+def ticket_line(issue: dict, state: dict) -> str:
+    found = find_ticket(state, str(issue["id"]))
+    where = f"{found[0]}:{found[1].get('agent_status', '?')}" if found else ""
+    return f"{issue['id']:<7} {where:<20} {issue['status']['name']:<14} {issue['subject']}"
+
+
+def pick(machines: dict) -> None:
+    with ThreadPoolExecutor() as pool:
+        issues_f = pool.submit(my_tickets)
+        state = scan(machines)
+        issues = issues_f.result()
+    chosen = fzf([ticket_line(i, state) for i in issues], "Ticket: ")
+    if not chosen:
+        return
+    ticket = chosen.split()[0]
+    if find_ticket(state, ticket):
+        focus(ticket, state)
+        return
+    chosen = fzf([machine_line(m, machines[m], state[m]) for m in machines], f"#{ticket} on machine: ")
+    if chosen:
+        machine = chosen.split()[0]
+        start(ticket, machine, machines, state)
+        focus(ticket, scan({machine: machines[machine]}))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("pick", help="fzf: pick a ticket, then start it on a machine or jump to it")
+    sub.add_parser("list", help="my open Redmine tickets and where they run")
+    sub.add_parser("status", help="machines and the tickets running on them")
+    p = sub.add_parser("start", help="start a ticket on a machine")
+    p.add_argument("ticket")
+    p.add_argument("machine")
+    p.add_argument("--resume", action="store_true", help="reopen the existing pi session without sending the start prompt")
+    p = sub.add_parser("focus", help="jump Herdr to a running ticket")
+    p.add_argument("ticket")
+    args = parser.parse_args(argv)
+
+    try:
+        machines = load_machines()
+        if args.cmd == "pick":
+            pick(machines)
+        elif args.cmd == "list":
+            state = scan(machines)
+            for issue in my_tickets():
+                print(ticket_line(issue, state))
+        elif args.cmd == "status":
+            state = scan(machines)
+            for label, machine in machines.items():
+                print(machine_line(label, machine, state[label]))
+        elif args.cmd == "start":
+            ticket = args.ticket.lstrip("#")
+            start(ticket, args.machine, machines, scan(machines), args.resume)
+        elif args.cmd == "focus":
+            focus(args.ticket.lstrip("#"), scan(machines))
+    except Error as exc:
+        print(f"herdr-tickets: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

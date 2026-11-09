@@ -55,7 +55,7 @@ reload_config = "prefix+R"
 # open_notification_target = "prefix+o"
 workspace_picker = "prefix+w"
 # goto = "prefix+g"
-# new_workspace = "prefix+shift+n"
+new_workspace = "prefix+shift+n"
 # new_worktree = "prefix+shift+g"
 # open_worktree = ""    # optional, unset by default
 # remove_worktree = ""  # optional, unset by default; opens confirmation
@@ -117,17 +117,25 @@ navigate_workspace_down = "j"
 # width = "80%"
 # height = "80%"
 
-[[keys.command]]
-key = "prefix+shift+n"
-type = "shell"
-command = "dev-herdr-new-workspace"
+# [[keys.command]]
+# key = "prefix+shift+n"
+# type = "shell"
+# command = "dev-herdr-new-workspace"
+#
+# [[keys.command]]
+# key = "prefix+f"
+# type = "popup"
+# command = "herdr-sessionizer"
+# width = "40%"
+# height = "40%"
 
+# Pick a Redmine ticket, then start it on a HW machine or jump to it.
 [[keys.command]]
-key = "prefix+f"
+key = "prefix+t"
 type = "popup"
-command = "herdr-sessionizer"
-width = "40%"
-height = "40%"
+command = "herdr-tickets pick"
+width = "80%"
+height = "60%"
 
 # Legacy indexed shortcut config is still parsed for compatibility.
 # Prefer switch_tab, switch_workspace, and focus_agent for new configs.

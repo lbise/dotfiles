@@ -20,6 +20,7 @@ COMMON_LINKS=(
     ".config/nvim"
     ".config/opencode"
     ".config/herdr/config.toml"
+    ".config/herdr-tickets"
     ".ssh/config"
     ".ssh/rc"
     ".gnupg/gpg-agent.conf"
