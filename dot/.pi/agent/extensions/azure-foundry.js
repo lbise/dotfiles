@@ -40,9 +40,11 @@ function deploymentToModel(d, host) {
     const c = route.catalogs.map((p) => getBuiltinModel(p, modelName)).find(Boolean);
     if (!c)
         console.log(`[Azure Foundry] ${d.name}: "${modelName}" not in pi's catalog, using generic limits`);
+    // Foundry rejects Anthropic's server-side `fallbacks` request field, so drop the compat entry that enables it.
+    const { allowedFallbackModels, ...compat } = c?.compat ?? {};
     const meta = c
         ? { reasoning: c.reasoning, input: c.input, cost: c.cost, contextWindow: c.contextWindow, maxTokens: c.maxTokens,
-            thinkingLevelMap: c.thinkingLevelMap, compat: c.compat, promptCache: c.promptCache, inputLimits: c.inputLimits }
+            thinkingLevelMap: c.thinkingLevelMap, compat: c.compat && compat, promptCache: c.promptCache, inputLimits: c.inputLimits }
         : FALLBACK;
     return { id: d.name, name: `${c?.name ?? modelName} (Azure)`, api: route.api, baseUrl: route.baseUrl, ...meta };
 }
