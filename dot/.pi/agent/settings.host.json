@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.5.0",
+  "lastChangelogVersion": "1.5.1",
   "defaultProvider": "github-copilot",
   "defaultModel": "gpt-5.6-luna",
   "defaultThinkingLevel": "high",
@@ -10,14 +10,13 @@
   "enabledModels": [
     "github-copilot/claude-opus-5.5",
     "github-copilot/gpt-6-luna",
-    "github-copilot/gpt-6-sol",
-    "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6-luna",
-    "openai-codex/gpt-6-sol",
     "anthropic/claude-sonnet-5-5",
     "anthropic/claude-opus-5-5",
-    "azure-foundry/gpt-6-luna",
-    "azure-foundry/claude-opus-5-5"
+    "azure-foundry/claude-opus-5-5",
+    "github-copilot/gpt-6.1-sol",
+    "azure-foundry/claude-fable-5-2",
+    "azure-foundry/gpt-6.1-sol"
   ],
   "delegate": {
     "extensions": [
