@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.3.0",
+  "lastChangelogVersion": "1.5.2",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
   "defaultThinkingLevel": "high",
@@ -41,5 +41,9 @@
   "warnings": {
     "anthropicExtraUsage": false
   },
-  "deviceId": "5f692a7a-a7a5-46f4-8b4e-1f2e27b20c64"
+  "deviceId": "5f692a7a-a7a5-46f4-8b4e-1f2e27b20c64",
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-context-view\",\"scope\":\"user\"}": "0.8.4",
+    "{\"source\":\"npm:pi-footer\",\"scope\":\"user\"}": "0.5.1"
+  }
 }
