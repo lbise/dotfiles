@@ -82,4 +82,28 @@ export default async function (pi) {
         models: deployments.map((d) => deploymentToModel(d, host)),
     });
     console.log(`[Azure Foundry] ✓ Registered ${deployments.length} model(s): ${deployments.map((d) => d.name).join(", ")}`);
+    // Foundry doesn't apply pi's `thinking.block_binding: drop_block` (thinking-binding-controls beta), so
+    // after a compaction or branch summary, thinking blocks bound to the replaced prefix get a 400.
+    pi.on("context", (event, ctx) => {
+        const m = ctx.model;
+        if (m?.provider !== "azure-foundry" || m.api !== "anthropic-messages" || !m.compat?.supportsMidConvoEffort)
+            return;
+        const messages = dropUnboundThinking(event.messages);
+        return messages === event.messages ? undefined : { messages };
+    });
+}
+
+/** Drop thinking from assistant messages created before a summary that now precedes them (their prefix changed). */
+export function dropUnboundThinking(messages) {
+    let summaryTime = -Infinity;
+    let changed = false;
+    const out = messages.map((msg) => {
+        if (msg.role === "compactionSummary" || msg.role === "branchSummary")
+            summaryTime = Math.max(summaryTime, msg.timestamp);
+        if (msg.role !== "assistant" || msg.timestamp >= summaryTime || !msg.content.some((b) => b.type === "thinking"))
+            return msg;
+        changed = true;
+        return { ...msg, content: msg.content.filter((b) => b.type !== "thinking") };
+    });
+    return changed ? out : messages;
 }
