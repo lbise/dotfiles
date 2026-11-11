@@ -329,6 +329,18 @@ hl.window_rule({
     center = true,
 })
 
+-- Blender's file browser opens as a 320x240 float; give it a usable size.
+-- It maps as "File Browser" and is renamed "Blender File View" afterwards, and
+-- size only applies at map time, so match the initial title.
+-- https://projects.blender.org/blender/blender/issues/162315
+hl.window_rule({
+    name   = "blender-file-view",
+    match  = { class = "^blender$", initial_title = "^File Browser$" },
+    float  = true,
+    size   = { 1600, 1000 },
+    center = true,
+})
+
 -- Fix some dragging issues with XWayland
 hl.window_rule({
     name  = "fix-xwayland-drags",
