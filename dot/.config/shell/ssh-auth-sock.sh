@@ -22,6 +22,9 @@ if [[ $- == *i* ]] && [[ -x "$_socklink" ]]; then
             "$_socklink" -c tmux-shell-init set-tmux-env
         fi
         export SSH_AUTH_SOCK="$_tmux_auth_sock"
+    elif [[ -n "${HC_TERMINAL_ID:-}" ]]; then
+        # herdr-core pane: not a login TTY, herdr-display.sh follows the herdr link.
+        :
     else
         # Record this login TTY's real forwarded socket before replacing it
         # with a stable link inside a multiplexer.

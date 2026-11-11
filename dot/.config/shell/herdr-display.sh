@@ -1,7 +1,8 @@
 # Refresh connection-specific environment in persistent Herdr panes.
 
 herdr_sync_connection_environment() {
-    [[ -n "${HERDR_ENV:-}" ]] || return 0
+    # HERDR_ENV: old herdr panes; HC_TERMINAL_ID: herdr-core panes
+    [[ -n "${HERDR_ENV:-}${HC_TERMINAL_ID:-}" ]] || return 0
 
     local socklink="$HOME/.scripts/herdr-socklink.sh" auth_sock
     if [[ -x "$socklink" ]] && auth_sock=$("$socklink" show 2>/dev/null) && [[ -S "$auth_sock" ]]; then
