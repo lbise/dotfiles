@@ -44,6 +44,8 @@ DESKTOP_LINKS=(
     ".config/uwsm"
     ".config/walker"
     ".config/elephant/menus"
+    # sdl-freerdp hotkeys default to Right Shift + key: Shift+D disconnects.
+    ".config/freerdp/sdl-freerdp.json"
     ".config/xdg-terminals.list"
     ".config/leo"
     ".local/share/applications/connect-rdp.desktop"
