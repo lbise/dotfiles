@@ -55,7 +55,10 @@ installs any packages newly declared by the repository.
 ## Apply hooks
 
 After pulling a commit, `dotfiles sync` runs executable `*.sh` files under
-`install/apply.d/` in filename order. The current hook applies symlinks.
+`install/apply.d/` in filename order. The hooks apply symlinks and, on WSL,
+copy the SSH config to the Windows profile for Windows apps such as the Herdr
+GUI. Windows OpenSSH cannot include files from WSL. The first copy backs up a
+hand-written Windows config to `config.bak.<timestamp>`.
 
 The command records the successfully applied commit in:
 

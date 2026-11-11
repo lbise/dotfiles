@@ -13,3 +13,6 @@ dot/.pi/agent/extensions/herdr-agent-state.ts
 dot/.config/opencode/herdr-tui-session.js
 dot/.config/opencode/tui.jsonc
 .pi/subagents
+# Type files the Herdr app generates inside each mod folder
+dot/.config/herdr-app/mods/*/*.d.ts
+dot/.config/herdr-app/mods/*/jsconfig.json

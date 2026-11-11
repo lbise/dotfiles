@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Link the Herdr desktop app's config on Windows to dot/.config/herdr-app in this
+# repo (WSL), so the repo holds the real files.
+#
+# Re-run it after editing a tracked file from WSL: the app does not see changes made
+# on the WSL side, but it reloads a file whose link is replaced.
+#
+# Creating Windows symlinks needs an elevated WSL session or Windows Developer Mode.
+set -Eeuo pipefail
+
+repo_dir="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)/dot/.config/herdr-app"
+win_profile="$(cd /mnt/c && cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
+app_dir="$(wslpath "$win_profile")/.config/herdr-app"
+
+if [[ "$repo_dir$app_dir" == *" "* ]]; then
+    echo "ERROR: paths with spaces are not supported: $repo_dir, $app_dir" >&2
+    exit 1
+fi
+if [[ ! -d $app_dir ]]; then
+    echo "ERROR: $app_dir does not exist; start the Herdr app once first" >&2
+    exit 1
+fi
+
+# shortcut: paths go to cmd.exe unquoted (WSL interop mangles embedded quotes),
+# so paths with spaces are refused; quote properly if a profile path ever has one.
+win_cmd() {
+    if [[ $1 == *'"'* ]]; then
+        echo "ERROR: unexpected quote in: $1" >&2
+        exit 1
+    fi
+    (cd /mnt/c && cmd.exe /c "$1" </dev/null 2>&1 | tr -d '\r')
+}
+
+# Keep a copy of whatever real file or folder the link replaces, once. It goes outside
+# mods/ and themes/, where the app would pick it up as another mod or theme.
+backup() {
+    local dst=$1 keep="$app_dir/.before-link/${1#"$app_dir"/}"
+    if [[ -e $dst && ! -L $dst && ! -e $keep ]]; then
+        mkdir -p "$(dirname "$keep")"
+        cp -r "$dst" "$keep"
+    fi
+}
+
+# Create the link under a temporary name and move it over the target: the app
+# recreates a default keys.json the moment the file is missing.
+link_file() {
+    local rel=$1 dst="$app_dir/$1" target dst_win
+    target="$(wslpath -w "$repo_dir/$rel")"
+    backup "$dst"
+    mkdir -p "$(dirname "$dst")"
+    dst_win="$(wslpath -w "$(dirname "$dst")")\\$(basename "$dst")"
+    win_cmd "mklink $dst_win.lnk $target >NUL && move /Y $dst_win.lnk $dst_win >NUL"
+    echo "linked $rel"
+}
+
+link_dir() {
+    local rel=$1 dst="$app_dir/$1" target dst_win
+    target="$(wslpath -w "$repo_dir/$rel")"
+    backup "$dst"
+    dst_win="$(wslpath -w "$(dirname "$dst")")\\$(basename "$dst")"
+    if [[ -L $dst ]]; then
+        win_cmd "rmdir $dst_win"
+    elif [[ -e $dst ]]; then
+        rm -rf "$dst"
+    fi
+    win_cmd "mklink /D $dst_win $target >NUL"
+    echo "linked $rel/"
+}
+
+cd "$repo_dir"
+for rel in *.json themes/*.json; do
+    [[ -f $rel ]] && link_file "$rel"
+done
+for rel in mods/*/; do
+    [[ -d $rel ]] && link_dir "${rel%/}"
+done
