@@ -24,9 +24,21 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
+import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
 
 const FALLBACK = { reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 4096 };
+
+/** Exact catalog entry, else the newest sibling of the same family (claude-fable-5-2 -> claude-fable-5-1).
+ * shortcut: a deployment newer than pi's catalog borrows its predecessor's limits/compat; exact match wins once pi is updated. */
+export function catalogModel(provider, id) {
+    const models = getBuiltinModels(provider);
+    const exact = models.find((m) => m.id === id);
+    const family = id.replace(/-\d+$/, "");
+    if (exact || family === id)
+        return exact;
+    return models.filter((m) => m.id === family || m.id.startsWith(`${family}-`))
+        .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })).at(-1);
+}
 
 /** Route a deployment to one of pi's built-in API implementations, with metadata from pi's catalog. */
 function deploymentToModel(d, host) {
@@ -37,16 +49,18 @@ function deploymentToModel(d, host) {
             ? { api: "azure-openai-responses", baseUrl: `${host}/openai/v1`, catalogs: ["azure", "openai"] }
             // shortcut: other publishers (Kimi, Llama, ...) untested on Foundry's OpenAI-compatible v1 route; verify when one is deployed.
             : { api: "openai-completions", baseUrl: `${host}/openai/v1`, catalogs: [] };
-    const c = route.catalogs.map((p) => getBuiltinModel(p, modelName)).find(Boolean);
+    const c = route.catalogs.map((p) => catalogModel(p, modelName)).find(Boolean);
     if (!c)
         console.log(`[Azure Foundry] ${d.name}: "${modelName}" not in pi's catalog, using generic limits`);
+    else if (c.id !== modelName)
+        console.log(`[Azure Foundry] ${d.name}: "${modelName}" not in pi's catalog, using ${c.id} metadata`);
     // Foundry rejects Anthropic's server-side `fallbacks` request field, so drop the compat entry that enables it.
     const { allowedFallbackModels, ...compat } = c?.compat ?? {};
     const meta = c
         ? { reasoning: c.reasoning, input: c.input, cost: c.cost, contextWindow: c.contextWindow, maxTokens: c.maxTokens,
             thinkingLevelMap: c.thinkingLevelMap, compat: c.compat && compat, promptCache: c.promptCache, inputLimits: c.inputLimits }
         : FALLBACK;
-    return { id: d.name, name: `${c?.name ?? modelName} (Azure)`, api: route.api, baseUrl: route.baseUrl, ...meta };
+    return { id: d.name, name: `${c?.id === modelName ? c.name : modelName} (Azure)`, api: route.api, baseUrl: route.baseUrl, ...meta };
 }
 
 export default async function (pi) {
@@ -86,7 +100,7 @@ export default async function (pi) {
     // after a compaction or branch summary, thinking blocks bound to the replaced prefix get a 400.
     pi.on("context", (event, ctx) => {
         const m = ctx.model;
-        if (m?.provider !== "azure-foundry" || m.api !== "anthropic-messages" || !m.compat?.supportsMidConvoEffort)
+        if (m?.provider !== "azure-foundry" || m.api !== "anthropic-messages")
             return;
         const messages = dropUnboundThinking(event.messages);
         return messages === event.messages ? undefined : { messages };
