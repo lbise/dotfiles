@@ -63,7 +63,7 @@ export function catalogModel(provider, id) {
 }
 
 /** Route a deployment to one of pi's built-in API implementations, with metadata from pi's catalog. */
-function deploymentToModel(d, host) {
+function deploymentToModel(d, host, note) {
     const modelName = d.modelName ?? d.name;
     const route = d.modelPublisher === "Anthropic"
         ? { api: "anthropic-messages", baseUrl: `${host}/anthropic`, catalogs: ["anthropic"] }
@@ -73,9 +73,9 @@ function deploymentToModel(d, host) {
             : { api: "openai-completions", baseUrl: `${host}/openai/v1`, catalogs: [] };
     const c = route.catalogs.map((p) => catalogModel(p, modelName)).find(Boolean);
     if (!c)
-        console.log(`[Azure Foundry] ${d.name}: "${modelName}" not in pi's catalog, using generic limits`);
+        note(`${d.name}: "${modelName}" not in pi's catalog, using generic limits`);
     else if (c.id !== modelName)
-        console.log(`[Azure Foundry] ${d.name}: "${modelName}" not in pi's catalog, using ${c.id} metadata`);
+        note(`${d.name}: "${modelName}" not in pi's catalog, using ${c.id} metadata`);
     // Foundry rejects Anthropic's server-side `fallbacks` request field, so drop the compat entry that enables it.
     const { allowedFallbackModels, ...compat } = c?.compat ?? {};
     const meta = c
@@ -86,6 +86,13 @@ function deploymentToModel(d, host) {
 }
 
 export default async function (pi) {
+    // Startup stdout is wiped by the TUI, so hold messages until the session UI exists.
+    const notes = [];
+    const note = (text, level = "info") => notes.push({ text: `[Azure Foundry] ${text}`, level });
+    pi.on("session_start", (event, ctx) => {
+        if (ctx.hasUI && (event.reason === "startup" || event.reason === "reload"))
+            notes.forEach((n) => ctx.ui.notify(n.text, n.level));
+    });
     // shortcut: api-key auth only; pi's built-in Anthropic/Azure clients take a static key.
     // Entra ID login needs a token-refreshing provider; add it if that auth is ever needed.
     const { AZURE_FOUNDRY_RESOURCE: resource, AZURE_FOUNDRY_PROJECT: project, AZURE_FOUNDRY_API_KEY: apiKey } = await credentials();
@@ -102,11 +109,11 @@ export default async function (pi) {
     }
     catch (error) {
         // Don't take pi down when Foundry is unreachable or misconfigured; just skip the provider.
-        console.warn(`[Azure Foundry] Deployment discovery failed (${url}): ${error instanceof Error ? error.message : error}`);
+        note(`Deployment discovery failed (${url}): ${error instanceof Error ? error.message : error}`, "warning");
         return;
     }
     if (deployments.length === 0) {
-        console.warn("[Azure Foundry] No chat-capable deployments found");
+        note("No chat-capable deployments found", "warning");
         return;
     }
     pi.registerProvider("azure-foundry", {
@@ -114,9 +121,9 @@ export default async function (pi) {
         baseUrl: host,
         // Literal key (Vault values are not in the env); escape pi's `$VAR` / `!command` syntax.
         apiKey: apiKey.replace(/[$!]/g, "$$$&"),
-        models: deployments.map((d) => deploymentToModel(d, host)),
+        models: deployments.map((d) => deploymentToModel(d, host, note)),
     });
-    console.log(`[Azure Foundry] ✓ Registered ${deployments.length} model(s): ${deployments.map((d) => d.name).join(", ")}`);
+    note(`✓ Registered ${deployments.length} model(s): ${deployments.map((d) => d.name).join(", ")}`);
     // Foundry doesn't apply pi's `thinking.block_binding: drop_block` (thinking-binding-controls beta), so
     // after a compaction or branch summary, thinking blocks bound to the replaced prefix get a 400.
     pi.on("context", (event, ctx) => {
