@@ -2,6 +2,12 @@
 set -Eeuo pipefail
 
 HOSTS_FILE=${DOTFILES_HOSTS:-$HOME/.config/dotfiles/hosts}
+# Hosts file lines are "HOST [# COMMENT]"; lines starting with # are comments.
+# Sets host and note to the trimmed parts of the current line.
+PARSE_LINE='{
+    i = index($0, "#"); host = i ? substr($0, 1, i - 1) : $0; note = i ? substr($0, i + 1) : ""
+    gsub(/^[ \t]+|[ \t]+$/, "", host); gsub(/^[ \t]+|[ \t]+$/, "", note)
+}'
 
 error() {
     echo "dotfiles-fleet: $*" >&2
@@ -11,7 +17,7 @@ error() {
 usage() {
     cat <<'EOF'
 Usage: dotfiles-fleet [sync|apps|update|system]
-       dotfiles-fleet add HOST [LABEL]
+       dotfiles-fleet add HOST [COMMENT] [--label LABEL]
        dotfiles-fleet remove HOST
        dotfiles-fleet list
 
@@ -20,23 +26,35 @@ $DOTFILES_HOSTS or ~/.config/dotfiles/hosts. Blank lines and comments are
 ignored. The default command is update.
 
 add sets up key-based SSH (asking for the password once if needed) and then
-lists HOST. On WSL with the Windows Herdr app (hc.exe), it also adds HOST to
+lists HOST with COMMENT (adding again replaces the comment). On WSL with the Windows Herdr app (hc.exe), it also adds HOST to
 Herdr as N-LABEL, N being the next free ordering number. LABEL defaults to the
 remote hostname without the ch03wx prefix. remove unlists HOST. list prints the
-listed hosts.
+listed hosts and their comments.
 EOF
 }
 
 validate_host() {
-    [[ -n "$1" && "$1" != -* && "$1" != *[[:space:]]* && "$1" != \#* ]] ||
+    [[ -n "$1" && "$1" != -* && "$1" != *[[:space:]]* && "$1" != *#* ]] ||
         error "invalid SSH destination: $1"
 }
 
-# Prints the listed hosts without surrounding whitespace, blank lines or comments.
-list_hosts() {
+# Prints "HOST<TAB>COMMENT" for each listed host.
+list_entries() {
     [[ -e "$HOSTS_FILE" ]] || return 0
     [[ -r "$HOSTS_FILE" ]] || error "hosts file is not readable: $HOSTS_FILE"
-    awk '{ gsub(/^[ \t]+|[ \t]+$/, "") } $0 != "" && $0 !~ /^#/' "$HOSTS_FILE"
+    awk "$PARSE_LINE"' host != "" { print host "\t" note }' "$HOSTS_FILE"
+}
+
+list_hosts() {
+    list_entries | cut -f1
+}
+
+# Replaces HOST's line with LINE, or deletes it when LINE is empty.
+replace_entry() {
+    local tmp_file
+    tmp_file=$(mktemp "$HOSTS_FILE.XXXXXX")
+    awk -v h="$1" -v line="$2" "$PARSE_LINE"' host == h { if (line != "") print line; next } { print }' "$HOSTS_FILE" > "$tmp_file"
+    mv "$tmp_file" "$HOSTS_FILE"
 }
 
 host_listed() {
@@ -82,9 +100,11 @@ add_to_herdr() {
 }
 
 add_host() {
-    local host=$1 label=${2:-} remote_name
+    local host=$1 comment=$2 label=$3 remote_name entry=$1
     validate_host "$host"
     [[ -z "$label" ]] || validate_host "$label"
+    [[ "$comment" != *$'\n'* ]] || error "comment must be a single line"
+    [[ -z "$comment" ]] || entry="$host # $comment"
 
     if ! key_login "$host"; then
         echo "Key login to $host failed; installing your public key (password prompt)."
@@ -98,11 +118,15 @@ add_host() {
     fi
     remote_name=${remote_name%%.*}
 
-    if host_listed "$host"; then
-        echo "$host is already listed in $HOSTS_FILE"
-    else
+    if ! host_listed "$host"; then
         mkdir -p "$(dirname "$HOSTS_FILE")"
-        printf '%s\n' "$host" >> "$HOSTS_FILE"
+        printf '%s\n' "$entry" >> "$HOSTS_FILE"
+        echo "Added $host to $HOSTS_FILE"
+    elif [[ -n "$comment" ]]; then
+        replace_entry "$host" "$entry"
+        echo "Updated the comment of $host in $HOSTS_FILE"
+    else
+        echo "$host is already listed in $HOSTS_FILE"
         echo "Added $host to $HOSTS_FILE"
     fi
 
@@ -110,13 +134,11 @@ add_host() {
 }
 
 remove_host() {
-    local host=$1 tmp_file
+    local host=$1
     validate_host "$host"
     host_listed "$host" || error "$host is not listed in $HOSTS_FILE"
 
-    tmp_file=$(mktemp "$HOSTS_FILE.XXXXXX")
-    awk -v h="$host" '{ t = $0; gsub(/^[ \t]+|[ \t]+$/, "", t) } t != h' "$HOSTS_FILE" > "$tmp_file"
-    mv "$tmp_file" "$HOSTS_FILE"
+    replace_entry "$host" ""
     echo "Removed $host from $HOSTS_FILE"
 }
 
@@ -126,8 +148,20 @@ main() {
 
     case "$action" in
         add)
-            [[ $# -eq 2 || $# -eq 3 ]] || error "add requires HOST and an optional LABEL"
-            add_host "$2" "${3:-}"
+            shift
+            local args=() label=""
+            while (( $# )); do
+                if [[ "$1" == --label ]]; then
+                    [[ $# -ge 2 ]] || error "--label requires a LABEL"
+                    label=$2
+                    shift 2
+                else
+                    args+=("$1")
+                    shift
+                fi
+            done
+            [[ ${#args[@]} -eq 1 || ${#args[@]} -eq 2 ]] || error "usage: dotfiles-fleet add HOST [COMMENT] [--label LABEL]"
+            add_host "${args[0]}" "${args[1]:-}" "$label"
             return 0
             ;;
         remove)
@@ -140,7 +174,7 @@ main() {
 
     case "$action" in
         list)
-            list_hosts
+            list_entries | awk -F '\t' '{ printf "%-24s %s\n", $1, $2 }'
             return 0
             ;;
         sync|apps|update|system) ;;

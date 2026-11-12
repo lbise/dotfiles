@@ -273,17 +273,24 @@ SCRIPT
     [[ $(cat "$hosts") == $'host-a\nuser@host-b' ]] || fail "add did not list each host once"
     [[ $(cat "$herdr_log") == 'machine add user@host-b --install --name 13-host-b' ]] || fail "add did not add only the new host to Herdr with the next number"
     PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add ch03wxboard7 >/dev/null
-    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-d mybox >/dev/null
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-d --label mybox >/dev/null
     [[ $(sed -n '2p' "$herdr_log") == 'machine add ch03wxboard7 --install --name 13-board7' ]] || fail "add did not strip the ch03wx prefix"
     [[ $(sed -n '3p' "$herdr_log") == 'machine add host-d --install --name 13-mybox' ]] || fail "add did not use the given label"
     head -n 1 "$herdr_log" > "$herdr_log.tmp" && mv "$herdr_log.tmp" "$herdr_log"
     DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove ch03wxboard7 >/dev/null
     DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove host-d >/dev/null
     printf '  # comment\n\n' >> "$hosts"
-    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list) == $'host-a\nuser@host-b' ]] || fail "list did not print the hosts"
+    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list) == "$(printf '%-24s \n%-24s ' host-a user@host-b)" ]] || fail "list did not print the hosts"
+
+    # A comment is stored after the host, shown by list, and replaced by adding again.
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-a 'Old #1' >/dev/null
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-a 'PEVB #16 Alice' >/dev/null
+    [[ $(sed -n '1p' "$hosts") == 'host-a # PEVB #16 Alice' ]] || fail "add did not store the comment"
+    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list | head -n 1) == "$(printf '%-24s %s' host-a 'PEVB #16 Alice')" ]] || fail "list did not show the comment"
+    [[ $(cat "$herdr_log") == 'machine add user@host-b --install --name 13-host-b' ]] || fail "updating a comment re-added the host to Herdr"
 
     PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove host-a >/dev/null
-    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list) == user@host-b ]] || fail "remove did not unlist host-a"
+    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list | awk '{ print $1 }') == user@host-b ]] || fail "remove did not unlist host-a"
     if DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove host-a >/dev/null 2>&1; then
         fail "remove accepted an unlisted host"
     fi
@@ -293,7 +300,7 @@ SCRIPT
     if PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-c >/dev/null 2>&1; then
         fail "add accepted a host without working key login"
     fi
-    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list) == user@host-b ]] || fail "add listed a host without working key login"
+    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list | awk '{ print $1 }') == user@host-b ]] || fail "add listed a host without working key login"
     [[ $(wc -l < "$herdr_log") == 1 ]] || fail "add sent a host without working key login to Herdr"
 }
 
