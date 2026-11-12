@@ -20,6 +20,7 @@ PACMAN_CONF=${PACMAN_CONF:-/etc/pacman.conf}
 NM_WIFI_BACKEND_CONF=${NM_WIFI_BACKEND_CONF:-/etc/NetworkManager/conf.d/wifi-backend.conf}
 IWD_MAIN_CONF=${IWD_MAIN_CONF:-/etc/iwd/main.conf}
 IWD_WAIT_DROPIN=${IWD_WAIT_DROPIN:-/etc/systemd/system/iwd.service.d/wait-for-wlan0.conf}
+ZRAM_CONF=${ZRAM_CONF:-/etc/systemd/zram-generator.conf}
 
 # Swiss French. SDDM's greeter runs on X11 and falls back to US without this.
 # Keep in step with kb_layout, kb_model and kb_variant in hypr/hyprland.lua.
@@ -51,6 +52,8 @@ SYSTEM_PKGS=(
     curl unzip fontconfig noto-fonts noto-fonts-emoji ttf-liberation
     # system-login-install.sh
     python
+    # Compressed swap in RAM, see configure_zram
+    zram-generator
 )
 
 SYSTEM_SERVICES=(
@@ -127,6 +130,14 @@ configure_network() {
     fi
 }
 
+# Without swap, an 8 GB laptop running Battle.net, a browser and an Electron
+# app thrashed the page cache and hit the OOM killer. zram-generator creates
+# the device at boot, so this takes effect after the reboot.
+configure_zram() {
+    printf '[zram0]\nzram-size = ram / 2\ncompression-algorithm = zstd\n' |
+        write_root_file "$ZRAM_CONF"
+}
+
 # localectl writes /etc/X11/xorg.conf.d/00-keyboard.conf, which X11 reads.
 configure_keyboard() {
     local status
@@ -183,6 +194,8 @@ main() {
     install_system_packages
     step "Configuring NetworkManager"
     configure_network
+    step "Configuring zram swap"
+    configure_zram
     step "Configuring the X11 keymap for SDDM"
     configure_keyboard
     step "Enabling system services"

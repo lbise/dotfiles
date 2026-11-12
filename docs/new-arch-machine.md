@@ -19,7 +19,8 @@ Earlier versions used iwd as the backend: it broke Wi-Fi at boot, and after a
 dropped link NetworkManager took iwd's failed reconnect for a wrong password
 and stopped reconnecting. Rerunning the script on such a machine removes the
 iwd config and disables iwd. It also enables Color, ParallelDownloads and
-multilib in pacman, sets the X11 keymap to Swiss French so SDDM's login
+multilib in pacman, sets up zram swap at half of RAM (without swap, an 8 GB
+laptop running Battle.net hit the OOM killer), sets the X11 keymap to Swiss French so SDDM's login
 screen matches Hyprland, enables the system services, enables the elephant user
 service, installs the fonts, and installs the SDDM theme. On a machine with a
 battery it adds power-profiles-daemon.
