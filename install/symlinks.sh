@@ -43,6 +43,12 @@ DESKTOP_LINKS=(
     ".config/systemd/user/leo-quickshell.service"
     ".config/systemd/user/leo-bt-agent.service"
     ".config/uwsm"
+    # Herdr desktop app. Link single files: the app writes its own state next to them.
+    # On WSL with the app on Windows, use scripts/herdr-app-link instead.
+    ".config/herdr-app/keys.json"
+    ".config/herdr-app/settings.json"
+    ".config/herdr-app/themes/tokyo-night.json"
+    ".config/herdr-app/mods/prefix"
     ".config/walker"
     ".config/elephant/menus"
     # sdl-freerdp hotkeys default to Right Shift + key: Shift+D disconnects.

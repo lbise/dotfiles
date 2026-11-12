@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Link the Herdr desktop app's config on Windows to dot/.config/herdr-app in this
-# repo (WSL), so the repo holds the real files.
+# repo (WSL), so the repo holds the real files. On native Linux, install/symlinks.sh
+# links ~/.config/herdr-app instead.
 #
 # Re-run it after editing a tracked file from WSL: the app does not see changes made
 # on the WSL side, but it reloads a file whose link is replaced.
