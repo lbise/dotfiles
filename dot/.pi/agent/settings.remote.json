@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.4.0",
+  "lastChangelogVersion": "1.5.1",
   "defaultProvider": "github-copilot",
   "defaultModel": "claude-opus-5.5",
   "defaultThinkingLevel": "high",
@@ -37,5 +37,9 @@
   "defaultProjectTrust": "always",
   "defaultTools": [
     "+codemode"
-  ]
+  ],
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-context-view\",\"scope\":\"user\"}": "0.8.3",
+    "{\"source\":\"npm:pi-footer\",\"scope\":\"user\"}": "0.5.1"
+  }
 }
