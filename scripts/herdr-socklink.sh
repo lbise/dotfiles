@@ -7,7 +7,7 @@ SOCKLINK_DIR="${SOCKLINK_DIR:-${SOCKLINK_TMPDIR:-/tmp}/socklink-$(id -u)}"
 HERDR_LINK="$SOCKLINK_DIR/herdr"
 
 usage() {
-    echo "Usage: $(basename "$0") {set-current-tty|set-current-socket|set-client-environment|show}" >&2
+    echo "Usage: $(basename "$0") {set-current-tty|set-current-socket|set-client-environment|refresh|show}" >&2
 }
 
 set_current_target() {
@@ -82,6 +82,25 @@ set_current_socket() {
     write_client_environment
 }
 
+# Repair a dead link without stealing a live one. Prefer the agent forwarded by
+# the Herdr GUI connection (herdr-core connect), which outlives short logins.
+refresh() {
+    local pid sock
+
+    [[ -S "$HERDR_LINK" ]] && return 0
+    for pid in $(pgrep -u "$(id -u)" -x herdr-core | sort -rn); do
+        tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | grep -qx connect || continue
+        sock=$(tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null | sed -n 's/^SSH_AUTH_SOCK=//p')
+        if [[ -S "$sock" && -O "$sock" ]]; then
+            set_current_target "$sock"
+            return 0
+        fi
+    done
+    if [[ -S "${SSH_AUTH_SOCK:-}" && -O "$SSH_AUTH_SOCK" ]]; then
+        set_current_socket
+    fi
+}
+
 case "${1:-}" in
     set-current-tty)
         set_current_tty
@@ -91,6 +110,9 @@ case "${1:-}" in
         ;;
     set-client-environment)
         write_client_environment
+        ;;
+    refresh)
+        refresh
         ;;
     show)
         printf '%s\n' "$HERDR_LINK"

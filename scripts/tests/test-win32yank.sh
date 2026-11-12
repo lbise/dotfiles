@@ -41,8 +41,8 @@ while (($#)); do
     esac
 done
 printf '%s\n' "$url" >> "$CURL_LOG"
-if [[ "$url" == *api.github.com* ]]; then
-    printf '{"tag_name":"%s"}\n' "$LATEST_TAG"
+if [[ "$url" == */releases/latest ]]; then
+    printf '%s/tag/%s' "${url%/latest}" "$LATEST_TAG"
 else
     : > "$output"
 fi

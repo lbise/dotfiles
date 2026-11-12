@@ -73,10 +73,12 @@ environment_file="$remote_home/.config/herdr/client-environment.sh"
     [[ ! -v XAUTHORITY ]]
 )
 
-# ~/.ssh/rc must not steal a live link from the Herdr connection, but must
-# replace a dead one.
+# ~/.ssh/rc must not steal a live link, but must repair a dead one, preferring
+# the agent of the Herdr GUI connection (herdr-core connect) over its own.
 other_sock="$TMP_DIR/other-agent.sock"
 other_pid=$(ssh-agent -a "$other_sock" -s | awk -F '[=;]' '/SSH_AGENT_PID/ { print $2 }')
+gui_sock="$TMP_DIR/gui-agent.sock"
+gui_agent_pid=$(ssh-agent -a "$gui_sock" -s | awk -F '[=;]' '/SSH_AGENT_PID/ { print $2 }')
 run_rc() {
     HOME="$remote_home" SOCKLINK_DIR="$socklink_dir" SSH_AUTH_SOCK="$other_sock" \
         sh "$ROOT/dot/.ssh/rc"
@@ -86,4 +88,13 @@ run_rc
 ln -sfn "$TMP_DIR/stale-agent.sock" "$socklink_dir/herdr"
 run_rc
 [[ $(readlink "$socklink_dir/herdr") == "$other_sock" ]]
-kill "$other_pid"
+
+# Fake GUI bridge: process named herdr-core with a "connect" argument.
+cp "$(command -v bash)" "$TMP_DIR/herdr-core"
+SSH_AUTH_SOCK="$gui_sock" "$TMP_DIR/herdr-core" -c 'sleep 30; :' connect &
+gui_pid=$!
+sleep 0.2
+ln -sfn "$TMP_DIR/stale-agent.sock" "$socklink_dir/herdr"
+run_rc
+[[ $(readlink "$socklink_dir/herdr") == "$gui_sock" ]]
+kill "$gui_pid" "$gui_agent_pid" "$other_pid"

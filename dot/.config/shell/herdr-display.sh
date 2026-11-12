@@ -5,8 +5,10 @@ herdr_sync_connection_environment() {
     [[ -n "${HERDR_ENV:-}${HC_TERMINAL_ID:-}" ]] || return 0
 
     local socklink="$HOME/.scripts/herdr-socklink.sh" auth_sock
-    if [[ -x "$socklink" ]] && auth_sock=$("$socklink" show 2>/dev/null) && [[ -S "$auth_sock" ]]; then
-        export SSH_AUTH_SOCK="$auth_sock"
+    if [[ -x "$socklink" ]] && auth_sock=$("$socklink" show 2>/dev/null); then
+        # The link dies when its SSH connection closes; repair it from a live one.
+        [[ -S "$auth_sock" ]] || "$socklink" refresh >/dev/null 2>&1
+        [[ -S "$auth_sock" ]] && export SSH_AUTH_SOCK="$auth_sock"
     fi
 
     local environment_dir="${HERDR_ENVIRONMENT_DIR:-$HOME/.config/herdr}"
