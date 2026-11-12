@@ -72,3 +72,18 @@ environment_file="$remote_home/.config/herdr/client-environment.sh"
     [[ ! -v WAYLAND_DISPLAY ]]
     [[ ! -v XAUTHORITY ]]
 )
+
+# ~/.ssh/rc must not steal a live link from the Herdr connection, but must
+# replace a dead one.
+other_sock="$TMP_DIR/other-agent.sock"
+other_pid=$(ssh-agent -a "$other_sock" -s | awk -F '[=;]' '/SSH_AGENT_PID/ { print $2 }')
+run_rc() {
+    HOME="$remote_home" SOCKLINK_DIR="$socklink_dir" SSH_AUTH_SOCK="$other_sock" \
+        sh "$ROOT/dot/.ssh/rc"
+}
+run_rc
+[[ $(readlink "$socklink_dir/herdr") == "$agent_sock" ]]
+ln -sfn "$TMP_DIR/stale-agent.sock" "$socklink_dir/herdr"
+run_rc
+[[ $(readlink "$socklink_dir/herdr") == "$other_sock" ]]
+kill "$other_pid"
