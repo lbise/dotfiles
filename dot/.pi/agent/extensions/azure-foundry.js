@@ -25,6 +25,28 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
+import { execFile } from "node:child_process";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+
+const CREDENTIALS = ["AZURE_FOUNDRY_RESOURCE", "AZURE_FOUNDRY_PROJECT", "AZURE_FOUNDRY_API_KEY"];
+
+/** Each credential from its env var, else the Vault agent folder, via the ai-skills helper redmine_cli.py also uses. */
+async function credentials() {
+    if (CREDENTIALS.every((n) => process.env[n]))
+        return Object.fromEntries(CREDENTIALS.map((n) => [n, process.env[n]]));
+    const script = "import json, sys; sys.path.append(sys.argv[1]); from vault_secrets import get_credential; "
+        + "print(json.dumps({n: get_credential(n, required=False) for n in sys.argv[2:]}))";
+    const helper = join(homedir(), "gitrepo/ai-skills/skills/vault-secrets");
+    try {
+        const { stdout } = await promisify(execFile)("python3", ["-c", script, helper, ...CREDENTIALS], { timeout: 15000 });
+        return JSON.parse(stdout);
+    }
+    catch {
+        return {}; // no python, no helper, or Vault unreachable: same as unset
+    }
+}
 
 const FALLBACK = { reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 4096 };
 
@@ -66,11 +88,9 @@ function deploymentToModel(d, host) {
 export default async function (pi) {
     // shortcut: api-key auth only; pi's built-in Anthropic/Azure clients take a static key.
     // Entra ID login needs a token-refreshing provider; add it if that auth is ever needed.
-    const { AZURE_FOUNDRY_RESOURCE: resource, AZURE_FOUNDRY_PROJECT: project, AZURE_FOUNDRY_API_KEY: apiKey } = process.env;
-    if (!resource || !project || !apiKey) {
-        console.warn("[Azure Foundry] Set AZURE_FOUNDRY_RESOURCE, AZURE_FOUNDRY_PROJECT and AZURE_FOUNDRY_API_KEY to enable the provider");
-        return;
-    }
+    const { AZURE_FOUNDRY_RESOURCE: resource, AZURE_FOUNDRY_PROJECT: project, AZURE_FOUNDRY_API_KEY: apiKey } = await credentials();
+    if (!resource || !project || !apiKey)
+        return; // not configured on this machine: stay silent
     const host = `https://${resource}.services.ai.azure.com`;
     const url = `${host}/api/projects/${project}/deployments?api-version=v1`;
     let deployments;
@@ -92,7 +112,8 @@ export default async function (pi) {
     pi.registerProvider("azure-foundry", {
         name: "Azure Foundry",
         baseUrl: host,
-        apiKey: "$AZURE_FOUNDRY_API_KEY",
+        // Literal key (Vault values are not in the env); escape pi's `$VAR` / `!command` syntax.
+        apiKey: apiKey.replace(/[$!]/g, "$$$&"),
         models: deployments.map((d) => deploymentToModel(d, host)),
     });
     console.log(`[Azure Foundry] ✓ Registered ${deployments.length} model(s): ${deployments.map((d) => d.name).join(", ")}`);
