@@ -72,16 +72,31 @@ hook rather than added to the routine app updater.
 
 ## Updating SSH machines
 
-Create an untracked host list on the laptop:
+The laptop keeps an untracked host list in `~/.config/dotfiles/hosts`, one SSH
+destination per line. Manage it with:
 
 ```bash
-mkdir -p ~/.config/dotfiles
-cat > ~/.config/dotfiles/hosts <<'EOF'
-server-one
-server-two
-user@workstation
-EOF
+dotfiles-fleet add user@workstation
+dotfiles-fleet remove user@workstation
+dotfiles-fleet list
 ```
+
+`add` first tries a key login. If that fails, it runs `ssh-copy-id`, which
+asks for the password once, and then checks the key login again. It only lists
+the host once a key login works. It warns when the host does not have dotfiles
+installed yet. `remove` only edits the list; it does not revoke the key on the
+host.
+
+On WSL, when the Windows Herdr app's `hc.exe` is on `PATH`, `add` also adds the
+host to Herdr. Herdr uses Windows OpenSSH, which has its own ssh-agent and
+`known_hosts`. `add` therefore checks a key login with `ssh.exe` first (and
+records the host key), then runs `hc.exe machine add HOST --install`. It skips
+hosts Herdr already has, matched by the remote hostname. Herdr sorts machines
+by name, so `add` names the machine `N-LABEL`, with N one above the highest
+existing number prefix. LABEL is the remote hostname without `ch03wx`, or the
+optional second argument: `dotfiles-fleet add user@workstation ws`. If the Windows
+ssh-agent lacks the key, it warns and leaves Herdr alone. `remove` does not
+remove the machine from Herdr; use `hc.exe machine rm NAME`.
 
 Run the normal update on each host, sequentially:
 

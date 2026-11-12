@@ -11,19 +11,138 @@ error() {
 usage() {
     cat <<'EOF'
 Usage: dotfiles-fleet [sync|apps|update|system]
+       dotfiles-fleet add HOST [LABEL]
+       dotfiles-fleet remove HOST
+       dotfiles-fleet list
 
 Runs the selected dotfiles command sequentially on each SSH destination in
 $DOTFILES_HOSTS or ~/.config/dotfiles/hosts. Blank lines and comments are
 ignored. The default command is update.
+
+add sets up key-based SSH (asking for the password once if needed) and then
+lists HOST. On WSL with the Windows Herdr app (hc.exe), it also adds HOST to
+Herdr as N-LABEL, N being the next free ordering number. LABEL defaults to the
+remote hostname without the ch03wx prefix. remove unlists HOST. list prints the
+listed hosts.
 EOF
+}
+
+validate_host() {
+    [[ -n "$1" && "$1" != -* && "$1" != *[[:space:]]* && "$1" != \#* ]] ||
+        error "invalid SSH destination: $1"
+}
+
+# Prints the listed hosts without surrounding whitespace, blank lines or comments.
+list_hosts() {
+    [[ -e "$HOSTS_FILE" ]] || return 0
+    [[ -r "$HOSTS_FILE" ]] || error "hosts file is not readable: $HOSTS_FILE"
+    awk '{ gsub(/^[ \t]+|[ \t]+$/, "") } $0 != "" && $0 !~ /^#/' "$HOSTS_FILE"
+}
+
+host_listed() {
+    list_hosts | grep -Fxq -- "$1"
+}
+
+key_login() {
+    ssh -o BatchMode=yes -o ConnectTimeout=10 "$1" true 2>/dev/null
+}
+
+# Run a Windows program from a Windows directory; a WSL working directory is a UNC path there.
+win() {
+    (cd /mnt/c 2>/dev/null || true; "$@")
+}
+
+# The Windows Herdr app connects with Windows OpenSSH, which has its own agent and
+# known_hosts, so check that login separately before asking Herdr to add the machine.
+add_to_herdr() {
+    local host=$1 remote_name=$2 label=$3 machines number
+    command -v hc.exe >/dev/null || return 0
+
+    # The WSL login just verified this host, so trust its key on first use here.
+    if ! win ssh.exe -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "$host" true; then
+        echo "warning: Windows ssh cannot log in to $host with a key (is the key in the Windows ssh-agent?); not added to Herdr" >&2
+        return 0
+    fi
+    machines=$(win hc.exe machine ls --json | tr -d '\r') || machines=
+    if [[ -n "$remote_name" ]] && grep -Fqi "\"host\":\"$remote_name\"" <<<"$machines"; then
+        echo "$host is already in Herdr"
+        return 0
+    fi
+
+    # Herdr sorts machines by name, so an N- prefix sets their order.
+    # shortcut: names sort as text, so 10- lands before 2-; pad numbers if you pass nine machines.
+    number=$(grep -o '"name":"[0-9]*-' <<<"$machines" | grep -o '[0-9]\+' | sort -n | tail -n 1) || true
+    label=${label:-${remote_name#ch03wx}}
+    label=${label:-${host#*@}}
+    if win hc.exe machine add "$host" --install --name "$((${number:-0} + 1))-$label"; then
+        echo "Added $host to Herdr as $((${number:-0} + 1))-$label"
+    else
+        echo "warning: 'hc.exe machine add $host' failed; add it from Herdr instead" >&2
+    fi
+}
+
+add_host() {
+    local host=$1 label=${2:-} remote_name
+    validate_host "$host"
+    [[ -z "$label" ]] || validate_host "$label"
+
+    if ! key_login "$host"; then
+        echo "Key login to $host failed; installing your public key (password prompt)."
+        ssh-copy-id "$host" || error "ssh-copy-id failed for $host"
+        key_login "$host" || error "key login to $host still fails; host not added"
+    fi
+    echo "Key login to $host works."
+
+    if ! remote_name=$(ssh "$host" 'hostname; test -x ~/.scripts/dotfiles'); then
+        echo "warning: dotfiles is not installed on $host; run the installer there before 'dotfiles-fleet update'" >&2
+    fi
+    remote_name=${remote_name%%.*}
+
+    if host_listed "$host"; then
+        echo "$host is already listed in $HOSTS_FILE"
+    else
+        mkdir -p "$(dirname "$HOSTS_FILE")"
+        printf '%s\n' "$host" >> "$HOSTS_FILE"
+        echo "Added $host to $HOSTS_FILE"
+    fi
+
+    add_to_herdr "$host" "${remote_name,,}" "$label"
+}
+
+remove_host() {
+    local host=$1 tmp_file
+    validate_host "$host"
+    host_listed "$host" || error "$host is not listed in $HOSTS_FILE"
+
+    tmp_file=$(mktemp "$HOSTS_FILE.XXXXXX")
+    awk -v h="$host" '{ t = $0; gsub(/^[ \t]+|[ \t]+$/, "", t) } t != h' "$HOSTS_FILE" > "$tmp_file"
+    mv "$tmp_file" "$HOSTS_FILE"
+    echo "Removed $host from $HOSTS_FILE"
 }
 
 main() {
     local action=${1:-update}
     local host
+
+    case "$action" in
+        add)
+            [[ $# -eq 2 || $# -eq 3 ]] || error "add requires HOST and an optional LABEL"
+            add_host "$2" "${3:-}"
+            return 0
+            ;;
+        remove)
+            [[ $# -eq 2 ]] || error "remove requires exactly one HOST"
+            remove_host "$2"
+            return 0
+            ;;
+    esac
     [[ $# -le 1 ]] || error "only one command may be specified"
 
     case "$action" in
+        list)
+            list_hosts
+            return 0
+            ;;
         sync|apps|update|system) ;;
         help|--help|-h)
             usage
@@ -34,11 +153,8 @@ main() {
 
     [[ -r "$HOSTS_FILE" ]] || error "hosts file is not readable: $HOSTS_FILE"
 
-    shopt -s extglob
-    while IFS= read -r host || [[ -n "$host" ]]; do
-        host=${host##+([[:space:]])}
-        host=${host%%+([[:space:]])}
-        [[ -z "$host" || "$host" == \#* ]] && continue
+    # Read hosts on fd 3: ssh would otherwise consume the rest of stdin.
+    while IFS= read -r -u 3 host; do
         [[ "$host" != *[[:space:]]* ]] || error "invalid SSH destination in $HOSTS_FILE: $host"
 
         echo "===== $host ====="
@@ -47,7 +163,7 @@ main() {
         else
             ssh "$host" "~/.scripts/dotfiles $action"
         fi
-    done < "$HOSTS_FILE"
+    done 3< <(list_hosts)
 }
 
 main "$@"

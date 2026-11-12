@@ -236,6 +236,67 @@ SCRIPT
     [[ $(wc -l < "$log") == 2 ]] || fail "fleet invoked unexpected hosts"
 }
 
+# add installs the key when key login fails, lists the host once and adds it to
+# Herdr unless Herdr knows it; remove unlists it; list prints the hosts.
+test_fleet_add_and_remove_hosts() {
+    local fake_bin="$TMP_DIR/fleet-add-bin"
+    local hosts="$TMP_DIR/fleet-add/hosts"
+    local key_installed="$TMP_DIR/fleet-key-installed"
+    local copy_log="$TMP_DIR/fleet-copy.log"
+    local herdr_log="$TMP_DIR/fleet-herdr.log"
+    mkdir -p "$fake_bin"
+    # Key login works only after ssh-copy-id ran. The remote command prints the
+    # destination's host part as its hostname.
+    cat > "$fake_bin/ssh" <<SCRIPT
+#!/usr/bin/env bash
+[[ -e '$key_installed' ]] || exit 255
+[[ \$# -eq 2 ]] && echo "\${1#*@}.corp"
+exit 0
+SCRIPT
+    cat > "$fake_bin/ssh-copy-id" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\\n' "\$1" >> '$copy_log'
+touch '$key_installed'
+SCRIPT
+    printf '#!/usr/bin/env bash\ntrue\n' > "$fake_bin/ssh.exe"
+    # Herdr already knows host-a.
+    cat > "$fake_bin/hc.exe" <<SCRIPT
+#!/usr/bin/env bash
+if [[ "\$2" == ls ]]; then echo '{"machines":[{"host":"HOST-A","name":"3-a"},{"host":"x","name":"12-x"},{"host":"y","name":"wsl"}]}'; else echo "\$*" >> '$herdr_log'; fi
+SCRIPT
+    chmod +x "$fake_bin/ssh" "$fake_bin/ssh-copy-id" "$fake_bin/ssh.exe" "$fake_bin/hc.exe"
+
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-a >/dev/null
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-a >/dev/null
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add user@host-b >/dev/null
+    [[ $(cat "$copy_log") == host-a ]] || fail "add did not install the key exactly once"
+    [[ $(cat "$hosts") == $'host-a\nuser@host-b' ]] || fail "add did not list each host once"
+    [[ $(cat "$herdr_log") == 'machine add user@host-b --install --name 13-host-b' ]] || fail "add did not add only the new host to Herdr with the next number"
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add ch03wxboard7 >/dev/null
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-d mybox >/dev/null
+    [[ $(sed -n '2p' "$herdr_log") == 'machine add ch03wxboard7 --install --name 13-board7' ]] || fail "add did not strip the ch03wx prefix"
+    [[ $(sed -n '3p' "$herdr_log") == 'machine add host-d --install --name 13-mybox' ]] || fail "add did not use the given label"
+    head -n 1 "$herdr_log" > "$herdr_log.tmp" && mv "$herdr_log.tmp" "$herdr_log"
+    DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove ch03wxboard7 >/dev/null
+    DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove host-d >/dev/null
+    printf '  # comment\n\n' >> "$hosts"
+    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list) == $'host-a\nuser@host-b' ]] || fail "list did not print the hosts"
+
+    PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove host-a >/dev/null
+    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list) == user@host-b ]] || fail "remove did not unlist host-a"
+    if DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" remove host-a >/dev/null 2>&1; then
+        fail "remove accepted an unlisted host"
+    fi
+
+    rm "$key_installed"
+    printf '#!/usr/bin/env bash\ntrue\n' > "$fake_bin/ssh-copy-id"
+    if PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" add host-c >/dev/null 2>&1; then
+        fail "add accepted a host without working key login"
+    fi
+    [[ $(DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" list) == user@host-b ]] || fail "add listed a host without working key login"
+    [[ $(wc -l < "$herdr_log") == 1 ]] || fail "add sent a host without working key login to Herdr"
+}
+
 # keys-push runs the real remote command per host, backing up and replacing ~/.keys owner-only.
 test_keys_push_replaces_remote_keys() {
     local fake_bin="$TMP_DIR/keys-bin"
@@ -273,6 +334,7 @@ test_system_updates_ubuntu_packages
 test_bootstrap_runs_full_installer
 test_setup_runs_arch_setup_only_on_arch
 test_fleet_updates_configured_hosts
+test_fleet_add_and_remove_hosts
 test_keys_push_replaces_remote_keys
 
 echo "PASS: dotfiles CLI"
