@@ -7,9 +7,14 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Optional
 
 import requests
+
+# Reuse the ai-skills Vault helper (env var first, then the Vault agent folder).
+sys.path.append(str(Path.home() / "gitrepo/ai-skills/skills/vault-secrets"))
+from vault_secrets import get_credential
 
 
 def _format_filesize(size_bytes: int) -> str:
@@ -867,26 +872,11 @@ class WorkflowManager:
 
 
 def get_api_key(args_api_key: Optional[str]) -> str:
-    if args_api_key:
-        return args_api_key
-
-    env_api_key = os.getenv("REDMINE_API_KEY")
-    if env_api_key:
-        return env_api_key
-
-    print(
-        "Error: No API key provided. Use --api-key or set REDMINE_API_KEY environment variable",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    return args_api_key or get_credential("REDMINE_API_KEY")
 
 
 def get_redmine_url() -> str:
-    redmine_url = os.getenv("REDMINE_URL")
-    if not redmine_url:
-        print("Error: REDMINE_URL environment variable is required", file=sys.stderr)
-        sys.exit(1)
-    return redmine_url
+    return os.getenv("REDMINE_URL", "https://ch03rdteam.phonak.com/redmine")
 
 
 def main():
@@ -896,7 +886,7 @@ def main():
     start_parser = subparsers.add_parser("start", help="Start work on a ticket")
     start_parser.add_argument("ticket_number", type=int, help="Redmine ticket number")
     start_parser.add_argument(
-        "--api-key", help="Redmine API key (or use REDMINE_API_KEY env var)"
+        "--api-key", help="Redmine API key (default: REDMINE_API_KEY env var, else Vault)"
     )
 
     view_parser = subparsers.add_parser("view", help="View ticket details")
@@ -907,7 +897,7 @@ def main():
         help="Show field change history in addition to comments",
     )
     view_parser.add_argument(
-        "--api-key", help="Redmine API key (or use REDMINE_API_KEY env var)"
+        "--api-key", help="Redmine API key (default: REDMINE_API_KEY env var, else Vault)"
     )
 
     summary_parser = subparsers.add_parser(
@@ -926,7 +916,7 @@ def main():
         help='Filter by priority (e.g., "Low", "Normal,High", "Urgent"). Use commas to specify multiple priorities.',
     )
     summary_parser.add_argument(
-        "--api-key", help="Redmine API key (or use REDMINE_API_KEY env var)"
+        "--api-key", help="Redmine API key (default: REDMINE_API_KEY env var, else Vault)"
     )
 
     report_parser = subparsers.add_parser(
@@ -940,14 +930,14 @@ def main():
         help="Output format for the report (default: html)",
     )
     report_parser.add_argument(
-        "--api-key", help="Redmine API key (or use REDMINE_API_KEY env var)"
+        "--api-key", help="Redmine API key (default: REDMINE_API_KEY env var, else Vault)"
     )
 
     note_parser = subparsers.add_parser("note", help="Add a note to a ticket")
     note_parser.add_argument("ticket_number", type=int, help="Redmine ticket number")
     note_parser.add_argument("note", help="Note text to add to the ticket")
     note_parser.add_argument(
-        "--api-key", help="Redmine API key (or use REDMINE_API_KEY env var)"
+        "--api-key", help="Redmine API key (default: REDMINE_API_KEY env var, else Vault)"
     )
 
     set_status_parser = subparsers.add_parser(
@@ -961,7 +951,7 @@ def main():
         help='Target status (e.g., "new", "in progress", "resolved", "closed")',
     )
     set_status_parser.add_argument(
-        "--api-key", help="Redmine API key (or use REDMINE_API_KEY env var)"
+        "--api-key", help="Redmine API key (default: REDMINE_API_KEY env var, else Vault)"
     )
 
     dl_parser = subparsers.add_parser(
@@ -978,7 +968,7 @@ def main():
         help="Destination directory (default: /tmp/redmine_attachments/<ticket>/)",
     )
     dl_parser.add_argument(
-        "--api-key", help="Redmine API key (or use REDMINE_API_KEY env var)"
+        "--api-key", help="Redmine API key (default: REDMINE_API_KEY env var, else Vault)"
     )
 
     args = parser.parse_args()
