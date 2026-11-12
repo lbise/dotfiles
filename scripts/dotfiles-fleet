@@ -144,7 +144,7 @@ remove_host() {
 
 main() {
     local action=${1:-update}
-    local host
+    local host failed=()
 
     case "$action" in
         add)
@@ -192,12 +192,13 @@ main() {
         [[ "$host" != *[[:space:]]* ]] || error "invalid SSH destination in $HOSTS_FILE: $host"
 
         echo "===== $host ====="
-        if [[ "$action" == system ]]; then
-            ssh -t "$host" "~/.scripts/dotfiles $action"
-        else
-            ssh "$host" "~/.scripts/dotfiles $action"
-        fi
+        local tty_flag=()
+        [[ "$action" == system ]] && tty_flag=(-t)
+        # One failed host must not stop the others.
+        ssh "${tty_flag[@]}" "$host" "~/.scripts/dotfiles $action" || failed+=("$host")
     done 3< <(list_hosts)
+
+    [[ ${#failed[@]} -eq 0 ]] || error "failed hosts: ${failed[*]}"
 }
 
 main "$@"

@@ -101,9 +101,16 @@ get_arch() {
 
 # Get the latest release tag from a GitHub repository
 # Usage: get_github_latest_tag "owner/repo"
+# Follows the releases/latest web redirect: the REST API allows only 60
+# unauthenticated requests per hour per IP, which a shared office IP exhausts.
 get_github_latest_tag() {
-    local repo="$1"
-    curl -sL "https://api.github.com/repos/${repo}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p'
+    local repo="$1" url
+    url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${repo}/releases/latest") || true
+    if [[ "$url" != */releases/tag/* ]]; then
+        echo "ERROR: cannot find the latest release of $repo" >&2
+        return 1
+    fi
+    echo "${url##*/}"
 }
 
 # Extract version number from a version string (strips leading 'v' and extra info)

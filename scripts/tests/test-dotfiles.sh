@@ -234,6 +234,18 @@ SCRIPT
     [[ $(sed -n '1p' "$log") == 'host-a|~/.scripts/dotfiles update' ]] || fail "fleet did not update host-a"
     [[ $(sed -n '2p' "$log") == 'server@example.test|~/.scripts/dotfiles update' ]] || fail "fleet did not update the SSH destination"
     [[ $(wc -l < "$log") == 2 ]] || fail "fleet invoked unexpected hosts"
+
+    # A failing host is reported, but the remaining hosts still run.
+    : > "$log"
+    cat > "$fake_bin/ssh" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\\n' "\$1" >> '$log'
+[[ "\$1" != host-a ]]
+SCRIPT
+    if PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" update >/dev/null 2>&1; then
+        fail "fleet succeeded although host-a failed"
+    fi
+    [[ $(wc -l < "$log") == 2 ]] || fail "fleet stopped at the failed host"
 }
 
 # add installs the key when key login fails, lists the host once and adds it to
