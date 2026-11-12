@@ -110,5 +110,10 @@ command requests a TTY because sudo may prompt. Set `DOTFILES_HOSTS` to use a
 different host-list file.
 
 The remote machines must already have this repository installed and
-`~/.scripts` linked. After deploying this change once, later runs use the new
-updater.
+`~/.scripts` linked. When a checkout is older than the `dotfiles` command, the
+fleet runs `git pull --ff-only` there first. The following `sync` then applies
+every hook. The symlink hook replaces whatever exists at a link path, real
+files and folders included. On an old machine, check those paths first.
+
+A failed host does not stop the others; the run ends with the list of failed
+hosts.

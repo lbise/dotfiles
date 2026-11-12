@@ -211,11 +211,14 @@ SCRIPT
     [[ $(wc -l < "$log") == 1 ]] || fail "setup ran the Arch script on Ubuntu"
 }
 
-# Fleet updates ignore comments and invoke the same command on each host.
+# Fleet updates ignore comments and run the dotfiles command on each host,
+# pulling first where the checkout predates that command.
 test_fleet_updates_configured_hosts() {
     local fake_bin="$TMP_DIR/fleet-bin"
     local hosts="$TMP_DIR/hosts"
     local log="$TMP_DIR/fleet.log"
+    local remotes="$TMP_DIR/fleet-remotes"
+    local remote
     mkdir -p "$fake_bin"
     cat > "$hosts" <<'EOF'
 # Personal machines
@@ -223,17 +226,29 @@ host-a
 
 server@example.test
 EOF
+    # host-a has the dotfiles command; example.test has an old checkout without it.
+    for remote in host-a example.test; do
+        mkdir -p "$remotes/$remote/checkout/scripts"
+        ln -s checkout/scripts "$remotes/$remote/.scripts"
+    done
+    printf '#!/bin/sh\necho "host-a $*" >> %q\n' "$log" > "$remotes/host-a/checkout/scripts/dotfiles"
+    chmod +x "$remotes/host-a/checkout/scripts/dotfiles"
     cat > "$fake_bin/ssh" <<SCRIPT
 #!/usr/bin/env bash
-printf '%s|%s\\n' "\$1" "\$2" >> '$log'
+HOME='$remotes'/"\${1#*@}" sh -c "\$2"
 SCRIPT
-    chmod +x "$fake_bin/ssh"
+    # The pull adds the dotfiles command to the old checkout.
+    cat > "$fake_bin/git" <<SCRIPT
+#!/usr/bin/env bash
+[[ "\$1 \$3 \$4" == '-C pull --ff-only' ]] || exit 1
+printf '#!/bin/sh\\necho "pulled \$*" >> %q\\n' '$log' > "\$2/scripts/dotfiles"
+chmod +x "\$2/scripts/dotfiles"
+SCRIPT
+    chmod +x "$fake_bin/ssh" "$fake_bin/git"
 
     PATH="$fake_bin:$PATH" DOTFILES_HOSTS="$hosts" "$DOTFILES_FLEET_BIN" update >/dev/null
 
-    [[ $(sed -n '1p' "$log") == 'host-a|~/.scripts/dotfiles update' ]] || fail "fleet did not update host-a"
-    [[ $(sed -n '2p' "$log") == 'server@example.test|~/.scripts/dotfiles update' ]] || fail "fleet did not update the SSH destination"
-    [[ $(wc -l < "$log") == 2 ]] || fail "fleet invoked unexpected hosts"
+    [[ $(cat "$log") == $'host-a update\npulled update' ]] || fail "fleet did not update both hosts, pulling the old checkout first"
 
     # A failing host is reported, but the remaining hosts still run.
     : > "$log"

@@ -114,7 +114,7 @@ add_host() {
     echo "Key login to $host works."
 
     if ! remote_name=$(ssh "$host" 'hostname; test -x ~/.scripts/dotfiles'); then
-        echo "warning: dotfiles is not installed on $host; run the installer there before 'dotfiles-fleet update'" >&2
+        echo "warning: ~/.scripts/dotfiles is missing on $host; the fleet pulls an old checkout first, but a machine without the repo needs the installer" >&2
     fi
     remote_name=${remote_name%%.*}
 
@@ -194,8 +194,11 @@ main() {
         echo "===== $host ====="
         local tty_flag=()
         [[ "$action" == system ]] && tty_flag=(-t)
+        # A checkout older than the dotfiles command gets a fast-forward pull first;
+        # ~/.scripts links to the checkout's scripts directory.
         # One failed host must not stop the others.
-        ssh "${tty_flag[@]}" "$host" "~/.scripts/dotfiles $action" || failed+=("$host")
+        ssh "${tty_flag[@]}" "$host" "{ [ -x ~/.scripts/dotfiles ] || { echo 'Old checkout: pulling first'; git -C ~/.scripts/.. pull --ff-only; }; } && ~/.scripts/dotfiles $action" ||
+            failed+=("$host")
     done 3< <(list_hosts)
 
     [[ ${#failed[@]} -eq 0 ]] || error "failed hosts: ${failed[*]}"
