@@ -78,7 +78,7 @@ export class Composer {
 
   // Enter, and Pi's model and thinking keys, from the reply box (keys.js hands them over).
   fieldKey(key, cx) {
-    if (key === "ctrl-a" || key === "f9") selectAll(this.input, cx);
+    if (key === "ctrl-a") selectAll(this.input, cx);
     else if (key === "ctrl-g") this.chat.editDraft(cx);
     else if (key === "enter") this.enter(cx);
     else if (key === "shift-tab") this.chat.command({ type: "cycle", what: "thinking" }, cx);

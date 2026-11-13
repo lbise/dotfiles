@@ -48,7 +48,7 @@
  * @property {{ root: string, branch: string }|null} git
  * @property {Array<{ key: string, text: string, label?: string, percent?: number, resets?: string }>} usage
  * @property {{ startedAt: number, endedAt: number|null, steps: LiveStep[] }|null} turn
- * @property {{ text: string, thinking: boolean, thought?: string }|null} stream
+ * @property {{ text: string, thinking: boolean }|null} stream
  * @property {{ id: string, question: string, options: Array<{ label: string, description?: string }>, multi: boolean }|null} ask
  * @property {string} draft
  * @property {string|null} error

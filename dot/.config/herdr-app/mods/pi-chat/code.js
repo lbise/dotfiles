@@ -17,22 +17,25 @@ function syntax(t) {
 
 export class CodeViews {
   constructor() {
-    this.views = new Map(); // id -> { state, code, language, colours }
-    this.wanted = new Map(); // id -> { code, language }: drawn without a view
+    this.views = new Map(); // id -> { state, code, language, wrap, colours }
+    this.wanted = new Map(); // id -> { code, language, wrap }: drawn without a view
   }
 
-  /** The view for a block, or null when there is none yet (then it is made on the next `make`). */
-  view(id, code, info) {
+  /**
+   * The view for a block, or null when there is none yet (then it is made on the next `make`).
+   * @param {boolean} [wrap] Long lines wrap (prose) instead of scrolling sideways.
+   */
+  view(id, code, info, wrap = false) {
     const language = LANGUAGES[info] || info || "text";
     const view = this.views.get(id);
-    if (view && view.language === language && view.colours === theme().ansi4) {
-      if (view.code !== code) this.wanted.set(id, { code, language });
+    if (view && view.language === language && view.wrap === wrap && view.colours === theme().ansi4) {
+      if (view.code !== code) this.wanted.set(id, { code, language, wrap });
       // Kept in the order last drawn: the views not drawn for longest go first.
       this.views.delete(id);
       this.views.set(id, view);
       return view.state;
     }
-    this.wanted.set(id, { code, language });
+    this.wanted.set(id, { code, language, wrap });
     return null;
   }
 
@@ -40,17 +43,17 @@ export class CodeViews {
   make() {
     if (!this.wanted.size) return false;
     const t = theme();
-    for (const [id, { code, language }] of this.wanted) {
+    for (const [id, { code, language, wrap }] of this.wanted) {
       const view = this.views.get(id);
-      if (view && view.language === language && view.colours === t.ansi4) {
+      if (view && view.language === language && view.wrap === wrap && view.colours === t.ansi4) {
         view.state.set_value(asCode(code));
         view.code = code;
         continue;
       }
       if (view) view.state.release();
       this.views.delete(id);
-      const state = EditorState.new({ language, value: asCode(code), readonly: true, line_numbers: false, folding: false, soft_wrap: false, font_family: codeFont(), font_size: 12.5, syntax: syntax(t) });
-      this.views.set(id, { state, code, language, colours: t.ansi4 });
+      const state = EditorState.new({ language, value: asCode(code), readonly: true, line_numbers: false, folding: false, soft_wrap: wrap, font_family: codeFont(), font_size: 12.5, syntax: syntax(t) });
+      this.views.set(id, { state, code, language, wrap, colours: t.ansi4 });
     }
     this.wanted.clear();
     for (const [id, view] of [...this.views].slice(0, Math.max(0, this.views.size - KEPT))) {

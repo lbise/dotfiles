@@ -62,7 +62,7 @@ Pi event announces (a typed draft, entries from other extensions) is picked up w
     "startedAt": 1794489000000, "endedAt": null,
     "steps": [ { "id": "toolu_…", "kind": "look", "name": "read", "label": "src/a.c", "startedAt": 1, "endedAt": 2, "ok": true } ]
   },
-  "stream": { "text": "The check belongs in…", "thinking": false, "thought": "…" },  // assistant message being written, else null; thinking: the model is reasoning right now; thought: the end (at most 600 characters) of its last thinking block, "" when none
+  "stream": { "text": "The check belongs in…", "thinking": false },  // assistant message being written, else null; thinking: the model is reasoning right now
   "ask": { "id": "a1", "question": "Which accent?", "options": [ { "label": "Lime", "description": "…" } ], "multi": false },  // else null
   "draft": "",                    // text in Pi's input box
   "error": null                   // last extension error as a short string, for the mod to show; null again once a later inbox command succeeds

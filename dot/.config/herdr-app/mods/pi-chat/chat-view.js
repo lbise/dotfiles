@@ -9,6 +9,7 @@ import { chatSettings } from "./model/settings.js";
 import { AskCard } from "./ask.js";
 import { CodeViews } from "./code.js";
 import { editInNeovim } from "./editor.js";
+import { loadImages } from "./images.js";
 import { Composer } from "./composer.js";
 import { SharedDraft } from "./draft.js";
 import { feedFor, feedFree, feedLive, feedSilent, readCommands, readFeed, sendCommand } from "./feeds.js";
@@ -95,6 +96,7 @@ export class ChatView {
   tick(cx) {
     followFocus(cx);
     if (this.code.make()) cx.notify();
+    loadImages(cx);
     const pi = target();
     const shown = Boolean(pi) && shownView() === "chat";
     if ((shown ? pi.key : "") !== (this.shown ? this.shown.key : "")) {

@@ -11,7 +11,7 @@
 //   Both: Ctrl+A selects all the text (the field's own binding moves to the line start).
 
 // shortcut: Pi's default keys, not read from Pi's keybindings.json; read them once someone remaps them.
-const CONTEXTS = { PiChatField: ["enter", "ctrl-p", "alt-p", "shift-tab", "ctrl-a", "ctrl-g", "f9"], PiChatMenu: ["up", "down", "tab", "enter", "escape", "ctrl-a"] };
+const CONTEXTS = { PiChatField: ["enter", "ctrl-p", "alt-p", "shift-tab", "ctrl-a", "ctrl-g"], PiChatMenu: ["up", "down", "tab", "enter", "escape", "ctrl-a"] };
 
 const action = (key) => `pi_chat_key_${key.replace(/-/g, "_")}`;
 

@@ -267,7 +267,7 @@ test("a run publishes its steps, the streamed text and the working status", asyn
   let state = await until(() => h.state().stream?.thinking && h.state(), "thinking stream");
   assert.equal(state.status, "working");
   assert.equal(state.turn.endedAt, null);
-  assert.deepEqual(state.stream, { text: "", thinking: true, thought: "hm" });
+  assert.deepEqual(state.stream, { text: "", thinking: true });
   assert.deepEqual(
     state.turn.steps.map(({ startedAt, endedAt, ...step }: any) => ({ ...step, ended: endedAt !== null })),
     [
@@ -279,7 +279,7 @@ test("a run publishes its steps, the streamed text and the working status", asyn
   message.content.push({ type: "text", text: "The check" }, { type: "toolCall", name: "bash" });
   await h.emit("message_update", { message, assistantMessageEvent: { type: "text_delta" } });
   state = await until(() => h.state().stream?.text && h.state(), "text stream");
-  assert.deepEqual(state.stream, { text: "The check", thinking: false, thought: "hm" });
+  assert.deepEqual(state.stream, { text: "The check", thinking: false });
 
   // Settling ends the turn; a tool that never reported its end counts as failed.
   await h.emit("message_end", { message });

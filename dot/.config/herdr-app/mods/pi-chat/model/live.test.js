@@ -99,9 +99,8 @@ test("a turn the file does not have yet is shown, and keeps its key when the fil
   s.user("first");
   s.assistant([text("done")]);
   feed();
-  const state = working({ updated: T0 + 61000, turn: { startedAt: T0 + 60000, steps: [live("c9", "ls", ".", "look", { startedAt: T0 + 60500 })] }, stream: { text: "", thinking: true, thought: "Which file?" } });
+  const state = working({ updated: T0 + 61000, turn: { startedAt: T0 + 60000, steps: [live("c9", "ls", ".", "look", { startedAt: T0 + 60500 })] }, stream: { text: "", thinking: true } });
   const ahead = mergeLive(transcript, state);
-  assert.equal(ahead.turns[1].thought, "Which file?");
   assert.equal(ahead.turns.length, 2);
   const key = ahead.turns[1].key;
   assert.deepEqual([ahead.turns[1].user, ahead.turns[1].live, ahead.turns[1].thinking, ahead.turns[1].startedAt, ahead.turns[1].durationMs], [null, true, true, T0 + 60000, 1000]);

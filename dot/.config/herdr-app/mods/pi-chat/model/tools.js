@@ -72,8 +72,8 @@ export function stepLabel(name, args, cwd) {
 const DETAIL_LANGUAGES = { bash: "bash", powershell: "powershell", codemode: "js" };
 
 /**
- * A call's command or code in full, for its opened step, when the one-line label
- * does not already show all of it; else null.
+ * A call's command or code in full, for its opened step: always for a command
+ * (bash, powershell, codemode), else only when the one-line label cuts it; else null.
  * @param {string} name
  * @param {any} args
  * @returns {{ text: string, language: string }|null}
@@ -83,7 +83,7 @@ export function stepDetail(name, args) {
   const key = LABEL_KEYS.find((k) => typeof given[k] === "string" && given[k]);
   if (!key || key === "path" || key === "file_path") return null;
   const text = given[key].replace(/\s+$/, "");
-  if (!text.includes("\n") && text.length <= LABEL_MAX) return null;
+  if (stepKind(name) !== "run" && !text.includes("\n") && text.length <= LABEL_MAX) return null;
   return { text: clip(text, DETAIL_MAX), language: DETAIL_LANGUAGES[name] || "text" };
 }
 

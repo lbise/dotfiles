@@ -404,7 +404,18 @@ test("an opened step has the whole command, and an edit or write its diff", () =
   s.result("c4", "edit", "Successfully replaced 1 block(s)", { details: { diff: "-1 int a;\n+1 int c;\n 2 int b;" } });
   const [turn] = read(s.lines).turns;
   assert.deepEqual(turn.steps[0].detail, { text: script, language: "bash" });
-  assert.equal(turn.steps[1].detail, undefined); // the label shows all of it
+  assert.deepEqual(turn.steps[1].detail, { text: "ls", language: "bash" }); // a command shows in full, always
   assert.equal(turn.steps[2].diff, "+1 int a;\n+2 int b;");
   assert.equal(turn.steps[3].diff, "-1 int a;\n+1 int c;\n 2 int b;");
+});
+
+test("a read that gave the model an image keeps the file's path", () => {
+  const s = session();
+  s.user("look");
+  s.assistant([call("c1", "read", { path: "shot.png" }), call("c2", "read", { path: "/abs/a.c" })], "toolUse");
+  s.message({ role: "toolResult", toolCallId: "c1", toolName: "read", content: [text("Read image"), { type: "image", data: "AAAA", mimeType: "image/png" }], isError: false });
+  s.result("c2", "read", "int a;");
+  const [turn] = read(s.lines).turns;
+  assert.equal(turn.steps[0].image, "/work/shot.png");
+  assert.equal(turn.steps[1].image, undefined);
 });

@@ -3,14 +3,16 @@
 // the whole command, its output, or the diff of an edit or write. Each in a
 // coloured, selectable code view that scrolls past its first lines.
 
-import { div } from "gpui-kit";
+import { div, image } from "gpui-kit";
 import { Editor, h_flex, v_flex } from "gpui-base";
+import { openOverlay } from "herdr";
 import { formatDuration } from "./model/format.js";
 import { diffRows } from "./model/tools.js";
 import { trail } from "./model/transcript.js";
 import { cell, stepColor } from "./cells.js";
 import { copyButton, hoverArea } from "./copy.js";
-import { MONO, codeFont, mix, monoLine } from "./ui.js";
+import { imageFor } from "./images.js";
+import { MONO, codeFont, icon, mix, monoLine } from "./ui.js";
 
 const LINE = 24;
 const CODE_LINE = 20; // a line of a code view at 12.5 px, as markdown.js
@@ -19,6 +21,9 @@ const DIFF_MAX = 2000; // rows of a diff drawn at all
 const RESULT_PAD = 8;
 const RESULT_GAP = 6;
 const GUTTER = 44; // a diff's line numbers and sign
+const IMAGE = 240; // a picture's height in its step
+const THOUGHT_SHOWN = 20; // a thought shows this many lines, then scrolls
+const CHAR = 7.6; // a code view's character at 12.5 px, for guessing where prose wraps
 const FRAME = 14; // the list's own padding and rules
 const OPEN = { duration: 180, easing: "ease-out" };
 
@@ -31,29 +36,43 @@ export function stepVerb(step) {
 
 const FILE_LANGUAGES = { md: "markdown", rs: "rust", yml: "yaml", py: "python", sh: "bash", htm: "html" };
 
-/** What a pressed step shows, in order: each a box of `lines` lines. */
+/** What a pressed step shows, in order: each a box of `lines` lines (a picture: its own height). */
 function boxes(step) {
   const all = [];
+  // A command first, then what it gave.
+  if (step.detail) all.push({ kind: "code", text: step.detail.text, language: step.detail.language });
   if (step.diff) {
     const extension = (/\.([\w+]+)$/.exec(step.label) || [])[1] || "";
     all.push({ kind: "diff", rows: diffRows(step.diff).slice(0, DIFF_MAX), language: FILE_LANGUAGES[extension] || extension });
   }
-  if (step.detail) all.push({ kind: "code", text: step.detail.text, language: step.detail.language });
   // An edit's output only says it worked: the diff is what it did.
   const output = step.result.replace(/\s+$/, "");
   if (output && !(step.diff && step.ok !== false)) all.push({ kind: "code", text: output, language: "text" });
-  for (const box of all) box.lines = box.kind === "diff" ? box.rows.length : box.text.split("\n").length;
+  if (step.image) all.push({ kind: "image", path: step.image });
+  for (const box of all) box.lines = box.kind === "diff" ? box.rows.length : box.kind === "image" ? 0 : box.text.split("\n").length;
   return all;
 }
 
-const boxHeight = (box) => Math.min(box.lines, SHOWN) * CODE_LINE + RESULT_PAD * 2 + RESULT_GAP;
+// A thought, opened: prose that wraps; how many lines it takes is a guess from the width.
+function thoughtBox(text, width) {
+  const perLine = Math.max(20, Math.floor((width - 68) / CHAR));
+  const lines = text.split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / perLine)), 0);
+  return { kind: "code", text, language: "markdown", wrap: true, lines: Math.min(lines, THOUGHT_SHOWN) };
+}
+
+function boxHeight(box) {
+  const inner = box.kind === "image" ? IMAGE : Math.min(box.lines, box.wrap ? THOUGHT_SHOWN : SHOWN) * CODE_LINE;
+  return inner + RESULT_PAD * 2 + RESULT_GAP;
+}
 
 /** The height the opened list takes, so it can open with motion. */
-function stepListHeight(turn, openSteps) {
+function stepListHeight(turn, openSteps, width) {
   let height = FRAME;
   for (const row of trail(turn)) {
     height += LINE;
-    if (row.type === "step" && openSteps.has(row.step.id)) for (const box of boxes(row.step)) height += boxHeight(box);
+    if (!openSteps.has(row.key)) continue;
+    if (row.type === "step") for (const box of boxes(row.step)) height += boxHeight(box);
+    else if (row.type === "text" && row.thought) height += boxHeight(thoughtBox(row.text, width));
   }
   return height;
 }
@@ -79,17 +98,37 @@ function frame(t, id, box, body, copy, ui) {
     .bg(mix(t.background, t.surface, 0.5))
     .overflow_hidden()
     .child(body)
-    .child(div().absolute().top(4).right(4).child(copyButton(t, id, copy, ui.pointer)));
+    .when(copy !== null, (el) => el.child(div().absolute().top(4).right(4).child(copyButton(t, id, copy, ui.pointer))));
 }
 
 function codeBox(t, id, box, ui) {
-  const view = ui.views.view(id, box.text, box.language);
-  const height = Math.min(box.lines, SHOWN) * CODE_LINE;
+  const view = ui.views.view(id, box.text, box.language, box.wrap === true);
+  const height = boxHeight(box) - RESULT_PAD * 2 - RESULT_GAP;
   const body = div()
     .px(10)
     .py(RESULT_PAD)
     .child(view ? Editor.new(view).w_full().h(height) : plainLines(t, box.text.split("\n")));
   return frame(t, id, box, body, box.text, ui);
+}
+
+// A picture Pi read, as large as fits; a click shows it full size.
+function imageBox(t, id, box, ui) {
+  const entry = imageFor(ui.machine, box.path);
+  const note = (...parts) => h_flex().size_full().gap(8).items_center().justify_center().text_size(12.5).text_color(t.muted).children(parts);
+  const body =
+    entry.status === "ready"
+      ? div()
+          .id(`${id}-picture`)
+          .size_full()
+          .p(RESULT_PAD)
+          .cursor_pointer()
+          .tooltip("Show full size")
+          .on_click(() => openOverlay({ kind: "dialog", mod: "pi-chat", props: { image: entry.rel }, width: 0.9, height: 0.9 }))
+          .child(image(entry.rel).size_full())
+      : entry.status === "failed"
+        ? note("The picture could not be copied from Pi's machine (moved or deleted since?).")
+        : note(icon("spinner", 13).spin(900), "Loading the picture…");
+  return frame(t, id, box, body, null, ui);
 }
 
 // The diff: a tinted row per line under one coloured code view of the file's text.
@@ -150,9 +189,25 @@ function plain(text) {
     .trim();
 }
 
-function remark(t, key, text, thought = false) {
+function remark(t, key, text) {
   return div().id(`pi-chat-remark-${key}`).h(LINE).flex_none().flex().items_center().min_w(0)
-    .child(div().truncate().text_color(t.muted).when(thought, (el) => el.italic()).child(thought ? `Thought: ${plain(text)}` : plain(text)));
+    .child(div().truncate().text_color(t.muted).child(plain(text)));
+}
+
+// A thought: a brain and its first words; pressed, the whole thought under it.
+function thoughtLine(t, key, text, open, toggle, ui) {
+  const line = h_flex()
+    .id(`pi-chat-thought-${key}`)
+    .h(LINE)
+    .flex_none()
+    .gap(8)
+    .items_center()
+    .cursor_pointer()
+    .hover((s) => s.bg(t.surface))
+    .on_click((_event, cx) => toggle(key, cx))
+    .child(div().w(16).flex_none().flex().justify_center().text_color(t.muted).child(icon("brain", 13)))
+    .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(plain(text)));
+  return open ? [line, codeBox(t, `pi-chat-box-${key}`, thoughtBox(text, ui.width), ui)] : [line];
 }
 
 function stepLine(t, step, open, toggle, ui) {
@@ -167,11 +222,13 @@ function stepLine(t, step, open, toggle, ui) {
     .text_size(12)
     .when(opens, (el) => el.cursor_pointer().hover((s) => s.bg(t.surface)).on_click((_event, cx) => toggle(step.id, cx)))
     .child(div().w(16).flex_none().flex().child(cell(stepColor(t, step), { width: 7, height: 14 })))
-    .child(div().w(44).flex_none().truncate().text_color(t.muted).child(stepVerb(step)))
+    .child(div().flex_none().text_color(t.dim).child(icon("wrench", 12)))
+    .child(div().w(64).flex_none().truncate().text_color(t.muted).child(step.name))
     .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(monoLine(step.label)))
     .child(div().flex_none().text_color(step.ok === false ? t.ansi1 : t.muted).child(step.ok === false && !step.durationMs ? "failed" : formatDuration(step.durationMs)));
   if (!opens || !open) return [line];
-  return [line, ...boxes(step).map((box, index) => (box.kind === "diff" ? diffBox : codeBox)(t, `pi-chat-box-${step.id}-${index}`, box, ui))];
+  const draw = { diff: diffBox, code: codeBox, image: imageBox };
+  return [line, ...boxes(step).map((box, index) => draw[box.kind](t, `pi-chat-box-${step.id}-${index}`, box, ui))];
 }
 
 /**
@@ -180,19 +237,21 @@ function stepLine(t, step, open, toggle, ui) {
  * @param {boolean} open Closed keeps the lines, at no height, so it closes with motion too.
  * @param {Set<string>} openSteps Ids of the steps showing their result.
  * @param {(id: string, cx: object) => void} toggle
- * @param {{ views: import("./code.js").CodeViews, pointer: object }} ui The code views and the pointer (copy buttons).
+ * @param {{ views: import("./code.js").CodeViews, pointer: object, width: number, machine: string|null }} ui
+ *   The code views, the pointer (copy buttons), the reading width, and Pi's machine (pictures).
  */
 export function stepList(t, turn, open, openSteps, toggle, ui) {
   const lines = [];
   for (const row of trail(turn)) {
     if (row.type === "step") lines.push(...stepLine(t, row.step, openSteps.has(row.step.id), toggle, ui));
-    else if (row.type === "text") lines.push(remark(t, row.key, row.text, row.thought === true));
+    else if (row.type === "text" && row.thought) lines.push(...thoughtLine(t, row.key, row.text, openSteps.has(row.key), toggle, ui));
+    else if (row.type === "text") lines.push(remark(t, row.key, row.text));
     else lines.push(remark(t, row.key, NOTES[row.note.kind] || row.note.title || row.note.text));
   }
   return div()
     .id(`pi-chat-steps-${turn.key}`)
     .w_full()
-    .h(open ? stepListHeight(turn, openSteps) : 0)
+    .h(open ? stepListHeight(turn, openSteps, ui.width) : 0)
     .overflow_hidden()
     .transition("height", OPEN)
     .child(v_flex().mt(2).py(6).border_y(1).border_color(t.border).text_size(13).children(lines));

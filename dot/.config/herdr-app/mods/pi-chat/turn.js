@@ -2,7 +2,7 @@
 // strip and steps, the answer, the changed files.
 
 import { div } from "gpui-kit";
-import { Popup, TextView, h_flex, v_flex } from "gpui-base";
+import { Popup, h_flex, v_flex } from "gpui-base";
 import { errorText, formatDuration } from "./model/format.js";
 import { copyButton, hoverArea, typedText } from "./copy.js";
 import { STEP_CELL, stepCell } from "./cells.js";
@@ -165,7 +165,7 @@ function work(ui, turn) {
     .w_full()
     .pt(10)
     .child(workLine(ui, turn, open === true))
-    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer })));
+    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer, width: ui.width, machine: chat.shown ? chat.shown.machine : null })));
 }
 
 function files(t, turn) {
@@ -210,21 +210,6 @@ function files(t, turn) {
     );
 }
 
-// What the model is thinking now, in brief, under the work line; it leaves when the thinking ends.
-function thought(t, key, text) {
-  return div()
-    .w_full()
-    .pt(2)
-    .pl(12)
-    .border_l(2)
-    .border_color(t.border)
-    .text_size(13)
-    .line_height(1.5)
-    .italic()
-    .text_color(t.muted)
-    .child(TextView.markdown(`pi-chat-thought-${key}`, text));
-}
-
 function quiet(t, text) {
   return div().w_full().pt(10).text_size(13).text_color(t.muted).child(text);
 }
@@ -241,7 +226,6 @@ export function drawRow(item, ui) {
   const { t } = ui;
   const pointer = ui.chat.pointer;
   if (item.kind === "user") return bubble(t, item.key, item.text || "Image", item.queued === true, pointer);
-  if (item.kind === "thought") return thought(t, item.key, item.turn.thought);
   if (item.kind === "work") return work(ui, item.turn);
   // An answer follows its turn's work line; one given without any work comes right after the message.
   if (item.kind === "answer") {

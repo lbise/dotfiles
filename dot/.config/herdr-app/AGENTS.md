@@ -13,5 +13,6 @@ This directory is the dotfiles source for the **Herdr desktop app** configuratio
 
 - Edit tracked files under this directory, not the Windows profile copy. `scripts/herdr-app-link` links top-level JSON files, `themes/*.json`, `layouts/*.json`, and `mods/*/` into the Windows app config.
 - Settings and keybindings are JSON. UI structure/custom behavior is implemented through layouts and mods; themes are JSON. Mods use the app's JavaScript/TypeScript API and are not Windows shell scripts.
+- After editing a linked file or mod from WSL, run `scripts/herdr-app-link`: the app gets no change notifications from the WSL side, and only reloads a file or mod whose link is replaced. Without it the change shows only after an app restart.
 - If a linked file or mod must be added, check `scripts/herdr-app-link`'s glob patterns and run the script from WSL to link it. Windows symlinks require Developer Mode or an elevated WSL session.
 - A mod's external commands should use the Herdr app API (`exec`) and specify the target machine when needed. Keep machine-specific command assumptions explicit; prefer portable shell commands if the command may run on different Linux machines.

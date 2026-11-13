@@ -38,6 +38,8 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} [diff] An edit's or write's change as Pi shows it: one line per
  *   line of the file, `+`, `-` or a space, the line number, a space, the text;
  *   a line of spaces and `...` where unchanged lines are left out.
+ * @property {string} [image] A read that gave the model an image: the file's absolute path on Pi's machine.
+ * @property {string} [readPath] A read call's file, absolute; becomes `image` when the result holds one.
  *
  * @typedef {object} Narration Assistant text written before the turn's last tool call, or its thinking.
  * @property {string} key
@@ -69,7 +71,6 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {boolean} done The assistant's last message ended its reply (it asked for no tool).
  * @property {boolean} [live] The turn is running now. Set by mergeLive.
  * @property {boolean} [thinking] The model is thinking. Set by mergeLive.
- * @property {string} [thought] The end of what the model is thinking now. Set by mergeLive.
  *
  * @typedef {{ type: "step", key: string, step: Step } | { type: "text", key: string, text: string, thought?: boolean } | { type: "note", key: string, note: Note }} TrailRow
  *
@@ -108,6 +109,7 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {boolean} [hidden] Note: the extension asked for it not to be shown.
  * @property {string} [text] Result and note.
  * @property {string} [diff] Result: an edit's diff.
+ * @property {boolean} [image] Result: it holds an image.
  */
 
 const TEXT_MAX = 2000;
@@ -310,7 +312,7 @@ function reduceMessage(entry, message, cwd) {
       if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
         entry.parts.push({ key: `${entry.id}:${index}`, text: block.text.trim() });
       } else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking.trim()) {
-        entry.parts.push({ key: `${entry.id}:${index}`, text: clip(block.thinking.trim(), TEXT_MAX), thought: true });
+        entry.parts.push({ key: `${entry.id}:${index}`, text: clip(block.thinking.trim(), DETAIL_MAX), thought: true });
       } else if (block.type === "toolCall" && typeof block.id === "string") {
         const name = String(block.name || "");
         /** @type {Omit<Step, "result">} */
@@ -321,6 +323,8 @@ function reduceMessage(entry, message, cwd) {
         if (detail) call.detail = detail;
         const diff = writeDiff(name, block.arguments);
         if (diff) call.diff = diff;
+        const path = block.arguments && block.arguments.path;
+        if (name === "read" && typeof path === "string" && (path.startsWith("/") || cwd)) call.readPath = path.startsWith("/") ? path : `${cwd}/${path}`;
         entry.parts.push({ call });
       }
     });
@@ -333,6 +337,7 @@ function reduceMessage(entry, message, cwd) {
     // Pi's edit tool gives its change as a diff with line numbers and context.
     const diff = message.details && message.details.diff;
     if (typeof diff === "string" && diff) entry.diff = clip(diff, DETAIL_MAX);
+    entry.image = content.some((/** @type {any} */ block) => block && block.type === "image");
   } else if (message.role === "bashExecution") {
     note(entry, "bash", String(message.command || ""), message.output);
   }
@@ -496,6 +501,7 @@ function foldResult(transcript, entry) {
   step.ok = entry.ok;
   step.result = entry.text;
   if (entry.diff) step.diff = entry.diff;
+  if (entry.image && step.readPath) step.image = step.readPath;
   if (entry.durationMs !== undefined) step.durationMs = entry.durationMs;
   if (step.change && entry.ok && !counted) {
     let file = turn.files.find((known) => known.path === step.change.path);

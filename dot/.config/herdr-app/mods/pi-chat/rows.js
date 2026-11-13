@@ -1,6 +1,5 @@
 // The conversation as the rows the timeline draws: each turn becomes its message,
-// its work line, what the model thinks now, its answer and its changed files; a
-// compaction running now, its line.
+// its work line, its answer and its changed files; a compaction running now, its line.
 
 import { isLive } from "./model/live.js";
 
@@ -21,7 +20,6 @@ export function conversationRows(chat, sent) {
     if (turn.user) rows.push({ key: `${turn.key}:user`, kind: "user", estimate: 64, text: turn.user.text, turn });
     const thought = turn.narration.some((part) => part.thought);
     if (turn.steps.length || turn.live || thought) rows.push({ key: `${turn.key}:work`, kind: "work", estimate: 44, turn });
-    if (turn.live && turn.thinking && turn.thought) rows.push({ key: `${turn.key}:thought`, kind: "thought", estimate: 60, turn });
     else for (const note of turn.notes) rows.push({ key: `${turn.key}:${note.key}`, kind: "note", estimate: 30, note });
     if (turn.answer) rows.push({ key: `${turn.key}:answer`, kind: "answer", estimate: 120, turn });
     if (turn.error || turn.aborted) rows.push({ key: `${turn.key}:end`, kind: "end", estimate: 30, turn });

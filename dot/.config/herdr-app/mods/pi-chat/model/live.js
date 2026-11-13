@@ -81,7 +81,6 @@ export function mergeLive(transcript, state) {
     done: false,
     live: true,
     thinking: !!(state.stream && state.stream.thinking),
-    thought: state.stream && state.stream.thinking && typeof state.stream.thought === "string" ? state.stream.thought : "",
   };
   return { turns: ahead ? turns.concat([merged]) : withLast(turns, merged), live: true };
 }

@@ -111,16 +111,6 @@ const modelRef = (model: { provider: string; id: string; name?: string }) => ({
   name: model.name ?? model.id,
 });
 
-const MAX_THOUGHT = 600;
-
-/** The end of the thinking block being written, for the chat to show while the model thinks; "" when there is none. */
-function lastThought(message: any): string {
-  if (!Array.isArray(message?.content)) return "";
-  const block = [...message.content].reverse().find((b: any) => b?.type === "thinking" && typeof b.thinking === "string");
-  const text = block ? block.thinking.trim() : "";
-  return text.length > MAX_THOUGHT ? `…${text.slice(-MAX_THOUGHT)}` : text;
-}
-
 function messageText(message: any): string {
   if (!Array.isArray(message?.content)) return "";
   return message.content
@@ -233,7 +223,7 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
       git,
       usage,
       turn,
-      stream: streaming ? { text: messageText(streaming.message), thinking: streaming.thinking, thought: lastThought(streaming.message) } : null,
+      stream: streaming ? { text: messageText(streaming.message), thinking: streaming.thinking } : null,
       ask: asker.current(),
       draft: c.ui.getEditorText(),
       error,
