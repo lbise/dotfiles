@@ -10,8 +10,6 @@
   "enabledModels": [
     "github-copilot/claude-opus-5.5",
     "github-copilot/gpt-6-luna",
-    "openai-codex/gpt-6-luna",
-    "anthropic/claude-sonnet-5-5",
     "anthropic/claude-opus-5-5",
     "azure-foundry/claude-opus-5-5",
     "github-copilot/gpt-6.1-sol",
@@ -40,7 +38,7 @@
   "usage": {
     "copilotCreditCap": 40000
   },
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",
   "defaultProjectTrust": "always",

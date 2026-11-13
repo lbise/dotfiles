@@ -69,7 +69,7 @@ link_dir() {
 }
 
 cd "$repo_dir"
-for rel in *.json themes/*.json; do
+for rel in *.json themes/*.json layouts/*.json; do
     [[ -f $rel ]] && link_file "$rel"
 done
 for rel in mods/*/; do

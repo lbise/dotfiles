@@ -1,0 +1,589 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-13T07:42:31+00:00",
+  "title": "Design System: Herdr app (Leo)",
+  "extensions": {
+    "colorMeta": {
+      "black-ground": {
+        "role": "neutral",
+        "displayName": "Black Ground",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ],
+        "alternate": {
+          "name": "Graphite",
+          "canvas": "#0B0C0F",
+          "chrome": "#0E1014",
+          "background": "#111318",
+          "surface": "#1A1D24",
+          "popover": "#1A1D24",
+          "raised": "#20242C",
+          "hover": "#20242C",
+          "selected": "#1A1D24",
+          "border": "#252932",
+          "input": "#333946",
+          "foreground": "#E7E9EE",
+          "muted": "#8B91A1",
+          "dim": "#5E6472"
+        }
+      },
+      "surface-grey": {
+        "role": "neutral",
+        "displayName": "Surface Grey",
+        "canonical": "#161616",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "raised-grey": {
+        "role": "neutral",
+        "displayName": "Raised Grey",
+        "canonical": "#1C1C1C",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "rule-grey": {
+        "role": "neutral",
+        "displayName": "Rule Grey",
+        "canonical": "#232323",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "input-grey": {
+        "role": "neutral",
+        "displayName": "Input Grey",
+        "canonical": "#333333",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "chalk-text": {
+        "role": "neutral",
+        "displayName": "Chalk Text",
+        "canonical": "#EDEDED",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "muted-grey": {
+        "role": "neutral",
+        "displayName": "Muted Grey",
+        "canonical": "#8F8F8F",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "dim-grey": {
+        "role": "neutral",
+        "displayName": "Dim Grey",
+        "canonical": "#5C5C5C",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "chalk-accent": {
+        "role": "primary",
+        "displayName": "Chalk",
+        "canonical": "#EDEDED",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ],
+        "presets": {
+          "Chalk": "#EDEDED",
+          "Lime": "#C5F25C",
+          "Jade": "#64D6A5",
+          "Ice": "#8FE3F2",
+          "Tangerine": "#FF8A3D"
+        }
+      },
+      "accent-ink": {
+        "role": "primary",
+        "displayName": "Accent Ink",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "well-black": {
+        "role": "neutral",
+        "displayName": "Well Black",
+        "canonical": "#0B0B0B",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ],
+        "source": "mix(background, surface, 0.5)"
+      },
+      "used-cell": {
+        "role": "neutral",
+        "displayName": "Used Cell",
+        "canonical": "#CCCCCC",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ],
+        "source": "mix(foreground, background, 0.14)"
+      },
+      "empty-cell-rule": {
+        "role": "neutral",
+        "displayName": "Empty Cell Rule",
+        "canonical": "#2B2B2B",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ],
+        "source": "mix(border, input, 0.5)"
+      },
+      "reply-rule": {
+        "role": "primary",
+        "displayName": "Reply Rule",
+        "canonical": "#7E7E7E",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ],
+        "source": "mix(border, accent, 0.45)"
+      },
+      "cell-look-blue": {
+        "role": "data",
+        "displayName": "Look Blue",
+        "canonical": "#7AA2F7",
+        "tonalRamp": [
+          "#010629",
+          "#0E214F",
+          "#253F78",
+          "#3E5EA4",
+          "#5A7FD1",
+          "#80A4EE",
+          "#B0C9FD",
+          "#E7EFFE"
+        ],
+        "source": "theme ansi4"
+      },
+      "cell-run-violet": {
+        "role": "data",
+        "displayName": "Run Violet",
+        "canonical": "#BB9AF7",
+        "tonalRamp": [
+          "#110125",
+          "#2C1749",
+          "#4B3271",
+          "#6C4F9B",
+          "#8F6EC6",
+          "#B094E4",
+          "#D2BCFD",
+          "#F1EBFE"
+        ],
+        "source": "theme ansi5"
+      },
+      "cell-edit-amber": {
+        "role": "data",
+        "displayName": "Edit Amber",
+        "canonical": "#E0AF68",
+        "tonalRamp": [
+          "#130900",
+          "#342101",
+          "#5A3B02",
+          "#805916",
+          "#A77930",
+          "#C79D60",
+          "#E8C28E",
+          "#FEEBD2"
+        ],
+        "source": "theme ansi3"
+      },
+      "cell-failed-rose": {
+        "role": "data",
+        "displayName": "Failed Rose",
+        "canonical": "#F7768E",
+        "tonalRamp": [
+          "#1D0006",
+          "#4B0019",
+          "#751B32",
+          "#A1364E",
+          "#CE526C",
+          "#EE7D90",
+          "#FDB1BC",
+          "#FEE8EA"
+        ],
+        "source": "theme ansi1"
+      },
+      "added-green": {
+        "role": "status",
+        "displayName": "Added Green",
+        "canonical": "#9ECE6A",
+        "tonalRamp": [
+          "#060E00",
+          "#192B02",
+          "#304C05",
+          "#496E11",
+          "#66922D",
+          "#8BB45F",
+          "#B2D78D",
+          "#DAFBBB"
+        ],
+        "source": "theme ansi2"
+      }
+    },
+    "typographyMeta": {
+      "prose": {
+        "displayName": "Prose",
+        "purpose": "The answer's markdown."
+      },
+      "message": {
+        "displayName": "Message",
+        "purpose": "User bubbles and the reply box."
+      },
+      "question": {
+        "displayName": "Question",
+        "purpose": "Pi's question over its options."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "\"Pi\" in the header, \"Chat settings\"."
+      },
+      "ui": {
+        "displayName": "UI",
+        "purpose": "Header row, work lines, notes, changed files."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Picker chips and segmented choices."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Settings section labels, muted."
+      },
+      "badge": {
+        "displayName": "Badge",
+        "purpose": "The \"Needs you\" chip in a pane header."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Counts, durations, tokens, cost, paths, the status bar, step lines, tooltips."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Code blocks and step results, in the terminal's font."
+      },
+      "terminal": {
+        "displayName": "Terminal",
+        "purpose": "The terminals (settings.json), ligatures off."
+      }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "shadow_lg (gpui platform large shadow)",
+        "purpose": "Only under things that float: settings panel, model and thinking menus, cell tooltip, jump-to-latest disc."
+      }
+    ],
+    "motion": [
+      {
+        "name": "cell-grow",
+        "value": "height 2px to 16px, 160ms ease-out",
+        "purpose": "A new step's cell scales in on the running turn."
+      },
+      {
+        "name": "cell-pulse",
+        "value": "opacity 0.35 to 1, 1200ms loop",
+        "purpose": "The running step's cell."
+      },
+      {
+        "name": "row-enter",
+        "value": "opacity 0 to 1 and 6px rise, 160ms ease-out",
+        "purpose": "New conversation rows after the first read."
+      },
+      {
+        "name": "steps-open",
+        "value": "height, 180ms ease-out",
+        "purpose": "A turn's step list opening and closing."
+      },
+      {
+        "name": "spinner",
+        "value": "one turn per 900ms",
+        "purpose": "Running work line and a working pane's header."
+      },
+      {
+        "name": "press-hover",
+        "value": "opacity 0.86",
+        "purpose": "Hover on accent buttons (send, stop, Answer, Open Terminal)."
+      },
+      {
+        "name": "copied",
+        "value": "1500ms",
+        "purpose": "How long a code block's copy button shows its check."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "reading-narrow",
+        "value": "680px"
+      },
+      {
+        "name": "reading-medium",
+        "value": "760px"
+      },
+      {
+        "name": "reading-wide",
+        "value": "900px"
+      }
+    ],
+    "layout": {
+      "zoom": 1.3,
+      "sidebar": "268px",
+      "tabs": "42px",
+      "statusLine": "28px",
+      "workBodyPadding": "8px",
+      "paneHeader": "46px",
+      "chatStatusBar": "34px",
+      "sidePanel": "368px (280-900), hidden",
+      "terminalPadding": "14px x 12px",
+      "paneRadius": "10px"
+    }
+  },
+  "components": [
+    {
+      "name": "Chat | Terminal switch",
+      "kind": "nav",
+      "refersTo": "view-switch",
+      "description": "Swaps the work area between the chat and the tab's terminals; the same in both views' headers.",
+      "html": "<div class=\"ds-switch\"><button class=\"ds-switch-seg ds-on\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg><span>Chat</span></button><button class=\"ds-switch-seg\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"m7 9 3 3-3 3M13 15h4\"/></svg><span>Terminal</span></button></div>",
+      "css": ".ds-switch { display:inline-flex; padding:2px; border-radius:8px; background:#161616; font-family: Geist, system-ui, sans-serif; font-size:13px; } .ds-switch-seg { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px; border:0; border-radius:6px; background:transparent; color:#8F8F8F; font:inherit; cursor:pointer; } .ds-switch-seg:hover { color:#EDEDED; } .ds-switch-seg:focus-visible { outline:1px solid #333333; } .ds-switch-seg.ds-on { background:#000000; color:#EDEDED; cursor:default; }"
+    },
+    {
+      "name": "Send button",
+      "kind": "button",
+      "refersTo": "send-button",
+      "description": "The reply box's round send (or stop) button: chalk when there is something to send, raised grey and dim when empty.",
+      "html": "<div style=\"display:flex;gap:10px\"><button class=\"ds-send\" aria-label=\"Send\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 19V5M5 12l7-7 7 7\"/></svg></button><button class=\"ds-send ds-idle\" aria-label=\"Send\" disabled><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 19V5M5 12l7-7 7 7\"/></svg></button></div>",
+      "css": ".ds-send { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:14px; background:#EDEDED; color:#000000; cursor:pointer; } .ds-send:hover { opacity:0.86; } .ds-send:focus-visible { outline:1px solid #EDEDED; outline-offset:2px; } .ds-send.ds-idle { background:#1C1C1C; color:#5C5C5C; cursor:default; opacity:1; }"
+    },
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action of an empty or error state, e.g. Open Terminal.",
+      "html": "<button class=\"ds-btn-primary\">Open Terminal</button>",
+      "css": ".ds-btn-primary { height:30px; padding:0 12px; border:0; border-radius:8px; background:#EDEDED; color:#000000; font-family: Geist, system-ui, sans-serif; font-size:13px; font-weight:500; cursor:pointer; } .ds-btn-primary:hover { opacity:0.86; } .ds-btn-primary:focus-visible { outline:1px solid #EDEDED; outline-offset:2px; }"
+    },
+    {
+      "name": "Work line with cell strip",
+      "kind": "custom",
+      "refersTo": "work-line",
+      "description": "A finished turn folded to one line: duration, chevron, one cell per tool call, step count.",
+      "html": "<div class=\"ds-work\"><span>Worked for 1m 45s</span><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m9 6 6 6-6 6\"/></svg><span class=\"ds-strip\"><span class=\"ds-cell\" style=\"background:#7AA2F7\"></span><span class=\"ds-cell\" style=\"background:#7AA2F7\"></span><span class=\"ds-cell\" style=\"background:#7AA2F7\"></span><span class=\"ds-cell\" style=\"background:#7AA2F7\"></span><span class=\"ds-cell\" style=\"background:#7AA2F7\"></span><span class=\"ds-cell\" style=\"background:#BB9AF7\"></span><span class=\"ds-cell\" style=\"background:#7AA2F7\"></span><span class=\"ds-cell\" style=\"background:#E0AF68\"></span><span class=\"ds-cell\" style=\"background:#E0AF68\"></span><span class=\"ds-cell\" style=\"background:#BB9AF7\"></span><span class=\"ds-cell\" style=\"background:#F7768E\"></span><span class=\"ds-cell\" style=\"background:#BB9AF7\"></span><span class=\"ds-cell\" style=\"background:#BB9AF7\"></span><span class=\"ds-cell\" style=\"background:#7AA2F7\"></span></span><span class=\"ds-fill\"></span><span class=\"ds-fig\">14 steps</span></div>",
+      "css": ".ds-work { display:flex; align-items:center; gap:10px; height:34px; width:560px; font-family: Geist, system-ui, sans-serif; font-size:13px; color:#8F8F8F; background:#000000; padding:0 12px; cursor:pointer; } .ds-work:hover { color:#EDEDED; } .ds-strip { display:flex; gap:2px; align-items:center; } .ds-cell { width:7px; height:16px; border-radius:1.5px; display:block; transition:height 160ms ease-out; } .ds-cell:hover { outline:1px solid #EDEDED; outline-offset:1px; } .ds-fill { flex:1; } .ds-fig { font-family: 'Geist Mono', ui-monospace, monospace; font-size:12px; }"
+    },
+    {
+      "name": "User bubble",
+      "kind": "card",
+      "refersTo": "user-bubble",
+      "description": "What the person sent, right-aligned in the reading column.",
+      "html": "<div class=\"ds-bubble-row\"><div class=\"ds-bubble\">Add a test for the two-channel case and run the suite.</div></div>",
+      "css": ".ds-bubble-row { display:flex; justify-content:flex-end; background:#000000; padding:18px 24px 0; } .ds-bubble { max-width:560px; padding:10px 14px; border-radius:14px; background:#161616; color:#EDEDED; font-family: Geist, system-ui, sans-serif; font-size:15px; line-height:1.5; }"
+    },
+    {
+      "name": "Reply box",
+      "kind": "input",
+      "refersTo": "reply-box",
+      "description": "Where the person writes to Pi: text, model and thinking chips, send button.",
+      "html": "<div class=\"ds-reply\"><textarea class=\"ds-reply-text\" rows=\"1\" placeholder=\"Reply to Pi\"></textarea><div class=\"ds-reply-row\"><button class=\"ds-chip ds-strong\">claude-fable-5-2</button><button class=\"ds-chip\">high</button><span style=\"flex:1\"></span><button class=\"ds-reply-send\" aria-label=\"Send\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 19V5M5 12l7-7 7 7\"/></svg></button></div></div>",
+      "css": ".ds-reply { width:560px; padding:12px 12px 10px 14px; border-radius:14px; background:#161616; border:1px solid #7E7E7E; font-family: Geist, system-ui, sans-serif; } .ds-reply-text { width:100%; border:0; outline:0; resize:none; background:transparent; color:#EDEDED; font:inherit; font-size:15px; } .ds-reply-text::placeholder { color:#8F8F8F; } .ds-reply-row { display:flex; align-items:center; gap:2px; margin-top:8px; } .ds-chip { height:24px; padding:0 8px; border:0; border-radius:7px; background:transparent; color:#8F8F8F; font:inherit; font-size:12.5px; cursor:pointer; } .ds-chip.ds-strong { color:#EDEDED; } .ds-chip:hover, .ds-chip:focus-visible { background:#1C1C1C; color:#EDEDED; outline:0; } .ds-reply-send { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:14px; background:#1C1C1C; color:#5C5C5C; }"
+    },
+    {
+      "name": "Question option",
+      "kind": "button",
+      "refersTo": "ask-option",
+      "description": "One of Pi's options, numbered; number keys pick. A picked option (multi-select) takes the accent.",
+      "html": "<div class=\"ds-ask\"><button class=\"ds-opt\"><span class=\"ds-num\">1</span><span class=\"ds-opt-label\">Channels 0 and 39</span><span class=\"ds-opt-note\">The two ends of the band</span></button><button class=\"ds-opt ds-picked\"><span class=\"ds-num\">&#10003;</span><span class=\"ds-opt-label\">Channels 11 and 12</span><span class=\"ds-opt-note\">Two neighbours</span></button></div>",
+      "css": ".ds-ask { display:flex; flex-direction:column; gap:6px; width:520px; padding:14px; border-radius:14px; border:1px solid #333333; background:#000000; font-family: Geist, system-ui, sans-serif; } .ds-opt { display:flex; align-items:center; gap:10px; min-height:36px; padding:7px 10px; border-radius:9px; border:1px solid #232323; background:transparent; font:inherit; cursor:pointer; text-align:left; } .ds-opt:hover, .ds-opt:focus-visible { background:#161616; outline:0; } .ds-num { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; border-radius:5px; background:#161616; color:#8F8F8F; font-family: 'Geist Mono', ui-monospace, monospace; font-size:12px; } .ds-opt-label { color:#EDEDED; font-size:14px; } .ds-opt-note { color:#8F8F8F; font-size:13px; } .ds-opt.ds-picked { border-color:#EDEDED; } .ds-opt.ds-picked .ds-num { background:#EDEDED; color:#000000; }"
+    },
+    {
+      "name": "Status bar",
+      "kind": "custom",
+      "refersTo": "status-bar",
+      "description": "Context as 40 cells, repository and branch, cost, usage limits as 10 cells; words drop before figures.",
+      "html": "<div class=\"ds-status\"><span>Context</span><span class=\"ds-bar\"><i class=\"ds-u\"></i><i class=\"ds-u\"></i><i class=\"ds-u\"></i><i class=\"ds-u\"></i><i class=\"ds-u\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i></span><b>113k</b><span>of 1M</span><span class=\"ds-rule\"></span><b>rom</b><span>dmtx-audit-fixes</span><span class=\"ds-rule\"></span><b>$1.42</b><span class=\"ds-rule\"></span><span>5h</span><span class=\"ds-bar\"><i class=\"ds-u\"></i><i class=\"ds-u\"></i><i class=\"ds-u\"></i><i class=\"ds-u\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i><i class=\"ds-e\"></i></span><b>38%</b></div>",
+      "css": ".ds-status { display:flex; align-items:center; gap:10px; height:34px; padding:0 14px; border-top:1px solid #232323; background:#000000; color:#8F8F8F; font-family: 'Geist Mono', ui-monospace, monospace; font-size:12px; white-space:nowrap; overflow:hidden; } .ds-status b { color:#EDEDED; font-weight:500; } .ds-bar { display:flex; gap:2px; } .ds-bar i { width:6px; height:13px; border-radius:1.5px; display:block; box-sizing:border-box; } .ds-u { background:#CCCCCC; } .ds-e { border:1px solid #2B2B2B; } .ds-rule { width:1px; height:12px; margin:0 4px; background:#232323; }"
+    },
+    {
+      "name": "Segmented choice",
+      "kind": "chip",
+      "refersTo": "segmented-choice-on",
+      "description": "A Chat settings choice: ground, tool activity, reading width.",
+      "html": "<div class=\"ds-choice\"><button class=\"ds-choice-seg\">Narrow</button><button class=\"ds-choice-seg ds-on\">Medium</button><button class=\"ds-choice-seg\">Wide</button></div>",
+      "css": ".ds-choice { display:flex; width:200px; padding:2px; border-radius:8px; background:#000000; font-family: Geist, system-ui, sans-serif; } .ds-choice-seg { flex:1; height:26px; border:1px solid transparent; border-radius:6px; background:transparent; color:#8F8F8F; font:inherit; font-size:12.5px; cursor:pointer; } .ds-choice-seg:hover, .ds-choice-seg:focus-visible { color:#EDEDED; outline:0; } .ds-choice-seg.ds-on { background:#161616; border-color:#232323; color:#EDEDED; cursor:default; }"
+    },
+    {
+      "name": "Code block",
+      "kind": "card",
+      "refersTo": "code-block",
+      "description": "Code in an answer, in the terminal's font, with a copy button on hover.",
+      "html": "<div class=\"ds-code\"><pre>static inline bool IsValid(uint64_t set) {\n    return count(set) &gt;= MIN_CHANNELS;\n}</pre><button class=\"ds-copy\" aria-label=\"Copy the code\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"9\" y=\"9\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M5 15V5a2 2 0 0 1 2-2h10\"/></svg></button></div>",
+      "css": ".ds-code { position:relative; width:520px; border-radius:10px; border:1px solid #232323; background:#0B0B0B; } .ds-code pre { margin:0; padding:12px 14px; color:#EDEDED; font-family: 'JetBrainsMono Nerd Font Mono', 'JetBrains Mono', 'Geist Mono', monospace; font-size:12.5px; line-height:1.6; overflow-x:auto; font-variant-ligatures:none; } .ds-copy { position:absolute; top:8px; right:8px; width:26px; height:26px; display:none; align-items:center; justify-content:center; border-radius:7px; border:1px solid #232323; background:#161616; color:#8F8F8F; cursor:pointer; } .ds-code:hover .ds-copy { display:inline-flex; } .ds-copy:hover, .ds-copy:focus-visible { color:#EDEDED; outline:0; display:inline-flex; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The channel map",
+    "overview": "**Creative North Star: \"The channel map\"**\n\nHerdr is the Windows window from which Leo runs several Pi agents at once, on WSL and on three Linux boards. The window is a black ground with neutral greys and chalk text; nothing in its chrome carries hue. Colour is reserved for one job: showing what an agent did. Each tool call is one small cell, coloured by its kind, laid on one line the way a radio draws channels. A thirty-step turn is one line of thirty cells, and pointing at a cell names its step.\n\nThe chat comes first and the real terminal is one click away (the Chat | Terminal switch in every Pi pane's header). The reading column is centred and narrow enough to read for hours beside dark terminals; the answer is the loudest thing on screen, and the work behind it folds into a single \"Worked for 1m 45s\" line until it is doubted. Everything that can be pressed is chalk or turns chalk under the pointer; everything else is grey.\n\nThe sources of truth are `themes/leo.json` (colours), `settings.json` (terminal font, zoom), `layouts/leo.json` (window structure) and the `mods/pi-chat/` mod (every chat size, radius and motion). Sizes are design pixels; the window renders them at the app zoom (1.3).",
+    "keyCharacteristics": [
+      "Black ground, neutral greys, chalk text; no tint in the chrome.",
+      "One accent (chalk), used only on what can be pressed or what has been picked.",
+      "Four cell colours (blue look, violet run, amber edit, rose failed), taken from the terminal's ANSI slots.",
+      "Geist for words, Geist Mono for figures, the terminal's font for code.",
+      "Flat tone layering; a shadow only under things that float.",
+      "Small, purposeful motion: cells grow in, rows rise in, step lists open."
+    ],
+    "rules": [
+      {
+        "name": "The Pressable Chalk Rule",
+        "body": "The accent marks what can be pressed (send, stop, a primary button, the reply box) or what has been picked (an ask option). It never marks a heading, a status or a decoration. A spinner is chalk text, not accent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Cells Carry the Colour Rule",
+        "body": "Blue, violet, amber and rose mean a step's kind. Outside a cell the only hues are rose for a failure and green for added lines; everything else is a grey.",
+        "section": "colors"
+      },
+      {
+        "name": "The Terminal Keeps Tokyo Night Rule",
+        "body": "The terminal ANSI palette stays Tokyo Night. The terminals take the black ground; the cells borrow the ANSI slots rather than defining their own.",
+        "section": "colors"
+      },
+      {
+        "name": "The Figures in Mono Rule",
+        "body": "Anything counted or timed (steps, seconds, tokens, dollars, percentages, paths) is Geist Mono so it does not jitter as it updates.",
+        "section": "typography"
+      },
+      {
+        "name": "The As Typed Rule",
+        "body": "Text shows what was typed: a zero-width non-joiner between sign characters stops `->` or `>=` becoming a ligature, matching the terminals' ligatures-off setting. Tabs show as four spaces.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Column Rule",
+        "body": "The conversation, question and reply box share one centred column. The header and status bar run full width; nothing else does.",
+        "section": "layout"
+      },
+      {
+        "name": "The Float Only Rule",
+        "body": "A shadow means \"this is above the conversation and will go away\". Cards in the conversation (code, files, question, reply box) are bordered or toned, never shadowed.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** take every colour from the Herdr theme (`theme()`): surface, raised, border, input, muted, dim, accent and the ANSI slots. Derived colours (well, used cell, reply rule) are mixes of theme colours, not new hex values.",
+      "**Do** give every tool call exactly one cell, coloured by its kind, and keep cells 2px apart.",
+      "**Do** put figures in Geist Mono and anything from a terminal (code, tool output) in the terminal font.",
+      "**Do** keep the reading column at the chosen width (680, 760 or 900) with its 24px gutter.",
+      "**Do** make an action discoverable by turning it chalk (or surface) on hover; keep it muted at rest.",
+      "**Do** keep the Pi header identical in the chat and the terminal view, with the Chat | Terminal switch at its right."
+    ],
+    "donts": [
+      "**Don't** use the accent for status, headings, rules or decoration; it marks what can be pressed or what is picked.",
+      "**Don't** use blue, violet or amber outside cells, or rose and green outside failures and line counts.",
+      "**Don't** shadow anything that sits in the conversation; shadows are for things that float.",
+      "**Don't** change the terminal's ANSI palette away from Tokyo Night; the cells depend on it.",
+      "**Don't** let ligatures join typed signs, in the chat or the terminal.",
+      "**Don't** drop figures or cells from the status bar when space is short; drop words first."
+    ]
+  }
+}

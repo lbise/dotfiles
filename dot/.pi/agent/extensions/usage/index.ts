@@ -33,6 +33,12 @@ export const STATUS_KEYS = {
   extra: "usage-extra",
 } as const;
 
+/**
+ * Event on pi.events with the same statuses as plain text, for extensions that cannot use ANSI
+ * (herdr-chat): [{ key, text }] in STATUS_KEYS order, sent whenever a status changes.
+ */
+export const USAGE_EVENT = "usage:status";
+
 // Keys from the old per-provider extensions. Cleared so they cannot linger after a reload.
 const LEGACY_STATUS_KEYS = [
   "openai-codex-usage",
@@ -101,6 +107,7 @@ function authSource(ctx: Ctx): AuthSource {
 export default function (pi: ExtensionAPI) {
   const states = new Map<string, ProviderState>();
   let pollTimer: ReturnType<typeof setInterval> | undefined;
+  const plain = new Map<string, string>();
 
   function stateFor(provider: UsageProvider): ProviderState {
     let state = states.get(provider.id);
@@ -113,10 +120,18 @@ export default function (pi: ExtensionAPI) {
 
   function set(ctx: Ctx, key: string, segments: Segment[] | undefined) {
     ctx.ui.setStatus(key, segments?.length ? renderSegments(segments, ctx.ui.theme) : undefined);
+    const text = segments?.map((segment) => segment.text).join("") || undefined;
+    if (text === plain.get(key)) return;
+    if (text) plain.set(key, text);
+    else plain.delete(key);
+    pi.events.emit(
+      USAGE_EVENT,
+      Object.values(STATUS_KEYS).flatMap((k) => (plain.has(k) ? [{ key: k, text: plain.get(k) }] : []))
+    );
   }
 
   function clear(ctx: Ctx) {
-    for (const key of Object.values(STATUS_KEYS)) ctx.ui.setStatus(key, undefined);
+    for (const key of Object.values(STATUS_KEYS)) set(ctx, key, undefined);
   }
 
   function publish(ctx: Ctx, provider: UsageProvider, state: ProviderState) {

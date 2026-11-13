@@ -4,9 +4,7 @@
   "defaultModel": "claude-opus-5.5",
   "defaultThinkingLevel": "high",
   "theme": "tokyo-night-custom",
-  "extensions": [
-    "~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"
-  ],
+  "extensions": ["~/gitrepo/leo_dotfiles/dot/.pi/agent/extensions"],
   "enabledModels": [
     "github-copilot/claude-opus-5.5",
     "github-copilot/gpt-6-luna",
@@ -31,13 +29,11 @@
   "usage": {
     "copilotCreditCap": 40000
   },
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "showCacheMissNotices": true,
   "tuiMode": "fullscreen",
   "defaultProjectTrust": "always",
-  "defaultTools": [
-    "+codemode"
-  ],
+  "defaultTools": ["+codemode"],
   "extensionChangelogVersions": {
     "{\"source\":\"npm:pi-context-view\",\"scope\":\"user\"}": "0.8.3",
     "{\"source\":\"npm:pi-footer\",\"scope\":\"user\"}": "0.5.1"

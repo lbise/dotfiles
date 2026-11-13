@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Drive the development copy of the Herdr app (its own home, so the daily window is untouched).
+#   herdr-app-dev sync            copy mods/pi-chat, layouts and themes from the repo into the dev home
+#   herdr-app-dev shot [name]     save the dev window's frame, print its WSL path
+#   herdr-app-dev <args...>       herdr-app <args...> against the dev window (status, do, check, ...)
+set -Eeuo pipefail
+repo="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)/dot/.config/herdr-app"
+win_profile="$(cd /mnt/c && cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
+dev_win="$win_profile\\.config\\herdr-app-dev"
+dev="$(wslpath "$dev_win")"
+run() { (cd /mnt/c && HERDR_APP_HOME="$dev_win" WSLENV="HERDR_APP_HOME:${WSLENV:-}" herdr-app.exe "$@" | tr -d '\r'); }
+case "${1:-}" in
+sync)
+    mkdir -p "$dev/mods/pi-chat" "$dev/layouts" "$dev/themes"
+    rsync -a --delete --exclude '*.test.js' "$repo/mods/pi-chat/" "$dev/mods/pi-chat/"
+    cp "$repo"/layouts/*.json "$dev/layouts/" 2>/dev/null || true
+    cp "$repo"/themes/*.json "$dev/themes/"
+    ;;
+shot)
+    out="$(wslpath "$(cd /mnt/c && cmd.exe /c 'echo %TEMP%' 2>/dev/null | tr -d '\r')")/herdr-shots"
+    mkdir -p "$out"
+    run shot "$(wslpath -w "$out")\\${2:-dev}.png" >/dev/null
+    echo "$out/${2:-dev}.png"
+    ;;
+*) run "$@" ;;
+esac

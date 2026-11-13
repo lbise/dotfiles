@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { afterEach, mock } from "node:test";
 
 import { ICONS } from "../format.ts";
-import extension, { STATUS_KEYS, providerForModel } from "../index.ts";
+import extension, { STATUS_KEYS, USAGE_EVENT, providerForModel } from "../index.ts";
 
 const realFetch = globalThis.fetch;
 const realEnv = { HOME: process.env.HOME, GITHUB_TOKEN: process.env.GITHUB_TOKEN };
@@ -25,6 +25,7 @@ function setup(fetchBody: unknown) {
   const commands = new Map<string, { handler: (args: string, ctx: any) => Promise<void> }>();
   const statuses = new Map<string, string>();
   const notifications: string[] = [];
+  const events: { channel: string; data: any }[] = [];
   let fetches = 0;
 
   globalThis.fetch = (async () => {
@@ -35,6 +36,7 @@ function setup(fetchBody: unknown) {
   extension({
     on: (name: string, handler: Handler) => handlers.set(name, handler),
     registerCommand: (name: string, command: any) => commands.set(name, command),
+    events: { emit: (channel: string, data: any) => events.push({ channel, data }) },
   } as any);
 
   const ctx = {
@@ -52,6 +54,7 @@ function setup(fetchBody: unknown) {
     ctx,
     statuses,
     notifications,
+    events,
     fetches: () => fetches,
     emit: (name: string, event: any = {}) => handlers.get(name)!(event, ctx),
     command: (name: string) => commands.get(name)!.handler("", ctx),
@@ -81,6 +84,21 @@ test("session start publishes every generic status key", async () => {
   assert.match(h.statuses.get(STATUS_KEYS.secondaryReset)!, new RegExp(`^${ICONS.reset} 3d \\d\\d\\.\\d\\d$`));
   assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} off`);
   assert.equal(h.statuses.has("copilot-usage"), false);
+});
+
+test("statuses are also sent as plain text in footer order, and withdrawn when cleared", async () => {
+  const h = setup(payload);
+  h.ctx.ui.theme.fg = (color: string, text: string) => `<${color}>${text}</>`;
+  await h.emit("session_start");
+
+  assert.ok(h.events.every((event) => event.channel === USAGE_EVENT));
+  const sent = h.events.at(-1)!.data;
+  assert.deepEqual(sent.map((item: any) => item.key), Object.values(STATUS_KEYS));
+  assert.equal(sent[0].text, `${ICONS.hours} ███░░░░░ 42%`);
+  assert.match(h.statuses.get(STATUS_KEYS.primary)!, /^<success>/);
+
+  await h.emit("model_select", { model: { provider: "openai", id: "gpt-5" } });
+  assert.deepEqual(h.events.at(-1)!.data, []);
 });
 
 test("cached usage is reused within the TTL and refreshed on agent end", async () => {

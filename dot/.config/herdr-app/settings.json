@@ -1,11 +1,11 @@
 {
-  "zoom": 1.2,
+  "zoom": 1.3,
   "sounds": {
     "enabled": true
   },
+  "font": "JetBrainsMono Nerd Font Mono",
+  "font_size": 16.0,
   "font_ligatures": false,
-  "minimum_contrast": 1,
-  "theme": "tokyo-night",
-  "font_size": 16,
-  "font": "JetBrainsMono Nerd Font Mono"
+  "minimum_contrast": 1.0,
+  "theme": "leo"
 }
