@@ -87,15 +87,38 @@
       "resizable": false,
       "children": [
         {
-          "id": "tabs",
-          "type": "block",
+          "id": "tabbar",
+          "type": "row",
           "size": {
             "px": 42
           },
-          "window_drag": true,
-          "content": {
-            "mod": "tabs"
-          }
+          "children": [
+            {
+              "id": "usage-toggle",
+              "type": "block",
+              "size": {
+                "px": 84
+              },
+              "window_drag": true,
+              "content": {
+                "mod": "usage",
+                "props": {
+                  "role": "toggle"
+                }
+              }
+            },
+            {
+              "id": "tabs",
+              "type": "block",
+              "window_drag": true,
+              "content": {
+                "mod": "tabs"
+              },
+              "size": {
+                "weight": 1
+              }
+            }
+          ]
         },
         {
           "id": "work-body",
