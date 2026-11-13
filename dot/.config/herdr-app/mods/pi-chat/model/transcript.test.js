@@ -12,7 +12,7 @@ function read(lines) {
 test("a turn with no tools is a user message and an answer", () => {
   const s = session();
   const first = s.user("What is AFH?");
-  s.assistant([{ type: "thinking", thinking: "hm" }, text("Adaptive **frequency** hopping.")], "stop", {}, 18000);
+  const reply = s.assistant([{ type: "thinking", thinking: "hm" }, text("Adaptive **frequency** hopping.")], "stop", {}, 18000);
   const t = read(s.lines);
 
   assert.deepEqual(t.header, { id: "session-1", cwd: "/work", parentSession: null });
@@ -21,7 +21,7 @@ test("a turn with no tools is a user message and an answer", () => {
     key: first,
     user: { text: "What is AFH?", skill: null, images: [] },
     steps: [],
-    narration: [],
+    narration: [{ key: `${reply}:0`, text: "hm", beforeStep: 0, thought: true }],
     notes: [],
     answer: "Adaptive **frequency** hopping.",
     files: [],
@@ -40,7 +40,7 @@ test("steps, narration before the last tool call, and the answer after it", () =
   s.user("Where is the minimum checked?");
   s.assistant([text("Looking."), call("c1", "grep", { pattern: "afh_min", path: "src" }), call("c2", "read", { path: "src/afh.c" })], "toolUse");
   s.result("c1", "grep", "src/afh.c:12", { durationMs: 40 });
-  s.result("c2", "read", "x".repeat(5000));
+  s.result("c2", "read", "x".repeat(60000));
   s.assistant([text("Found it, running the tests."), call("c3", "bash", { command: "make test" })], "toolUse");
   s.result("c3", "bash", "ok", { durationMs: 2100 });
   s.assistant([text("The check is in `afh.c`."), text("It holds.")], "stop");
@@ -55,7 +55,7 @@ test("steps, narration before the last tool call, and the answer after it", () =
     ]
   );
   assert.equal(turn.steps[0].result, "src/afh.c:12");
-  assert.equal(turn.steps[1].result.length, 2000);
+  assert.equal(turn.steps[1].result.length, 50000);
   assert.ok(turn.steps[1].result.endsWith("…"));
   assert.deepEqual(
     turn.narration.map((n) => [n.text, n.beforeStep]),
@@ -394,4 +394,17 @@ test("appending to a big session touches only its last turn", () => {
   for (let i = 0; i < before.length; i++) assert.equal(turns[i], before[i]);
   assert.equal(turns[count - 1].answer, `answer ${count - 1}\n\nmore 0\n\nmore 1\n\nmore 2\n\nmore 3\n\nmore 4`);
   assert.ok(one < full / 100, `one line took ${one} ms, the whole session ${full} ms`);
+});
+
+test("an opened step has the whole command, and an edit or write its diff", () => {
+  const s = session();
+  s.user("go");
+  const script = "set -e\nmake\nmake test";
+  s.assistant([call("c1", "bash", { command: script }), call("c2", "bash", { command: "ls" }), call("c3", "write", { path: "/work/a.c", content: "int a;\nint b;\n" }), call("c4", "edit", { path: "/work/a.c", edits: [{ oldText: "int a;", newText: "int c;" }] })], "toolUse");
+  s.result("c4", "edit", "Successfully replaced 1 block(s)", { details: { diff: "-1 int a;\n+1 int c;\n 2 int b;" } });
+  const [turn] = read(s.lines).turns;
+  assert.deepEqual(turn.steps[0].detail, { text: script, language: "bash" });
+  assert.equal(turn.steps[1].detail, undefined); // the label shows all of it
+  assert.equal(turn.steps[2].diff, "+1 int a;\n+2 int b;");
+  assert.equal(turn.steps[3].diff, "-1 int a;\n+1 int c;\n 2 int b;");
 });

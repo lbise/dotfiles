@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matches, parseCommands, parseSessions, parseTree, sessionCommand, slashItems } from "./lists.js";
+import { matches, parseCommands, parseModels, parseSessions, parseTree, sessionCommand, slashItems } from "./lists.js";
 import { formatAge } from "./format.js";
 
 test("sessions are checked and their titles made one line", () => {
@@ -75,4 +75,13 @@ test("ages", () => {
   assert.equal(formatAge(now - 20 * 86_400_000, now), "2w ago");
   assert.equal(formatAge(now - 400 * 86_400_000, now), "1y ago");
   assert.equal(formatAge(null, now), "");
+});
+
+test("models.json: every model, the scoped and current ones marked", () => {
+  const text = JSON.stringify({ v: 1, items: [{ provider: "openai", id: "gpt-6", scoped: true, current: true }, { provider: "x" }, { provider: "a", id: "b", name: "B" }] });
+  assert.deepEqual(parseModels(text), [
+    { provider: "openai", id: "gpt-6", name: "gpt-6", scoped: true, current: true },
+    { provider: "a", id: "b", name: "B", scoped: false, current: false },
+  ]);
+  assert.equal(parseModels("{"), null);
 });

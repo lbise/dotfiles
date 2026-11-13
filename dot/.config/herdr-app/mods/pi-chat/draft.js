@@ -6,6 +6,8 @@
 import { feedFor, sendCommand } from "./feeds.js";
 
 // Pi notices typing within a second: until then a fresher draft may still come in.
+// The chat does not read while hidden, so the first read after arrival may also
+// bring one (the draft the reply box handed Pi on leaving), however late it comes.
 const SETTLE = 1500;
 
 export class SharedDraft {
@@ -21,14 +23,15 @@ export class SharedDraft {
     const state = feedFor(pi).chat.state;
     const text = this.kept.has(pi.key) ? this.kept.get(pi.key) : (state && state.draft) || "";
     this.composer.set(text);
-    this.took = { key: pi.key, text, until: Date.now() + SETTLE };
+    this.took = { key: pi.key, text, until: Date.now() + SETTLE, read: false };
   }
 
   /** After a read: a draft Pi reports just after arrival still comes in, while the box is untouched. */
   follow(pi) {
     const took = this.took;
     const state = feedFor(pi).chat.state;
-    if (!took || took.key !== pi.key || Date.now() > took.until || !state || this.kept.has(pi.key)) return;
+    if (!took || took.key !== pi.key || (took.read && Date.now() > took.until) || !state || this.kept.has(pi.key)) return;
+    took.read = true;
     const draft = state.draft || "";
     if (draft === took.text || this.composer.text() !== took.text) return;
     this.composer.set(draft);
@@ -38,7 +41,7 @@ export class SharedDraft {
   /** Pi is about to set its draft (a move back to one of your messages): the reply box takes it, unless typed in meanwhile. */
   expect(pi, within) {
     this.kept.delete(pi.key);
-    this.took = { key: pi.key, text: this.composer.text(), until: Date.now() + within };
+    this.took = { key: pi.key, text: this.composer.text(), until: Date.now() + within, read: true };
   }
 
   /**

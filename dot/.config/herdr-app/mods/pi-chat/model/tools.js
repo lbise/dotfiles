@@ -7,6 +7,9 @@
 /** @typedef {"look"|"run"|"edit"|"other"} StepKind */
 
 const LABEL_MAX = 200;
+// What an opened step shows in full: the command or code, a written file. Pi's own
+// tool output stops at 2000 lines or 50 KB; a call is not shown longer than that either.
+export const DETAIL_MAX = 50000;
 /** @type {Record<string, StepKind>} */
 const KINDS = { read: "look", grep: "look", find: "look", ls: "look", bash: "run", powershell: "run", codemode: "run", edit: "edit", write: "edit" };
 // The argument that names what a call is about, most telling first. The extension
@@ -65,6 +68,39 @@ export function stepLabel(name, args, cwd) {
   return line ? clip(line, LABEL_MAX) : String(name);
 }
 
+// The language of the code a call runs, for its coloured view.
+const DETAIL_LANGUAGES = { bash: "bash", powershell: "powershell", codemode: "js" };
+
+/**
+ * A call's command or code in full, for its opened step, when the one-line label
+ * does not already show all of it; else null.
+ * @param {string} name
+ * @param {any} args
+ * @returns {{ text: string, language: string }|null}
+ */
+export function stepDetail(name, args) {
+  const given = args && typeof args === "object" ? args : {};
+  const key = LABEL_KEYS.find((k) => typeof given[k] === "string" && given[k]);
+  if (!key || key === "path" || key === "file_path") return null;
+  const text = given[key].replace(/\s+$/, "");
+  if (!text.includes("\n") && text.length <= LABEL_MAX) return null;
+  return { text: clip(text, DETAIL_MAX), language: DETAIL_LANGUAGES[name] || "text" };
+}
+
+/**
+ * A written file as a diff of added lines, in the form Pi gives an edit's diff:
+ * `+<line number> <text>` per line.
+ * @param {string} name
+ * @param {any} args
+ * @returns {string|null}
+ */
+export function writeDiff(name, args) {
+  if (name !== "write" || !args || typeof args.content !== "string") return null;
+  const all = lines(clip(args.content, DETAIL_MAX));
+  const width = String(all.length).length;
+  return all.map((line, index) => `+${String(index + 1).padStart(width)} ${line}`).join("\n");
+}
+
 /** @param {unknown} text */
 function lines(text) {
   if (typeof text !== "string" || text === "") return [];
@@ -116,4 +152,26 @@ export function fileChange(name, args, cwd) {
     change.removed += delta.removed;
   }
   return change;
+}
+
+/**
+ * @typedef {object} DiffRow One line of a diff, ready to draw.
+ * @property {"add"|"del"|"same"|"gap"} kind `gap`: unchanged lines left out.
+ * @property {string} number The file's line number, "" for a gap.
+ * @property {string} text
+ */
+
+/**
+ * A step's diff (Pi's form: `+12 text`, `-12 text`, ` 12 text`, `   ...`) as rows.
+ * A line in no known form is kept as unchanged text.
+ * @param {string} diff
+ * @returns {DiffRow[]}
+ */
+export function diffRows(diff) {
+  return diff.split("\n").map((line) => {
+    if (/^\s*\.\.\.\s*$/.test(line)) return { kind: "gap", number: "", text: "" };
+    const match = /^([+\- ])\s*(\d+) ?(.*)$/.exec(line);
+    if (!match) return { kind: "same", number: "", text: line };
+    return { kind: match[1] === "+" ? "add" : match[1] === "-" ? "del" : "same", number: match[2], text: match[3] };
+  });
 }

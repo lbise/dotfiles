@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { contextCells, formatCost, formatDuration, formatTokens, usageCells, usageGroups } from "./format.js";
+import { contextCells, errorText, formatCost, formatDuration, formatTokens, usageCells, usageGroups } from "./format.js";
 
 test("tokens", () => {
   assert.equal(formatTokens(113089), "113k");
@@ -106,4 +106,13 @@ test("usage groups take the extension's figures, else the text's", () => {
   assert.deepEqual([groups[0].tone, groups[3].tone, groups[3].note, groups[3].noteTone], [null, "warning", "→47.8k", "error"]);
   assert.deepEqual(usageGroups([{ key: "usage-primary", text: "unlimited" }]).map((group) => [group.label, group.value]), [["", "unlimited"]]);
   assert.deepEqual(usageGroups(null), []);
+});
+
+test("errorText: a provider's JSON error as a sentence", () => {
+  const raw = '429 {"type":"error","error":{"type":"rate_limit_error","message":"Try again later."},"request_id":"r1"}';
+  assert.equal(errorText(raw), "429 rate_limit_error: Try again later.");
+  assert.equal(errorText('{"message":"Bad key"}'), "Bad key");
+  assert.equal(errorText("Connection reset"), "Connection reset");
+  assert.equal(errorText("400 {not json"), "400 {not json");
+  assert.equal(errorText('500 {"error":{"code":"server_error","message":"Boom"}}'), "500 server_error: Boom");
 });

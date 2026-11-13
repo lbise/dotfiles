@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clip, fileChange, shortPath, stepKind, stepLabel } from "./tools.js";
+import { clip, diffRows, fileChange, shortPath, stepKind, stepLabel } from "./tools.js";
 
 test("kinds follow the protocol's four", () => {
   for (const name of ["read", "grep", "find", "ls", "web_fetch", "WebSearch"]) assert.equal(stepKind(name), "look", name);
@@ -63,4 +63,14 @@ test("edit counts the lines that differ, over all its edits", () => {
 test("other tools change no file", () => {
   assert.equal(fileChange("read", { path: "a.c" }), null);
   assert.equal(fileChange("edit", null), null);
+});
+
+test("diffRows: Pi's diff as rows, a left-out stretch as a gap", () => {
+  assert.deepEqual(diffRows("     ...\n 193 \n-197   <div>\n+197   <p>\nodd"), [
+    { kind: "gap", number: "", text: "" },
+    { kind: "same", number: "193", text: "" },
+    { kind: "del", number: "197", text: "  <div>" },
+    { kind: "add", number: "197", text: "  <p>" },
+    { kind: "same", number: "", text: "odd" },
+  ]);
 });

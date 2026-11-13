@@ -52,7 +52,7 @@ Pi event announces (a typed draft, entries from other extensions) is picked up w
   "leaf": "e9f…",                 // id of the current entry (the end of the active branch), null in an empty session; changes on a tree move that adds no entry
   "model": { "provider": "azure-foundry", "id": "claude-fable-5-2", "name": "claude-fable-5-2" },  // null when none is selected
   "thinking": "high",
-  "models": [ { "provider": "…", "id": "…", "name": "…" } ],   // what the picker offers: Pi's scoped models (`enabledModels`), or every model with credentials when there is no scope
+  "models": [ { "provider": "…", "id": "…", "name": "…" } ],   // what the picker offers and `cycle` steps through: the scope (the chat's last `scope`, else Pi's `enabledModels`), or every model with credentials when there is no scope
   "thinkingLevels": ["off", "minimal", "low", "medium", "high", "xhigh"],  // the levels the current model supports
   "context": { "tokens": 113089, "window": 1000000 },          // each null when unknown (tokens: right after a compaction)
   "cost": 1.42,                   // session cost in USD as Pi's built-in footer counts it (messages, compactions, branch summaries), null when unknown
@@ -62,7 +62,7 @@ Pi event announces (a typed draft, entries from other extensions) is picked up w
     "startedAt": 1794489000000, "endedAt": null,
     "steps": [ { "id": "toolu_…", "kind": "look", "name": "read", "label": "src/a.c", "startedAt": 1, "endedAt": 2, "ok": true } ]
   },
-  "stream": { "text": "The check belongs in…", "thinking": false },  // assistant message being written, else null; thinking: the model is reasoning right now
+  "stream": { "text": "The check belongs in…", "thinking": false, "thought": "…" },  // assistant message being written, else null; thinking: the model is reasoning right now; thought: the end (at most 600 characters) of its last thinking block, "" when none
   "ask": { "id": "a1", "question": "Which accent?", "options": [ { "label": "Lime", "description": "…" } ], "multi": false },  // else null
   "draft": "",                    // text in Pi's input box
   "error": null                   // last extension error as a short string, for the mod to show; null again once a later inbox command succeeds
@@ -131,6 +131,8 @@ made the name does not matter. A command that cannot run sets `state.error`.
 { "type": "abort" }
 { "type": "model", "provider": "…", "id": "…" }
 { "type": "thinking", "level": "low" }
+{ "type": "cycle", "what": "model", "direction": "backward" }   // as Ctrl+P (forward, the default) / Shift+Ctrl+P over `models`; "what": "thinking" as Shift+Tab over `thinkingLevels`
+{ "type": "scope", "models": [ { "provider": "…", "id": "…" } ] } // the models Ctrl+P cycles through, saved as `enabledModels` in Pi's global settings; none or all is no scope
 { "type": "answer", "id": "a1", "value": ["Lime"] }               // labels chosen, or free text as one string; ignored when id is not the pending ask
 { "type": "draft", "text": "…" }                                  // set Pi's input box
 { "type": "session", "action": "new" }                          // like /new
@@ -140,6 +142,7 @@ made the name does not matter. A command that cannot run sets `state.error`.
 { "type": "session", "action": "tree", "entryId": "…", "summarize": false }  // like /tree, jumping to that entry
 { "type": "list", "what": "sessions" }                           // write sessions.json
 { "type": "list", "what": "tree" }                               // write tree.json
+{ "type": "list", "what": "models" }                             // write models.json
 ```
 
 Session commands do what Pi's built-in command of the same name does, with Pi's own messages in
@@ -188,6 +191,19 @@ entries, their type (`compaction`, `branch_summary`, `custom_message`). `text`: 
 for a tool result the tool and its step label (`read src/a.c`); `(aborted)` or the error for a
 failed assistant message; `113k tokens` for a compaction; the summary for a branch summary; empty
 when there is none.
+
+### `models.json` (extension writes on a `list` request)
+
+```jsonc
+{ "v": 1, "at": 1794489190038, "items": [ { "provider": "openai", "id": "gpt-6", "name": "GPT 6", "scoped": true, "current": false } ] }
+```
+
+Every model with credentials. `scoped` marks the scope (all false when there is none), `current` the model in use.
+
+Pi resolves its scope once, at startup, and gives extensions no way to change it. A `scope` command
+therefore changes what the chat offers and cycles through at once (for every session of this Pi
+process) and saves `enabledModels`, but Pi's own Ctrl+P in its terminal keeps the startup scope
+until Pi restarts.
 
 ### Transcript
 

@@ -2,35 +2,67 @@
 // strip and steps, the answer, the changed files.
 
 import { div } from "gpui-kit";
-import { Popup, h_flex, v_flex } from "gpui-base";
-import { formatDuration } from "./model/format.js";
+import { Popup, TextView, h_flex, v_flex } from "gpui-base";
+import { errorText, formatDuration } from "./model/format.js";
+import { copyButton, hoverArea, typedText } from "./copy.js";
 import { STEP_CELL, stepCell } from "./cells.js";
 import { markdown } from "./markdown.js";
 import { stepList, stepVerb } from "./steps.js";
-import { MONO, asTyped, icon, monoLine } from "./ui.js";
+import { MONO, icon, monoLine } from "./ui.js";
 
 const DOING = { read: "Reading", grep: "Searching", find: "Searching", ls: "Listing", bash: "Running", edit: "Editing", write: "Writing" };
 // What a work line holds besides its cells: the words, the chevron, the count.
 const LINE_REST = 250;
 
-function bubble(t, text) {
-  const lines = text.split("\n");
-  return h_flex()
+// Your message, selectable, with its copy button beside it. One sent while Pi
+// works waits until Pi takes it (a steer): it says so until it reaches the conversation.
+function bubble(t, key, text, queued, pointer) {
+  const id = `pi-chat-user-${key}`;
+  // The copy button hangs in the right margin, level with the card's top, as an answer's does.
+  return hoverArea(v_flex(), id, pointer)
+    .relative()
     .w_full()
-    .justify_end()
+    .items_end()
     .pt(18)
     .child(
-      v_flex()
+      div()
         .max_w(560)
         .px(14)
         .py(10)
         .rounded(14)
         .bg(t.surface)
+        .when(queued, (el) => el.border_1().border_color(t.border).border_dashed())
         .text_size(15)
         .line_height(1.5)
         .text_color(t.foreground)
-        .children(lines.map((line) => div().child(asTyped(line)))),
+        .child(typedText(`${id}-text`, text)),
+    )
+    .child(div().absolute().top(18).right(-34).child(copyButton(t, id, text, pointer, "Copy your message")))
+    .when(queued, (el) =>
+      el.child(
+        h_flex()
+          .pt(6)
+          .gap(6)
+          .items_center()
+          .text_size(12.5)
+          .text_color(t.muted)
+          .child(icon("history", 13))
+          .child("Queued. Pi reads it once its running step ends."),
+      ),
     );
+}
+
+// A line of text you may want to copy: an error, a note. Selectable, with a copy button at its end.
+function copyLine(t, id, text, color, pointer) {
+  return hoverArea(h_flex(), id, pointer)
+    .w_full()
+    .pt(10)
+    .gap(8)
+    .items_start()
+    .text_size(13)
+    .text_color(color)
+    .child(div().flex_1().min_w(0).child(typedText(`${id}-text`, text)))
+    .child(copyButton(t, id, text, pointer));
 }
 
 function tip(t, step) {
@@ -99,7 +131,7 @@ function workLine(ui, turn, open) {
     .items_center()
     .text_size(13)
     .text_color(t.muted)
-    .when(turn.steps.length, (el) => el.cursor_pointer().on_click((_event, cx) => chat.toggleTurn(turn.key, cx)));
+    .when(turn.steps.length || turn.narration.length, (el) => el.cursor_pointer().on_click((_event, cx) => chat.toggleTurn(turn.key, cx)));
   const activity = ui.look.activity === "cells" && turn.steps.length ? [cells(ui, turn)] : [];
   const figure = (text) => div().flex_none().font_family(MONO).text_size(12).child(text);
   if (turn.live) {
@@ -123,7 +155,7 @@ function workLine(ui, turn, open) {
     .child(icon(open ? "chevron-down" : "chevron-right", 13))
     .children(activity)
     .child(div().flex_1())
-    .child(figure(`${count} ${count === 1 ? "step" : "steps"}`));
+    .when(count, (el) => el.child(figure(`${count} ${count === 1 ? "step" : "steps"}`)));
 }
 
 function work(ui, turn) {
@@ -133,7 +165,7 @@ function work(ui, turn) {
     .w_full()
     .pt(10)
     .child(workLine(ui, turn, open === true))
-    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx))));
+    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer })));
 }
 
 function files(t, turn) {
@@ -178,6 +210,21 @@ function files(t, turn) {
     );
 }
 
+// What the model is thinking now, in brief, under the work line; it leaves when the thinking ends.
+function thought(t, key, text) {
+  return div()
+    .w_full()
+    .pt(2)
+    .pl(12)
+    .border_l(2)
+    .border_color(t.border)
+    .text_size(13)
+    .line_height(1.5)
+    .italic()
+    .text_color(t.muted)
+    .child(TextView.markdown(`pi-chat-thought-${key}`, text));
+}
+
 function quiet(t, text) {
   return div().w_full().pt(10).text_size(13).text_color(t.muted).child(text);
 }
@@ -192,19 +239,32 @@ const NOTES = { compaction: "Context compacted.", branch: "Came back from anothe
  */
 export function drawRow(item, ui) {
   const { t } = ui;
-  if (item.kind === "user") return bubble(t, item.text || "Image");
+  const pointer = ui.chat.pointer;
+  if (item.kind === "user") return bubble(t, item.key, item.text || "Image", item.queued === true, pointer);
+  if (item.kind === "thought") return thought(t, item.key, item.turn.thought);
   if (item.kind === "work") return work(ui, item.turn);
   // An answer follows its turn's work line; one given without any work comes right after the message.
   if (item.kind === "answer") {
-    const gap = item.turn.steps.length || item.turn.live ? 4 : 12;
-    return div().w_full().pt(gap).child(markdown(t, `pi-chat-md-${item.key}`, item.turn.answer, ui.chat.pointer, ui.chat.code));
+    const gap = item.turn.steps.length || item.turn.live || item.turn.narration.length ? 4 : 12;
+    const id = `pi-chat-md-${item.key}`;
+    // The copy button hangs in the margin beside the answer's first line, so the answer keeps its place.
+    return hoverArea(div(), id, pointer)
+      .relative()
+      .w_full()
+      .pt(gap)
+      .child(markdown(t, id, item.turn.answer, pointer, ui.chat.code))
+      .when(!item.turn.live, (el) => el.child(div().absolute().top(gap).right(-34).child(copyButton(t, id, item.turn.answer, pointer, "Copy the answer"))));
   }
   if (item.kind === "files") return files(t, item.turn);
   if (item.kind === "end") {
     const error = item.turn.error;
-    return div().w_full().pt(10).text_size(13).text_color(error ? t.ansi1 : t.muted).child(error ? `Pi stopped with an error: ${error}` : "Stopped.");
+    if (!error) return quiet(t, "Stopped.");
+    return copyLine(t, `pi-chat-end-${item.key}`, `Pi stopped with an error: ${errorText(error)}`, t.ansi1, pointer);
   }
-  if (item.kind === "note") return quiet(t, NOTES[item.note.kind] || [item.note.title, item.note.text].filter(Boolean).join(": "));
+  if (item.kind === "note") {
+    if (NOTES[item.note.kind]) return quiet(t, NOTES[item.note.kind]);
+    return copyLine(t, `pi-chat-note-${item.key}`, [item.note.title, item.note.text].filter(Boolean).join(": "), t.muted, pointer);
+  }
   if (item.kind === "compacting") {
     return h_flex().w_full().pt(10).h(44).gap(10).items_center().text_size(13).text_color(t.foreground)
       .child(icon("spinner", 13).spin(900))

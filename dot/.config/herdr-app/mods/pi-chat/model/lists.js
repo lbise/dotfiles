@@ -69,6 +69,18 @@ export function parseSessions(text) {
 }
 
 /**
+ * @param {string} text models.json
+ * @returns {{ provider: string, id: string, name: string, scoped: boolean, current: boolean }[]|null} Null when it is not a version 1 file.
+ */
+export function parseModels(text) {
+  const data = parsed(text);
+  if (!data || !Array.isArray(data.items)) return null;
+  return data.items
+    .filter((item) => item && typeof item.provider === "string" && typeof item.id === "string" && item.id)
+    .map((item) => ({ provider: item.provider, id: item.id, name: str(item.name) || item.id, scoped: item.scoped === true, current: item.current === true }));
+}
+
+/**
  * The user's messages of tree.json, each under the nearest one above it.
  * @param {string} text tree.json
  * @returns {TreeRow[]|null} In tree order. Null when it is not a version 1 file.

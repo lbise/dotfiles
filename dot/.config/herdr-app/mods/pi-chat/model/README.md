@@ -40,7 +40,7 @@ for (const argv of inboxArgvs(id, { type: "prompt", text })) {
 | | `parsePoll(stdout)` | `{ state, problem, file, chunk, complete }`. Never throws. |
 | | `advance(cursor, poll)` | `{ cursor, lines, reset }`: the complete lines read and the new byte offset. |
 | | `inboxArgvs(terminalId, command)` | The commands that drop one file into `inbox/` (one, or several for a long prompt). |
-| | `listArgv(terminalId, what)` | Sends `list` (`"sessions"` or `"tree"`) and prints the file once Pi rewrote it; exit 3 when it did not within 5 s. |
+| | `listArgv(terminalId, what)` | Sends `list` (`"sessions"`, `"tree"` or `"models"`) and prints the file once Pi rewrote it; exit 3 when it did not within 5 s. |
 | | `readArgv(terminalId, name)` | Prints one file of the state directory (`commands.json`). |
 | | `utf8Length`, `utf8Bytes`, `base64` | Hand-written, for the engine that has none. |
 | `transcript.js` | `createTranscript(cwd?)` | An empty transcript. |
@@ -51,6 +51,8 @@ for (const argv of inboxArgvs(id, { type: "prompt", text })) {
 | `live.js` | `mergeLive(transcript, state)` | `{ turns, live }`: the transcript plus what state.json knows of the running turn. |
 | | `isLive(state)` | True while `status` is `working` or `asking`. |
 | `tools.js` | `stepKind(name)`, `stepLabel(name, args, cwd?)` | A tool call's kind and one-line label, as the Pi extension gives them. |
+| | `stepDetail(name, args)` | The whole command or code, with its language, when the label cuts it; else null. |
+| | `writeDiff(name, args)`, `diffRows(diff)` | A write as an all-added diff in Pi's form; a diff as rows (`add`, `del`, `same`, `gap`) to draw. |
 | | `fileChange(name, args, cwd?)` | Lines an edit or write call adds and removes. |
 | | `shortPath(path, cwd)` | A path inside `cwd` as relative to it. |
 | | `clip(text, max)` | Cuts text, ending in an ellipsis. |
@@ -59,7 +61,7 @@ for (const argv of inboxArgvs(id, { type: "prompt", text })) {
 | | `usageCells("5h 38%")` | `{ label: "5h", percent: 38, detail: "", cells: boolean[10] }`. |
 | | `usageGroups(state.usage)` | The status bar's usage figures: `label`, `percent`, `resets` as Pi gives them, else read from the text. |
 | | `formatAge(ms, now)` | `now`, `5m ago`, `3h ago`, `2d ago`. |
-| `lists.js` | `parseSessions`, `parseTree`, `parseCommands` | `sessions.json`, `tree.json` (your messages, indented under forks, `current` where Pi is), `commands.json`; null when not version 1. |
+| `lists.js` | `parseSessions`, `parseTree`, `parseModels`, `parseCommands` | `sessions.json`, `tree.json` (your messages, indented under forks, `current` where Pi is), `models.json`, `commands.json`; null when not version 1. |
 | | `slashItems(query, commands)` | The slash menu: session commands first, then by how well the name matches. |
 | | `sessionCommand(text)` | `"/compact keep tests"` to `{ action, instructions }`, else null. |
 | | `matches(query, fields)`, `SESSION_COMMANDS` | The pickers' filter; the four commands the chat runs itself. |
@@ -102,7 +104,10 @@ A turn starts at a user message and runs to the next one.
 ```
 
 - `step.ok` is absent while the step runs, `false` when the tool failed or never
-  finished. `result` is at most 2000 characters, `label` at most 200.
+  finished. `result` is at most 50,000 characters, `label` at most 200. `detail`
+  (`{ text, language }`) is the whole command or code when the label cuts it;
+  `diff` an edit's change (Pi's own, with line numbers and context) or a write's
+  content, in Pi's form: `+12 text`, `-12 text`, ` 12 text`, `   ...` for a gap.
 - `narration` and `notes` say where they go with `beforeStep` (an index in `steps`;
   `steps.length` means after the last step). `trail(turn)` interleaves them.
 - `user` is `null` for a turn opened by something else: an extension's message that

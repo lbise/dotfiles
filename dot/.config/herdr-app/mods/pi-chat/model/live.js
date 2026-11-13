@@ -64,7 +64,8 @@ export function mergeLive(transcript, state) {
   // The reply being written is the answer in progress, unless it is a stale copy
   // of text the file already holds (state.json is read a moment before the file).
   const stream = state.stream && typeof state.stream.text === "string" ? state.stream.text.trim() : "";
-  const written = base.answer || (base.narration.length ? base.narration[base.narration.length - 1].text : "");
+  const said = base.narration.filter((part) => !part.thought);
+  const written = base.answer || (said.length ? said[said.length - 1].text : "");
   const startedAt = base.startedAt === null ? begun : base.startedAt;
   /** @type {Turn} */
   const merged = {
@@ -80,6 +81,7 @@ export function mergeLive(transcript, state) {
     done: false,
     live: true,
     thinking: !!(state.stream && state.stream.thinking),
+    thought: state.stream && state.stream.thinking && typeof state.stream.thought === "string" ? state.stream.thought : "",
   };
   return { turns: ahead ? turns.concat([merged]) : withLast(turns, merged), live: true };
 }

@@ -3,7 +3,7 @@
 
 import { exec } from "herdr";
 import { chatPollArgv, chatReceive, createChat } from "./model/chat.js";
-import { parseCommands, parseSessions, parseTree } from "./model/lists.js";
+import { parseCommands, parseModels, parseSessions, parseTree } from "./model/lists.js";
 import { inboxArgvs, listArgv, readArgv } from "./model/protocol.js";
 
 const TIMEOUT = 8000;
@@ -11,6 +11,9 @@ const LIST_TIMEOUT = 12000; // Pi has 5 s to answer a list request
 const KEPT = 8;
 // After this many failed reads in a row the machine counts as not answering.
 const SILENT_AFTER = 2;
+// A read still out this long after it started never comes back (seen after the
+// laptop slept): it counts as failed and the next read may start.
+const STUCK_AFTER = TIMEOUT + 4000;
 
 const feeds = new Map();
 
@@ -26,6 +29,7 @@ export function feedFor(pi) {
       reads: 0, // reads that got an answer
       failures: 0, // failed reads in a row
       busy: false,
+      read: null, // the read out now: one that ends after it was given up does nothing
       readAt: 0,
       changedAt: 0, // when a read last brought something new, on this machine's clock
       commands: [], // Pi's slash commands, from commands.json
@@ -59,20 +63,30 @@ async function onMachine(feed, argv, timeout = TIMEOUT) {
   return result.stdout;
 }
 
+/** No read is out, or the one out is given up. */
+export function feedFree(feed) {
+  return !feed.busy || Date.now() - feed.readAt > STUCK_AFTER;
+}
+
 /** Reads the feed once. Resolves true when what the chat shows changed. */
 export async function readFeed(feed) {
-  if (feed.busy) return false;
+  if (!feedFree(feed)) return false;
+  if (feed.busy) feed.failures++; // the read given up
+  const read = (feed.read = {});
   feed.busy = true;
   feed.readAt = Date.now();
   const before = signature(feed);
   try {
-    chatReceive(feed.chat, await onMachine(feed, chatPollArgv(feed.chat, feed.id)));
+    const stdout = await onMachine(feed, chatPollArgv(feed.chat, feed.id));
+    if (feed.read !== read) return false;
+    chatReceive(feed.chat, stdout);
     feed.reads++;
     feed.failures = 0;
   } catch {
+    if (feed.read !== read) return false;
     feed.failures++;
   } finally {
-    feed.busy = false;
+    if (feed.read === read) feed.busy = false;
   }
   if (signature(feed) === before) return false;
   feed.changedAt = Date.now();
@@ -95,11 +109,11 @@ export async function readCommands(feed) {
 /**
  * Asks Pi for its sessions or its tree. Resolves with the rows; rejects when Pi
  * did not answer (an older extension) or the machine did not.
- * @param {"sessions"|"tree"} what
+ * @param {"sessions"|"tree"|"models"} what
  */
 export async function askList(feed, what) {
   const text = await onMachine(feed, listArgv(feed.id, what), LIST_TIMEOUT);
-  const rows = what === "sessions" ? parseSessions(text) : parseTree(text);
+  const rows = { sessions: parseSessions, tree: parseTree, models: parseModels }[what](text);
   if (!rows) throw new Error(`unreadable ${what}`);
   return rows;
 }

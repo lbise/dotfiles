@@ -5,7 +5,7 @@
 import { div } from "gpui-kit";
 import { Popup, Textarea, TextareaState, h_flex, v_flex } from "gpui-base";
 import { sessionCommand } from "./model/lists.js";
-import { takeKeys } from "./keys.js";
+import { selectAll, takeKeys } from "./keys.js";
 import { menu } from "./menu.js";
 import { SlashMenu } from "./slash.js";
 import { icon, mix } from "./ui.js";
@@ -15,7 +15,7 @@ const TWICE = 250; // a press that closes a menu also lands on its chip
 export class Composer {
   /**
    * @param {object} chat The view: `send(text, cx)`, `stop(cx)`, `command(command, cx)`,
-   *   `runSession(action, instructions, cx)`, `slashCommands()`, `loadCommands(cx)`, `busy()`.
+   *   `runSession(action, instructions, cx)`, `slashCommands()`, `loadCommands(cx)`, `busy()`, `openModels(cx)`, `editDraft(cx)`.
    */
   constructor(chat) {
     this.chat = chat;
@@ -76,8 +76,18 @@ export class Composer {
     cx.notify();
   }
 
+  // Enter, and Pi's model and thinking keys, from the reply box (keys.js hands them over).
+  fieldKey(key, cx) {
+    if (key === "ctrl-a" || key === "f9") selectAll(this.input, cx);
+    else if (key === "ctrl-g") this.chat.editDraft(cx);
+    else if (key === "enter") this.enter(cx);
+    else if (key === "shift-tab") this.chat.command({ type: "cycle", what: "thinking" }, cx);
+    else this.chat.command({ type: "cycle", what: "model", direction: key === "alt-p" ? "backward" : "forward" }, cx);
+  }
+
   // ↑↓ Tab Enter Esc while the slash menu is open (keys.js hands them over).
   slashKey(key, cx) {
+    if (key === "ctrl-a") return selectAll(this.input, cx);
     const items = this.slash.items(this.chat.slashCommands());
     if (key === "up" || key === "down") this.slash.move(key === "up" ? -1 : 1, items.length);
     else if (key === "escape") this.slash.dismiss(this.input.value());
@@ -125,17 +135,25 @@ export class Composer {
       parts.push(
         menu(t, {
           id: "pi-chat-models",
-          trigger: this.chip(t, "model", model.name || model.id, true),
+          trigger: this.chip(
+            t,
+            "model",
+            h_flex()
+              .gap(6)
+              .child(model.name || model.id)
+              .when(model.provider, (el) => el.child(div().font_normal().text_color(t.muted).child(model.provider))),
+            true,
+          ),
           open: this.open === "model",
-          width: 300,
-          items: models.map((entry, index) => {
-            const name = entry.name || entry.id;
-            const twice = models.some((other) => other !== entry && (other.name || other.id) === name);
-            return { key: String(index), text: name, note: twice ? entry.provider : "", on: same(entry) };
-          }),
+          width: 340,
+          items: [
+            ...models.map((entry, index) => ({ key: String(index), text: entry.name || entry.id, note: entry.provider, on: same(entry) })),
+            { key: "all", text: "All models…", glyph: "sliders" },
+          ],
           pick: (key, cx) => {
-            const picked = models[Number(key)];
             this.close(cx);
+            if (key === "all") return this.chat.openModels(cx);
+            const picked = models[Number(key)];
             if (!same(picked)) this.chat.command({ type: "model", provider: picked.provider, id: picked.id }, cx);
           },
           close: (cx) => this.close(cx),
@@ -162,20 +180,30 @@ export class Composer {
     return parts;
   }
 
-  button(t, working) {
+  // Send, or Stop while Pi works. Text typed while it works is a steer: Pi reads
+  // it once its running step ends, so both buttons show.
+  buttons(t, working) {
+    if (!working || this.blank) return [this.button(t, working ? "stop" : "send")];
+    return [this.button(t, "steer"), this.button(t, "stop")];
+  }
+
+  button(t, kind) {
+    const working = kind === "stop";
     const ready = working || !this.blank;
-    const label = working ? "Stop" : "Send";
+    const label = { send: "Send", steer: "Steer", stop: "Stop" }[kind];
+    const tip = { send: "Send (Enter)", steer: "Steer: Pi reads it once its running step ends (Enter)", stop: "Stop (Esc)" }[kind];
     return div()
-      .id("pi-chat-send")
+      .id(`pi-chat-${kind}`)
       .size(28)
       .flex_none()
       .flex()
       .items_center()
       .justify_center()
       .rounded(14)
-      .bg(ready ? t.accent : t.raised)
-      .text_color(ready ? t.accent_foreground : t.dim)
-      .tooltip(working ? "Stop (Esc)" : "Send (Enter)")
+      // Beside Steer, Stop steps back.
+      .bg(ready && !(working && !this.blank) ? t.accent : t.raised)
+      .text_color(!ready ? t.dim : working && !this.blank ? t.foreground : t.accent_foreground)
+      .tooltip(tip)
       .accessibility_label(label)
       .when(ready, (el) =>
         el
@@ -221,8 +249,8 @@ export class Composer {
         cx.stop_propagation();
         this.chat.stop(cx);
       })
-      .child(takeKeys(div().w_full(), slash !== null, (key, cx) => (slash ? this.slashKey(key, cx) : this.enter(cx))).child(Textarea.new(this.input).w_full().text_size(15).text_color(t.foreground)))
-      .child(h_flex().mt(8).gap(2).items_center().children(this.pickers(t, state)).child(div().flex_1()).child(this.button(t, working)));
+      .child(takeKeys(div().w_full(), slash !== null, (key, cx) => (slash ? this.slashKey(key, cx) : this.fieldKey(key, cx))).child(Textarea.new(this.input).w_full().text_size(15).text_color(t.foreground)))
+      .child(h_flex().mt(8).gap(2).items_center().children(this.pickers(t, state)).child(div().flex_1()).child(h_flex().gap(6).children(this.buttons(t, working))));
     // The popovers hang from a line along the box's top edge.
     const anchor = Popup.new("pi-chat-over-reply", div().w_full().h(0)).anchor("bottom_left").when(over, (el) => el.content(div().pb(8).child(over)));
     return v_flex().w_full().mt(14).mb(12).child(anchor).child(box);

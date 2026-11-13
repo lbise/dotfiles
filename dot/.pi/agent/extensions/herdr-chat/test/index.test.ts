@@ -10,6 +10,7 @@ const realTerminalId = process.env.HC_TERMINAL_ID;
 const cleanups: (() => unknown)[] = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  delete (globalThis as any)[Symbol.for("herdr-chat.scope")];
   if (realTerminalId === undefined) delete process.env.HC_TERMINAL_ID;
   else process.env.HC_TERMINAL_ID = realTerminalId;
 });
@@ -120,13 +121,14 @@ function setup({ hasUI = true } = {}) {
     ];
   };
 
-  activate(pi as any, dir, sessions);
+  const saved: (string[] | undefined)[] = [];
+  activate(pi as any, dir, sessions, async (_cwd, patterns) => void saved.push(patterns));
   const emit = (name: string, event: any = {}) => handlers.get(name)!(event, ctx);
   cleanups.push(() => emit("session_shutdown"));
   const state = () => JSON.parse(readFileSync(join(dir, "state.json"), "utf8"));
   let seq = 0;
   const send = (command: unknown) => writeFileSync(join(dir, "inbox", `${Date.now()}-${seq++}.json`), JSON.stringify(command));
-  return { dir, pi, ctx, handlers, busHandlers, tools, commands, calls, entries, prompts, listed, emit, state, send };
+  return { dir, pi, ctx, handlers, busHandlers, tools, commands, calls, entries, prompts, listed, saved, emit, state, send };
 }
 
 test("registers nothing outside a herdr-core terminal", () => {
@@ -215,6 +217,34 @@ test("the picker offers the scoped models when pi has a scope", async () => {
   assert.deepEqual((await until(() => h.state())).models, [{ provider: "openai", id: "gpt-6", name: "GPT 6" }]);
 });
 
+test("cycle steps through the models and the thinking levels as Ctrl+P and Shift+Tab", async () => {
+  const h = setup();
+  await h.emit("session_start");
+  h.send({ type: "cycle", what: "model" });
+  await until(() => h.calls.some((call) => call[0] === "setModel"), "setModel");
+  assert.deepEqual(h.calls.filter((call) => call[0] === "setModel"), [["setModel", "gpt-6"]]);
+  h.send({ type: "cycle", what: "thinking" });
+  await until(() => h.pi.getThinkingLevel() === "xhigh", "next level");
+  h.send({ type: "cycle", what: "thinking", direction: "backward" });
+  await until(() => h.pi.getThinkingLevel() === "high", "previous level");
+});
+
+test("scope narrows the models, is saved as enabledModels, and lists in models.json", async () => {
+  const h = setup();
+  await h.emit("session_start");
+  h.send({ type: "scope", models: [{ provider: "openai", id: "gpt-6" }, { provider: "gone", id: "x" }] });
+  const state = await until(() => h.state().models.length === 1 && h.state(), "scoped state");
+  assert.deepEqual(state.models, [{ provider: "openai", id: "gpt-6", name: "gpt-6" }]);
+  assert.deepEqual(h.saved, [["openai/gpt-6"]]);
+  h.send({ type: "list", what: "models" });
+  const list = await until(() => JSON.parse(readFileSync(join(h.dir, "models.json"), "utf8")), "models.json");
+  assert.deepEqual(list.items.map((m: any) => [m.id, m.scoped]), [["claude-opus-5-5", false], ["gpt-6", true]]);
+  // Every model is no scope.
+  h.send({ type: "scope", models: [{ provider: "openai", id: "gpt-6" }, { provider: "anthropic", id: "claude-opus-5-5" }] });
+  await until(() => h.saved.length === 2, "second save");
+  assert.equal(h.saved[1], undefined);
+});
+
 test("thinking levels follow the model", () => {
   assert.deepEqual(thinkingLevels({ reasoning: false }), ["off"]);
   assert.deepEqual(thinkingLevels({ reasoning: true }), ["off", "minimal", "low", "medium", "high"]);
@@ -237,7 +267,7 @@ test("a run publishes its steps, the streamed text and the working status", asyn
   let state = await until(() => h.state().stream?.thinking && h.state(), "thinking stream");
   assert.equal(state.status, "working");
   assert.equal(state.turn.endedAt, null);
-  assert.deepEqual(state.stream, { text: "", thinking: true });
+  assert.deepEqual(state.stream, { text: "", thinking: true, thought: "hm" });
   assert.deepEqual(
     state.turn.steps.map(({ startedAt, endedAt, ...step }: any) => ({ ...step, ended: endedAt !== null })),
     [
@@ -249,7 +279,7 @@ test("a run publishes its steps, the streamed text and the working status", asyn
   message.content.push({ type: "text", text: "The check" }, { type: "toolCall", name: "bash" });
   await h.emit("message_update", { message, assistantMessageEvent: { type: "text_delta" } });
   state = await until(() => h.state().stream?.text && h.state(), "text stream");
-  assert.deepEqual(state.stream, { text: "The check", thinking: false });
+  assert.deepEqual(state.stream, { text: "The check", thinking: false, thought: "hm" });
 
   // Settling ends the turn; a tool that never reported its end counts as failed.
   await h.emit("message_end", { message });

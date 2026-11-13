@@ -8,9 +8,10 @@ import { nextCommand, setShared, settings, shared, theme } from "herdr";
 import { chatSettings } from "./model/settings.js";
 import { AskCard } from "./ask.js";
 import { CodeViews } from "./code.js";
+import { editInNeovim } from "./editor.js";
 import { Composer } from "./composer.js";
 import { SharedDraft } from "./draft.js";
-import { feedFor, feedLive, feedSilent, readCommands, readFeed, sendCommand } from "./feeds.js";
+import { feedFor, feedFree, feedLive, feedSilent, readCommands, readFeed, sendCommand } from "./feeds.js";
 import { followFocus } from "./follow.js";
 import { HEADER_HEIGHT, headerButton, piHeader } from "./header.js";
 import { bindKeys } from "./keys.js";
@@ -28,7 +29,8 @@ import { icon } from "./ui.js";
 import { chooseView, shownView, target } from "./view.js";
 
 const SETTINGS = "pi-chat.settings";
-const TICK = 250;
+const TICK = 50; // the view follows a tab switch within this
+const REOPEN = 250; // a press this soon after a menu closed was the press that closed it
 const READ_LIVE = 250;
 const READ_IDLE = 2000;
 const HURRY = 4000; // after a command, read fast until its effect shows
@@ -64,7 +66,7 @@ export class ChatView {
     this.hurryUntil = 0;
     this.second = -1;
     this.pointer = {
-      hovered: null,
+      hovered: new Set(),
       copied: null,
       copy: (id, code, cx) => {
         cx.write_to_clipboard(code);
@@ -107,7 +109,7 @@ export class ChatView {
       cx.notify();
     }
     const fast = feed.chat.live || (feed.chat.state && feed.chat.state.status === "compacting") || Date.now() < this.hurryUntil;
-    if (!feed.busy && Date.now() - feed.readAt >= (fast ? READ_LIVE : READ_IDLE)) this.read(feed, cx);
+    if (feedFree(feed) && Date.now() - feed.readAt >= (fast ? READ_LIVE : READ_IDLE)) this.read(feed, cx);
     // The running clock: one redraw a second.
     const second = feed.chat.live ? Math.floor(this.elapsed(feed) / 1000) : -1;
     if (second !== this.second) {
@@ -171,6 +173,7 @@ export class ChatView {
     this.session = session;
     this.picker.kind = null;
     this.sessionOpen = false;
+    this.pointer.hovered.clear();
     this.timeline.reset();
     this.openTurns.clear();
     this.openSteps.clear();
@@ -248,6 +251,32 @@ export class ChatView {
     this.command(command, cx);
   }
 
+  /** Ctrl+G: the reply box's text in Neovim over the chat; what Neovim leaves comes back into the box. */
+  editDraft(cx) {
+    const pi = target();
+    if (!pi || this.editing) return;
+    this.editing = true;
+    const text = this.composer.text();
+    cx.spawn(async (cx) => {
+      try {
+        const edited = await editInNeovim(pi, text);
+        if (this.shown && this.shown.key === pi.key) this.composer.set(edited);
+      } catch (err) {
+        this.notice = `Neovim did not open: ${err instanceof Error ? err.message : err}`;
+      } finally {
+        this.editing = false;
+        this.composer.focus();
+        cx.notify();
+      }
+    });
+  }
+
+  /** Every model Pi has credentials for, to pick one or change which ones Ctrl+P cycles through. */
+  openModels(cx) {
+    const pi = target();
+    if (pi) this.picker.open("models", feedFor(pi), cx);
+  }
+
   pickerClosed(cx) {
     this.composer.focus();
     cx.notify();
@@ -255,7 +284,7 @@ export class ChatView {
 
   toggleSession(cx) {
     // The press that closes the menu also lands on the title: that click must not open it again.
-    const reopens = !this.sessionOpen && Date.now() - this.sessionClosedAt < TICK;
+    const reopens = !this.sessionOpen && Date.now() - this.sessionClosedAt < REOPEN;
     this.sessionOpen = !this.sessionOpen && !reopens;
     cx.notify();
   }
@@ -344,7 +373,7 @@ export class ChatView {
   settingsButton(t, look) {
     const button = headerButton(t, "pi-chat-settings", icon("sliders"), "Chat settings", this.panelOpen, (cx) => {
       // The press that closes the panel also lands here: that click must not open it again.
-      const reopens = !this.panelOpen && Date.now() - this.panelClosedAt < TICK;
+      const reopens = !this.panelOpen && Date.now() - this.panelClosedAt < REOPEN;
       this.panelOpen = !this.panelOpen && !reopens;
       if (this.panelOpen) this.panel.opened(look);
       cx.notify();

@@ -1,5 +1,6 @@
 // The line along the chat's bottom: the context window as 40 cells, the
-// repository and branch, the session's cost, and each usage limit as 10 cells.
+// repository and branch, the session's cost, the model's provider, and each
+// usage limit (the provider's) as 10 cells.
 // When the line is too narrow the least needed words go first, never the
 // figures. Each version of the line (all words, then fewer) is drawn once out of
 // sight and measured, so words go only when they truly do not fit.
@@ -70,6 +71,7 @@ function groupsOf(t, state) {
   }
   const cost = formatCost(state.cost);
   if (cost) groups.push([words(t, cost, true)]);
+  if (state.model && state.model.provider) groups.push([words(t, state.model.provider, false)]);
   for (const usage of usageGroups(state.usage)) groups.push(usageParts(t, usage));
   return groups;
 }

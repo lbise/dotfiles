@@ -169,3 +169,26 @@ export function usageGroups(entries) {
   }
   return groups;
 }
+
+/**
+ * A provider's error as a sentence: `429 {"error":{"type":"rate_limit_error","message":"…"}}`
+ * becomes `429 rate_limit_error: …`. Text without JSON stays as it is.
+ * @param {string} raw
+ */
+export function errorText(raw) {
+  const text = String(raw || "").trim();
+  const at = text.indexOf("{");
+  if (at < 0) return text;
+  let data;
+  try {
+    data = JSON.parse(text.slice(at));
+  } catch {
+    return text;
+  }
+  const inner = data && typeof data.error === "object" && data.error ? data.error : data;
+  const message = [inner.message, data.message, typeof data.error === "string" ? data.error : "", data.detail].find((part) => typeof part === "string" && part.trim());
+  if (!message) return text;
+  const kind = typeof inner.type === "string" && inner.type !== "error" ? inner.type : typeof inner.code === "string" ? inner.code : "";
+  const head = [text.slice(0, at).trim().replace(/[:\s]+$/, ""), kind].filter(Boolean).join(" ");
+  return head ? `${head}: ${message.trim()}` : message.trim();
+}

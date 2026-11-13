@@ -61,6 +61,27 @@ async function listSessions(cwd: string, sessionDir: string): Promise<SessionInf
   return SessionManager.list(cwd, sessionDir);
 }
 
+type ModelRef = { provider: string; id: string };
+
+/**
+ * The scope the chat last set, kept for the whole process: Pi resolves its scope only at startup and
+ * gives extensions no way to change it, so a new instance after /new, /resume or /reload would show
+ * the startup scope again. shortcut: Pi's own Ctrl+P keeps the startup scope until Pi restarts; drop
+ * this once Pi lets extensions set the scope.
+ */
+const SCOPE_KEY = Symbol.for("herdr-chat.scope");
+const scopeStore = globalThis as { [SCOPE_KEY]?: ModelRef[] };
+
+/** Saves the scope as Pi's /scoped-models does: `enabledModels` in the global settings, none for all. */
+async function saveEnabledModels(cwd: string, patterns: string[] | undefined) {
+  const { SettingsManager } = await import("@earendil-works/pi-coding-agent");
+  const settings = SettingsManager.create(cwd);
+  settings.setEnabledModels(patterns);
+  await settings.flush();
+  const [failed] = settings.drainErrors();
+  if (failed) throw new Error(`scope: settings not saved: ${failed.error.message}`);
+}
+
 /**
  * Whether another pi started this process. Pi sets PI_CODING_AGENT=true in its own environment
  * before extensions load, so process.env cannot tell; the environment the process was started
@@ -90,6 +111,16 @@ const modelRef = (model: { provider: string; id: string; name?: string }) => ({
   name: model.name ?? model.id,
 });
 
+const MAX_THOUGHT = 600;
+
+/** The end of the thinking block being written, for the chat to show while the model thinks; "" when there is none. */
+function lastThought(message: any): string {
+  if (!Array.isArray(message?.content)) return "";
+  const block = [...message.content].reverse().find((b: any) => b?.type === "thinking" && typeof b.thinking === "string");
+  const text = block ? block.thinking.trim() : "";
+  return text.length > MAX_THOUGHT ? `…${text.slice(-MAX_THOUGHT)}` : text;
+}
+
 function messageText(message: any): string {
   if (!Array.isArray(message?.content)) return "";
   return message.content
@@ -117,7 +148,7 @@ export default function (pi: ExtensionAPI) {
 }
 
 /** Wires the extension to the state directory `dir`. Nothing is written until a session with a UI starts. */
-export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions) {
+export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions, saveScope = saveEnabledModels) {
   const inboxDir = join(dir, "inbox");
 
   /** Set while a session with a UI runs; everything else is a no-op without it. */
@@ -160,6 +191,16 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions)
     if (ctx) publisher.schedule();
   }
 
+  const same = (a: ModelRef, b: ModelRef) => a.provider === b.provider && a.id === b.id;
+
+  /** The models Ctrl+P cycles through: the scope, else every model with credentials. */
+  function cycleModels(c: ExtensionContext) {
+    const available = c.modelRegistry.getAvailable();
+    const scope = scopeStore[SCOPE_KEY];
+    const scoped = scope ? available.filter((m) => scope.some((s) => same(s, m))) : c.scopedModels.map((s) => s.model);
+    return scoped.length ? scoped : available;
+  }
+
   function build() {
     const c = ctx!;
     const all = c.sessionManager.getEntries();
@@ -172,7 +213,6 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions)
       const used = c.getContextUsage();
       context = { tokens: used?.tokens ?? null, window: used?.contextWindow ?? null };
     }
-    const scoped = c.scopedModels;
     return {
       v: 1,
       pid: process.pid,
@@ -186,14 +226,14 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions)
       leaf: c.sessionManager.getLeafId() ?? null,
       model: c.model ? modelRef(c.model) : null,
       thinking: pi.getThinkingLevel(),
-      models: (scoped.length ? scoped.map((s) => s.model) : c.modelRegistry.getAvailable()).map(modelRef),
+      models: cycleModels(c).map(modelRef),
       thinkingLevels: thinkingLevels(c.model),
       context,
       cost,
       git,
       usage,
       turn,
-      stream: streaming ? { text: messageText(streaming.message), thinking: streaming.thinking } : null,
+      stream: streaming ? { text: messageText(streaming.message), thinking: streaming.thinking, thought: lastThought(streaming.message) } : null,
       ask: asker.current(),
       draft: c.ui.getEditorText(),
       error,
@@ -235,6 +275,31 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions)
         const model = c.modelRegistry.find(String(command.provider), String(command.id));
         if (!model) throw new Error(`model: ${command.provider}/${command.id} not found`);
         if (!(await pi.setModel(model))) throw new Error(`model: no credentials for ${model.provider}`);
+        return;
+      }
+      case "cycle": {
+        const back = command.direction === "backward" ? -1 : 1;
+        if (command.what === "thinking") {
+          const levels = thinkingLevels(c.model);
+          pi.setThinkingLevel(levels[(levels.indexOf(pi.getThinkingLevel()) + back + levels.length) % levels.length] as any);
+          return;
+        }
+        if (command.what !== "model") throw new Error(`cycle: unknown ${command.what}`);
+        const models = cycleModels(c);
+        const at = c.model ? models.findIndex((m) => same(m, c.model!)) : -1;
+        const next = models[(at + back + models.length) % models.length];
+        if (!next || (c.model && same(next, c.model))) return;
+        if (!(await pi.setModel(next))) throw new Error(`model: no credentials for ${next.provider}`);
+        return;
+      }
+      case "scope": {
+        if (!Array.isArray(command.models)) throw new Error("scope: models must be a list");
+        const available = c.modelRegistry.getAvailable();
+        const scope = available.filter((m) => (command.models as ModelRef[]).some((s) => same(s, m))).map(({ provider, id }) => ({ provider, id }));
+        // As /scoped-models: none or every model means no scope.
+        const all = !scope.length || scope.length === available.length;
+        scopeStore[SCOPE_KEY] = all ? [] : scope;
+        await saveScope(c.cwd, all ? undefined : scope.map((m) => `${m.provider}/${m.id}`));
         return;
       }
       case "thinking":
@@ -291,6 +356,15 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions)
           const sm = c.sessionManager;
           const leaf = sm.getLeafId();
           writeJsonAtomic(join(dir, "tree.json"), { v: 1, at: Date.now(), leaf, items: treeItems(sm.getTree(), leaf, c.cwd) });
+        } else if (command.what === "models") {
+          const available = c.modelRegistry.getAvailable();
+          const scoped = cycleModels(c);
+          const items = available.map((m) => ({
+            ...modelRef(m),
+            scoped: scoped.length < available.length && scoped.some((s) => same(s, m)),
+            current: !!c.model && same(c.model, m),
+          }));
+          writeJsonAtomic(join(dir, "models.json"), { v: 1, at: Date.now(), items });
         } else {
           throw new Error(`list: unknown list ${command.what}`);
         }

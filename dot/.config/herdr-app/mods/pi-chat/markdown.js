@@ -3,7 +3,8 @@
 
 import { div } from "gpui-kit";
 import { Editor, TextView, v_flex } from "gpui-base";
-import { codeFont, icon, mix, monoLine } from "./ui.js";
+import { copyButton, hoverArea } from "./copy.js";
+import { codeFont, mix, monoLine } from "./ui.js";
 
 const FENCE = /```([^\n`]*)\n([\s\S]*?)(?:\n```|$)/g;
 // Pi shows an answer's lines as written; markdown would join them. Two spaces
@@ -26,22 +27,15 @@ function blocks(text) {
 }
 
 function codeBlock(t, id, code, info, pointer, views) {
-  const shows = pointer.hovered === id || pointer.copied === id;
   const view = views.view(id, code, info);
   const lines = code.split("\n");
-  return div()
-    .id(id)
+  return hoverArea(div(), id, pointer)
     .relative()
     .w_full()
     .rounded(10)
     .border_1()
     .border_color(t.border)
     .bg(mix(t.background, t.surface, 0.5))
-    .on_hover((hovered, cx) => {
-      if (hovered) pointer.hovered = id;
-      else if (pointer.hovered === id) pointer.hovered = null;
-      cx.notify();
-    })
     .child(
       view
         ? div().px(14).py(12).child(Editor.new(view).w_full().h(lines.length * LINE))
@@ -56,37 +50,14 @@ function codeBlock(t, id, code, info, pointer, views) {
             .text_color(t.foreground)
             .children(lines.map((line) => div().flex_none().whitespace_nowrap().child(monoLine(line)))),
     )
-    .when(shows, (el) =>
-      el.child(
-        div()
-          .id(`${id}-copy`)
-          .absolute()
-          .top(8)
-          .right(8)
-          .size(26)
-          .flex()
-          .items_center()
-          .justify_center()
-          .rounded(7)
-          .cursor_pointer()
-          .bg(t.surface)
-          .border_1()
-          .border_color(t.border)
-          .text_color(pointer.copied === id ? t.foreground : t.muted)
-          .hover((s) => s.text_color(t.foreground))
-          .tooltip(pointer.copied === id ? "Copied" : "Copy")
-          .accessibility_label("Copy the code")
-          .on_click((_event, cx) => pointer.copy(id, code, cx))
-          .child(icon(pointer.copied === id ? "check" : "copy", 14)),
-      ),
-    );
+    .child(div().absolute().top(8).right(8).child(copyButton(t, id, code, pointer, "Copy the code")));
 }
 
 /**
  * @param {Record<string, string>} t The theme.
  * @param {string} id Unique and stable for this text.
  * @param {string} text Markdown.
- * @param {{ hovered: string|null, copied: string|null, copy: (id: string, code: string, cx: object) => void }} pointer
+ * @param {{ hovered: Set<string>, copied: string|null, copy: (id: string, code: string, cx: object) => void }} pointer
  * @param {import("./code.js").CodeViews} views
  */
 export function markdown(t, id, text, pointer, views) {

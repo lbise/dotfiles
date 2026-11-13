@@ -1,11 +1,11 @@
 // Pi's session file (JSONL, see Pi's docs/session-format.md) as a list of turns.
 //
 // Lines are fed as they arrive. Each one is parsed once and reduced to the little
-// the chat shows (no image data, no thinking, tool output cut short); a line that
+// the chat shows (no image data, thinking and tool output cut short); a line that
 // continues the active branch is folded into the last turn, and only a line that
 // starts or switches a branch makes the turns be rebuilt from the kept entries.
 
-import { clip, fileChange, stepKind, stepLabel } from "./tools.js";
+import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDiff } from "./tools.js";
 
 /**
  * @typedef {object} ImageRef An image of a user message, without its data.
@@ -32,13 +32,18 @@ import { clip, fileChange, stepKind, stepLabel } from "./tools.js";
  * @property {boolean} [ok] Absent while the tool runs; false when it failed or never finished.
  * @property {number} [durationMs] When known.
  * @property {number} [startedAt] Epoch ms on the agent's machine; only on a step still running.
- * @property {string} result The tool's text output, at most 2000 characters.
+ * @property {string} result The tool's text output, at most 50,000 characters.
  * @property {ChangedFile} [change] What an edit or write call changes.
+ * @property {{ text: string, language: string }} [detail] The command or code in full, when the label cuts it.
+ * @property {string} [diff] An edit's or write's change as Pi shows it: one line per
+ *   line of the file, `+`, `-` or a space, the line number, a space, the text;
+ *   a line of spaces and `...` where unchanged lines are left out.
  *
- * @typedef {object} Narration Assistant text written before the turn's last tool call.
+ * @typedef {object} Narration Assistant text written before the turn's last tool call, or its thinking.
  * @property {string} key
  * @property {string} text Markdown.
  * @property {number} beforeStep Index in `steps` of the step it precedes.
+ * @property {boolean} [thought] Thinking, not text.
  *
  * @typedef {object} Note Something that is neither the user nor the assistant.
  * @property {string} key
@@ -64,8 +69,9 @@ import { clip, fileChange, stepKind, stepLabel } from "./tools.js";
  * @property {boolean} done The assistant's last message ended its reply (it asked for no tool).
  * @property {boolean} [live] The turn is running now. Set by mergeLive.
  * @property {boolean} [thinking] The model is thinking. Set by mergeLive.
+ * @property {string} [thought] The end of what the model is thinking now. Set by mergeLive.
  *
- * @typedef {{ type: "step", key: string, step: Step } | { type: "text", key: string, text: string } | { type: "note", key: string, note: Note }} TrailRow
+ * @typedef {{ type: "step", key: string, step: Step } | { type: "text", key: string, text: string, thought?: boolean } | { type: "note", key: string, note: Note }} TrailRow
  *
  * @typedef {object} Transcript
  * @property {{ id: string, cwd: string, parentSession: string|null }|null} header
@@ -90,7 +96,7 @@ import { clip, fileChange, stepKind, stepLabel } from "./tools.js";
  * @property {number|null} at When it was written, epoch ms.
  * @property {"skip"|"user"|"assistant"|"result"|"note"} kind
  * @property {UserMessage} [user]
- * @property {Array<{ key: string, text: string } | { call: Omit<Step, "result"> }>} [parts] Assistant: text and tool calls, in order.
+ * @property {Array<{ key: string, text: string, thought?: boolean } | { call: Omit<Step, "result"> }>} [parts] Assistant: text and tool calls, in order.
  * @property {string} [stop] Assistant: the stop reason.
  * @property {string|null} [error] Assistant.
  * @property {Turn["model"]} [model] Assistant.
@@ -101,6 +107,7 @@ import { clip, fileChange, stepKind, stepLabel } from "./tools.js";
  * @property {string} [title] Note.
  * @property {boolean} [hidden] Note: the extension asked for it not to be shown.
  * @property {string} [text] Result and note.
+ * @property {string} [diff] Result: an edit's diff.
  */
 
 const TEXT_MAX = 2000;
@@ -201,7 +208,8 @@ export function trail(turn) {
       rows.push({ type: "note", key: turn.notes[n].key, note: turn.notes[n] });
     }
     for (; t < turn.narration.length && turn.narration[t].beforeStep <= i; t++) {
-      rows.push({ type: "text", key: turn.narration[t].key, text: turn.narration[t].text });
+      const { key, text, thought } = turn.narration[t];
+      rows.push(thought ? { type: "text", key, text, thought } : { type: "text", key, text });
     }
     if (i < turn.steps.length) rows.push({ type: "step", key: turn.steps[i].id, step: turn.steps[i] });
   }
@@ -301,12 +309,18 @@ function reduceMessage(entry, message, cwd) {
       if (!block) return;
       if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
         entry.parts.push({ key: `${entry.id}:${index}`, text: block.text.trim() });
+      } else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking.trim()) {
+        entry.parts.push({ key: `${entry.id}:${index}`, text: clip(block.thinking.trim(), TEXT_MAX), thought: true });
       } else if (block.type === "toolCall" && typeof block.id === "string") {
         const name = String(block.name || "");
         /** @type {Omit<Step, "result">} */
         const call = { id: block.id, kind: stepKind(name), name, label: stepLabel(name, block.arguments, cwd) };
         const change = fileChange(name, block.arguments, cwd);
         if (change) call.change = change;
+        const detail = stepDetail(name, block.arguments);
+        if (detail) call.detail = detail;
+        const diff = writeDiff(name, block.arguments);
+        if (diff) call.diff = diff;
         entry.parts.push({ call });
       }
     });
@@ -315,7 +329,10 @@ function reduceMessage(entry, message, cwd) {
     entry.callId = message.toolCallId;
     entry.ok = message.isError !== true;
     entry.durationMs = Number.isFinite(message.durationMs) ? message.durationMs : undefined;
-    entry.text = clip(blocksText(content, TEXT_MAX), TEXT_MAX);
+    entry.text = clip(blocksText(content, DETAIL_MAX), DETAIL_MAX);
+    // Pi's edit tool gives its change as a diff with line numbers and context.
+    const diff = message.details && message.details.diff;
+    if (typeof diff === "string" && diff) entry.diff = clip(diff, DETAIL_MAX);
   } else if (message.role === "bashExecution") {
     note(entry, "bash", String(message.command || ""), message.output);
   }
@@ -443,6 +460,10 @@ function foldAssistant(transcript, turn, entry) {
   if (turn.error !== null) transcript.pending = [];
   const failed = entry.stop === "error" || entry.stop === "aborted";
   for (const part of entry.parts) {
+    if ("thought" in part) {
+      turn.narration.push({ key: part.key, text: part.text, beforeStep: turn.steps.length, thought: true });
+      continue;
+    }
     if (!("call" in part)) {
       transcript.pending.push(part);
       continue;
@@ -474,6 +495,7 @@ function foldResult(transcript, entry) {
   const counted = step.ok === true;
   step.ok = entry.ok;
   step.result = entry.text;
+  if (entry.diff) step.diff = entry.diff;
   if (entry.durationMs !== undefined) step.durationMs = entry.durationMs;
   if (step.change && entry.ok && !counted) {
     let file = turn.files.find((known) => known.path === step.change.path);

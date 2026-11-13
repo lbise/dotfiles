@@ -48,7 +48,7 @@
  * @property {{ root: string, branch: string }|null} git
  * @property {Array<{ key: string, text: string, label?: string, percent?: number, resets?: string }>} usage
  * @property {{ startedAt: number, endedAt: number|null, steps: LiveStep[] }|null} turn
- * @property {{ text: string, thinking: boolean }|null} stream
+ * @property {{ text: string, thinking: boolean, thought?: string }|null} stream
  * @property {{ id: string, question: string, options: Array<{ label: string, description?: string }>, multi: boolean }|null} ask
  * @property {string} draft
  * @property {string|null} error
@@ -138,7 +138,7 @@ const ASK_SCRIPT = oneLine([
 // $1 terminal id, $2 a file of the state directory.
 const READ_SCRIPT = `${STATE_DIR}; cat "$d/$2"`;
 
-const ANSWERS = { sessions: "sessions.json", tree: "tree.json" };
+const ANSWERS = { sessions: "sessions.json", tree: "tree.json", models: "models.json" };
 
 /**
  * Splits a terminal address: "1-wsl/t7" is machine "1-wsl", id "t7".
