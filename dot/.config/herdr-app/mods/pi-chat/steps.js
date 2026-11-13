@@ -196,36 +196,84 @@ function remark(t, key, text) {
 
 // A thought: a brain and its first words; pressed, the whole thought under it.
 function thoughtLine(t, key, text, open, toggle, ui) {
-  const line = h_flex()
-    .id(`pi-chat-thought-${key}`)
-    .h(LINE)
-    .flex_none()
-    .gap(8)
-    .items_center()
+  const line = noteRow(t, `pi-chat-thought-${key}`, "brain", plain(text))
     .cursor_pointer()
     .hover((s) => s.bg(t.surface))
-    .on_click((_event, cx) => toggle(key, cx))
-    .child(div().w(16).flex_none().flex().justify_center().text_color(t.muted).child(icon("brain", 13)))
-    .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(plain(text)));
+    .on_click((_event, cx) => toggle(key, cx));
   return open ? [line, codeBox(t, `pi-chat-box-${key}`, thoughtBox(text, ui.width), ui)] : [line];
 }
 
-function stepLine(t, step, open, toggle, ui) {
-  const opens = Boolean(step.result || step.detail || step.diff);
-  const line = h_flex()
-    .id(`pi-chat-step-${step.id}`)
+// A step's line: cell, wrench, tool, label, and how long it took; a step still
+// running has a spinner and its clock (`now`: the agent machine's time, or null).
+function stepRow(t, id, step, now) {
+  const running = step.ok === undefined;
+  const right = running
+    ? h_flex()
+        .gap(6)
+        .items_center()
+        .child(icon("spinner", 11).spin(900))
+        .when(now !== null && Number.isFinite(step.startedAt), (el) => el.child(formatDuration(Math.max(1000, now - step.startedAt))))
+    : div().child(step.ok === false && !step.durationMs ? "failed" : formatDuration(step.durationMs));
+  return h_flex()
+    .id(id)
     .h(LINE)
     .flex_none()
     .gap(8)
     .items_center()
     .font_family(MONO)
     .text_size(12)
-    .when(opens, (el) => el.cursor_pointer().hover((s) => s.bg(t.surface)).on_click((_event, cx) => toggle(step.id, cx)))
     .child(div().w(16).flex_none().flex().child(cell(stepColor(t, step), { width: 7, height: 14 })))
     .child(div().flex_none().text_color(t.dim).child(icon("wrench", 12)))
     .child(div().w(64).flex_none().truncate().text_color(t.muted).child(step.name))
     .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(monoLine(step.label)))
-    .child(div().flex_none().text_color(step.ok === false ? t.ansi1 : t.muted).child(step.ok === false && !step.durationMs ? "failed" : formatDuration(step.durationMs)));
+    .child(div().flex_none().text_color(step.ok === false ? t.ansi1 : t.muted).child(right));
+}
+
+// A brain (or another icon) and one line of muted text: a thought, or what Pi does now.
+function noteRow(t, id, glyph, text, spinning = false) {
+  return h_flex()
+    .id(id)
+    .h(LINE)
+    .flex_none()
+    .gap(8)
+    .items_center()
+    .child(div().w(16).flex_none().flex().justify_center().text_color(t.muted).child(icon(glyph, 13)))
+    .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(text))
+    .when(spinning, (el) => el.child(div().flex_none().text_color(t.muted).child(icon("spinner", 11).spin(900))));
+}
+
+const TAIL = 3;
+
+/**
+ * While Pi works: its last steps and thoughts, and what it does right now, three
+ * lines at most, newest at the bottom. Null when there is nothing yet.
+ * @param {number|null} now The agent machine's time, for the running step's clock.
+ * @param {(cx: object) => void} open Opens the whole list.
+ */
+export function liveTail(t, turn, now, open) {
+  const lines = [];
+  for (const row of trail(turn)) {
+    if (row.type === "step") lines.push(stepRow(t, `pi-chat-tail-${row.key}`, row.step, now));
+    else if (row.type === "text" && row.thought) lines.push(noteRow(t, `pi-chat-tail-${row.key}`, "brain", plain(row.text)));
+  }
+  const running = turn.steps.some((step) => step.ok === undefined);
+  if (turn.thinking) lines.push(noteRow(t, "pi-chat-tail-now", "brain", "Thinking…", true));
+  else if (!running && turn.answer) lines.push(noteRow(t, "pi-chat-tail-now", "chat", "Writing…", true));
+  if (!lines.length) return null;
+  return v_flex()
+    .id(`pi-chat-tail-${turn.key}`)
+    .w_full()
+    .text_size(13)
+    .cursor_pointer()
+    .on_click((_event, cx) => open(cx))
+    .children(lines.slice(-TAIL));
+}
+
+function stepLine(t, step, open, toggle, ui) {
+  const opens = Boolean(step.result || step.detail || step.diff);
+  const line = stepRow(t, `pi-chat-step-${step.id}`, step, ui.now === undefined ? null : ui.now).when(opens, (el) =>
+    el.cursor_pointer().hover((s) => s.bg(t.surface)).on_click((_event, cx) => toggle(step.id, cx)),
+  );
   if (!opens || !open) return [line];
   const draw = { diff: diffBox, code: codeBox, image: imageBox };
   return [line, ...boxes(step).map((box, index) => draw[box.kind](t, `pi-chat-box-${step.id}-${index}`, box, ui))];
@@ -237,8 +285,8 @@ function stepLine(t, step, open, toggle, ui) {
  * @param {boolean} open Closed keeps the lines, at no height, so it closes with motion too.
  * @param {Set<string>} openSteps Ids of the steps showing their result.
  * @param {(id: string, cx: object) => void} toggle
- * @param {{ views: import("./code.js").CodeViews, pointer: object, width: number, machine: string|null }} ui
- *   The code views, the pointer (copy buttons), the reading width, and Pi's machine (pictures).
+ * @param {{ views: import("./code.js").CodeViews, pointer: object, width: number, machine: string|null, now: number|null }} ui
+ *   The code views, the pointer (copy buttons), the reading width, Pi's machine (pictures), the agent machine's time (running clocks).
  */
 export function stepList(t, turn, open, openSteps, toggle, ui) {
   const lines = [];

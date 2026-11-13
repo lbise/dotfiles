@@ -7,10 +7,9 @@ import { errorText, formatDuration } from "./model/format.js";
 import { copyButton, hoverArea, typedText } from "./copy.js";
 import { STEP_CELL, stepCell } from "./cells.js";
 import { markdown } from "./markdown.js";
-import { stepList, stepVerb } from "./steps.js";
+import { liveTail, stepList, stepVerb } from "./steps.js";
 import { MONO, icon, monoLine } from "./ui.js";
 
-const DOING = { read: "Reading", grep: "Searching", find: "Searching", ls: "Listing", bash: "Running", edit: "Editing", write: "Writing" };
 // What a work line holds besides its cells: the words, the chevron, the count.
 const LINE_REST = 250;
 
@@ -115,13 +114,6 @@ function cells(ui, turn) {
   return h_flex().flex_none().items_center().children([...count, ...shown]);
 }
 
-function doing(turn, asking) {
-  if (asking) return { verb: "Waiting for your answer", label: "" };
-  const running = [...turn.steps].reverse().find((step) => step.ok === undefined);
-  if (running) return { verb: DOING[running.name] || "Running", label: running.label };
-  return { verb: turn.thinking ? "Thinking" : turn.answer ? "Writing" : "Working", label: "" };
-}
-
 function workLine(ui, turn, open) {
   const { t, chat } = ui;
   const line = h_flex()
@@ -134,17 +126,11 @@ function workLine(ui, turn, open) {
     .when(turn.steps.length || turn.narration.length, (el) => el.cursor_pointer().on_click((_event, cx) => chat.toggleTurn(turn.key, cx)));
   const activity = ui.look.activity === "cells" && turn.steps.length ? [cells(ui, turn)] : [];
   const figure = (text) => div().flex_none().font_family(MONO).text_size(12).child(text);
+  // What it does right now is the tail's to say (liveTail, under this line).
   if (turn.live) {
-    const { verb, label } = doing(turn, ui.asking);
     return line
       .when(!ui.asking, (el) => el.child(icon("spinner", 13).text_color(t.foreground).spin(900)))
-      .child(div().flex_none().text_color(t.foreground).child(verb))
-      .when(label, (el) =>
-        el.child(
-          div().flex_shrink(1).min_w(0).truncate().px(5).py(1).rounded(5).bg(t.surface).font_family(MONO).text_size(12.5).text_color(t.foreground)
-            .child(monoLine(label)),
-        ),
-      )
+      .child(div().flex_none().text_color(t.foreground).child(ui.asking ? "Waiting for your answer" : "Working"))
       .children(activity)
       .child(div().flex_1())
       .child(figure(formatDuration(Math.max(1000, ui.elapsed))));
@@ -161,11 +147,14 @@ function workLine(ui, turn, open) {
 function work(ui, turn) {
   const { t, chat } = ui;
   const open = chat.openTurns.get(turn.key);
+  // While Pi works and the list is closed, its last three steps and thoughts show under the line.
+  const tail = turn.live && open !== true ? liveTail(t, turn, ui.now, (cx) => chat.toggleTurn(turn.key, cx)) : null;
   return v_flex()
     .w_full()
     .pt(10)
     .child(workLine(ui, turn, open === true))
-    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer, width: ui.width, machine: chat.shown ? chat.shown.machine : null })));
+    .when(tail !== null, (el) => el.child(tail))
+    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer, width: ui.width, machine: chat.shown ? chat.shown.machine : null, now: ui.now })));
 }
 
 function files(t, turn) {

@@ -439,7 +439,9 @@ export class ChatView {
   conversation(t, look, feed, zoom) {
     const items = conversationRows(feed.chat, this.sent);
     if (!items.length) return emptyChat(t);
-    const ui = { t, look, width: look.width, elapsed: this.elapsed(feed), asking: feed.chat.state.status === "asking", chat: this };
+    // The agent machine's time now: its last state, plus the time since that read.
+    const now = Number.isFinite(feed.chat.state.updated) ? feed.chat.state.updated + (Date.now() - feed.changedAt) : null;
+    const ui = { t, look, width: look.width, elapsed: this.elapsed(feed), now, asking: feed.chat.state.status === "asking", chat: this };
     const list = this.timeline.render({
       items,
       row: (item) => drawRow(item, ui),
