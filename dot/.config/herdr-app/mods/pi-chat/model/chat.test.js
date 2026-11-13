@@ -76,3 +76,32 @@ test("an unreadable state keeps the last good one; a missing one clears it", () 
   chatReceive(chat, "");
   assert.equal(chat.turns.length, 1);
 });
+
+test("a tree move without an entry follows Pi's leaf, unless the file is newer than the state", () => {
+  const chat = createChat();
+  const s = session();
+  const first = s.user("one");
+  const answer = s.assistant([text("1")]);
+  s.user("two");
+  s.assistant([text("2")]);
+  const at = Date.parse("2026-01-01T10:00:04.000Z"); // when the last entry was written
+  chatReceive(chat, stdout(state({ leaf: s.leaf, updated: at }), "/s/one.jsonl", s.lines));
+  assert.deepEqual([chat.turns.length, chat.epoch], [2, 1]);
+
+  // A state written before the last entry still names its parent: the file wins.
+  const read = s.lines.length;
+  const stale = s.leaf;
+  s.user("three");
+  chatReceive(chat, stdout(state({ leaf: stale, updated: at }), "/s/one.jsonl", s.lines, read));
+  assert.deepEqual([chat.turns.length, chat.epoch], [3, 1]);
+
+  // Pi moved back to the first answer: no entry, only the leaf.
+  chatReceive(chat, stdout(state({ leaf: answer, updated: at + 5000 }), "/s/one.jsonl", s.lines, s.lines.length));
+  assert.deepEqual([chat.turns.length, chat.turns[0].key, chat.turns[0].answer, chat.epoch], [1, first, "1", 2]);
+
+  // Back to before the first message: the conversation is empty; a leaf never read changes nothing.
+  chatReceive(chat, stdout(state({ leaf: "unknown", updated: at + 6000 }), "/s/one.jsonl", s.lines, s.lines.length));
+  assert.equal(chat.turns.length, 1);
+  chatReceive(chat, stdout(state({ leaf: null, updated: at + 7000 }), "/s/one.jsonl", s.lines, s.lines.length));
+  assert.equal(chat.turns.length, 0);
+});

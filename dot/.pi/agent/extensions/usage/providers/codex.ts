@@ -5,7 +5,7 @@
  * Codex also sends x-codex-{primary,secondary}-* headers on every response.
  */
 
-import { getHeader, numberValue, windowIcon } from "../format.ts";
+import { getHeader, numberValue, windowIcon, windowLabel } from "../format.ts";
 import type { AuthSource, Segment, UsageProvider, UsageSnapshot, UsageWindow } from "../types.ts";
 
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
@@ -52,8 +52,10 @@ function windowFromRaw(raw: WindowRaw | null | undefined, fallbackMinutes: numbe
   const resetAt = numberValue(raw?.reset_at);
   const resetAfter = numberValue(raw?.reset_after_seconds);
 
+  const minutes = seconds !== undefined && seconds > 0 ? Math.ceil(seconds / 60) : undefined;
   return {
-    icon: windowIcon(seconds !== undefined && seconds > 0 ? Math.ceil(seconds / 60) : undefined, fallbackMinutes),
+    icon: windowIcon(minutes, fallbackMinutes),
+    label: windowLabel(minutes, fallbackMinutes),
     usedPercent,
     resetsAt: resetAt !== undefined ? resetAt * 1000 : resetAfter !== undefined ? now + resetAfter * 1000 : undefined,
   };
@@ -81,8 +83,10 @@ function windowFromHeaders(headers: Record<string, string>, prefix: string, fall
   const usedPercent = numberValue(getHeader(headers, `${prefix}-used-percent`));
   if (usedPercent === undefined) return undefined;
   const resetAt = numberValue(getHeader(headers, `${prefix}-reset-at`));
+  const minutes = numberValue(getHeader(headers, `${prefix}-window-minutes`));
   return {
-    icon: windowIcon(numberValue(getHeader(headers, `${prefix}-window-minutes`)), fallbackMinutes),
+    icon: windowIcon(minutes, fallbackMinutes),
+    label: windowLabel(minutes, fallbackMinutes),
     usedPercent,
     resetsAt: resetAt !== undefined ? resetAt * 1000 : undefined,
   };
@@ -91,6 +95,7 @@ function windowFromHeaders(headers: Record<string, string>, prefix: string, fall
 export const codexProvider: UsageProvider = {
   id: "openai-codex",
   name: "Codex",
+  extraLabel: "Credits",
   cacheTtlMs: 60 * 1000,
 
   async fetchUsage(auth: AuthSource): Promise<UsageSnapshot> {

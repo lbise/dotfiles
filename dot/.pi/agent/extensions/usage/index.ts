@@ -7,8 +7,9 @@
  *
  * Refresh points: session start, model switch, prompt start/end, provider
  * response headers, a TTL-throttled fetch after each turn for providers
- * without headers, and a poll for providers that book usage late (Copilot).
- * /usage-refresh forces a fetch.
+ * without headers, and a poll every minute so spend from other sessions and
+ * machines shows while idle. Reset countdowns
+ * are redrawn every 30 s. /usage-refresh forces a fetch.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -16,12 +17,12 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { formatReset, formatWindow, ICONS, numberValue, renderSegments } from "./format.ts";
+import { formatCount, formatRemaining, formatReset, formatWindow, ICONS, numberValue, percentTone, renderSegments } from "./format.ts";
 import { anthropicProvider } from "./providers/anthropic.ts";
 import { azureFoundryProvider } from "./providers/azure-foundry.ts";
 import { codexProvider } from "./providers/codex.ts";
 import { copilotProvider, setCopilotCreditCap } from "./providers/copilot.ts";
-import type { AuthSource, PiAuthEntry, PromptTracker, Segment, UsageProvider, UsageSnapshot } from "./types.ts";
+import type { AuthSource, PiAuthEntry, PromptTracker, Segment, Tone, UsageProvider, UsageSnapshot, UsageWindow } from "./types.ts";
 
 // Integration contract with pi-footer.json. Each independently renderable
 // value has its own key so the footer can arrange or omit fields.
@@ -35,9 +36,16 @@ export const STATUS_KEYS = {
 
 /**
  * Event on pi.events with the same statuses as plain text, for extensions that cannot use ANSI
- * (herdr-chat): [{ key, text }] in STATUS_KEYS order, sent whenever a status changes.
+ * (herdr-chat): [{ key, text, label?, percent?, resets? }] in STATUS_KEYS order, sent whenever a
+ * status changes. label names the window ("5h", "Week", "Credits"), percent is its use (0 to 100),
+ * resets the time left ("2h 10m"), detail used/limit ("10.8k/40k"), note what follows it ("→27.8k",
+ * "+12 overage"), tone and noteTone "warning" or "error" when the footer warns; each is absent when
+ * unknown or calm.
  */
 export const USAGE_EVENT = "usage:status";
+
+type Meta = { label?: string; percent?: number; resets?: string; detail?: string; tone?: Tone; note?: string; noteTone?: Tone };
+type StatusEntry = Meta & { key: string; text: string };
 
 // Keys from the old per-provider extensions. Cleared so they cannot linger after a reload.
 const LEGACY_STATUS_KEYS = [
@@ -63,8 +71,14 @@ type ProviderState = {
   promptExtra?: Segment[];
 };
 
-/** How often the poll checks whether a provider's pollIntervalMs has elapsed. */
+/** How often the poll checks whether a provider's poll interval has elapsed, and redraws reset countdowns. */
 const POLL_TICK_MS = 30 * 1000;
+/**
+ * Poll interval while idle: other sessions and machines spend the same quota. Every running pi polls
+ * on its own, so this stays at a minute rather than seconds; mid-prompt, response headers and the
+ * per-turn fetch keep it current anyway.
+ */
+const POLL_MS = 60 * 1000;
 
 type Ctx = Pick<ExtensionContext, "ui" | "model" | "modelRegistry">;
 
@@ -107,7 +121,7 @@ function authSource(ctx: Ctx): AuthSource {
 export default function (pi: ExtensionAPI) {
   const states = new Map<string, ProviderState>();
   let pollTimer: ReturnType<typeof setInterval> | undefined;
-  const plain = new Map<string, string>();
+  const plain = new Map<string, StatusEntry>();
 
   function stateFor(provider: UsageProvider): ProviderState {
     let state = states.get(provider.id);
@@ -118,16 +132,15 @@ export default function (pi: ExtensionAPI) {
     return state;
   }
 
-  function set(ctx: Ctx, key: string, segments: Segment[] | undefined) {
+  function set(ctx: Ctx, key: string, segments: Segment[] | undefined, meta: Meta = {}) {
     ctx.ui.setStatus(key, segments?.length ? renderSegments(segments, ctx.ui.theme) : undefined);
     const text = segments?.map((segment) => segment.text).join("") || undefined;
-    if (text === plain.get(key)) return;
-    if (text) plain.set(key, text);
+    // JSON drops the meta fields that are undefined.
+    const entry: StatusEntry | undefined = text ? JSON.parse(JSON.stringify({ key, text, ...meta })) : undefined;
+    if (JSON.stringify(entry) === JSON.stringify(plain.get(key))) return;
+    if (entry) plain.set(key, entry);
     else plain.delete(key);
-    pi.events.emit(
-      USAGE_EVENT,
-      Object.values(STATUS_KEYS).flatMap((k) => (plain.has(k) ? [{ key: k, text: plain.get(k) }] : []))
-    );
+    pi.events.emit(USAGE_EVENT, Object.values(STATUS_KEYS).flatMap((k) => plain.get(k) ?? []));
   }
 
   function clear(ctx: Ctx) {
@@ -141,16 +154,37 @@ export default function (pi: ExtensionAPI) {
       return text ? [{ text, tone: "dim" }] : undefined;
     };
     const extra = state.promptExtra ?? snapshot?.extra;
+    const resetMeta = (window: UsageWindow | undefined): Meta => ({ label: window?.label, resets: formatRemaining(window?.resetsAt) });
+    // Only the tones that warn travel; the chat draws everything else in its default colour.
+    const alarm = (tone: Tone | undefined): Tone | undefined => (tone === "warning" || tone === "error" ? tone : undefined);
+    // The figures the footer prints after the bar: used/limit ("10.8k/40k"), then the note ("→27.8k").
+    const windowMeta = (window: UsageWindow | undefined): Meta =>
+      window
+        ? {
+            ...resetMeta(window),
+            percent: Math.round(Math.min(100, Math.max(0, window.usedPercent)) * 10) / 10,
+            tone: alarm(window.tone ?? percentTone(Math.max(0, window.usedPercent))),
+            detail: window.used !== undefined && window.limit !== undefined ? `${formatCount(window.used)}/${formatCount(window.limit)}` : undefined,
+            note: window.note?.map((segment) => segment.text).join("") || undefined,
+            noteTone: alarm(window.note?.find((segment) => alarm(segment.tone))?.tone),
+          }
+        : {};
 
     set(
       ctx,
       STATUS_KEYS.primary,
-      snapshot?.primary ? formatWindow(snapshot.primary) : (snapshot?.summary ?? [{ text: provider.name, tone: "dim" }])
+      snapshot?.primary ? formatWindow(snapshot.primary) : (snapshot?.summary ?? [{ text: provider.name, tone: "dim" }]),
+      snapshot?.primary ? windowMeta(snapshot.primary) : { label: snapshot?.summaryLabel }
     );
-    set(ctx, STATUS_KEYS.primaryReset, reset(snapshot?.primary?.resetsAt));
-    set(ctx, STATUS_KEYS.secondary, snapshot?.secondary ? formatWindow(snapshot.secondary) : undefined);
-    set(ctx, STATUS_KEYS.secondaryReset, reset(snapshot?.secondary?.resetsAt));
-    set(ctx, STATUS_KEYS.extra, extra?.length ? [{ text: `${ICONS.money} `, tone: "dim" }, ...extra] : undefined);
+    set(ctx, STATUS_KEYS.primaryReset, reset(snapshot?.primary?.resetsAt), resetMeta(snapshot?.primary));
+    set(ctx, STATUS_KEYS.secondary, snapshot?.secondary ? formatWindow(snapshot.secondary) : undefined, windowMeta(snapshot?.secondary));
+    set(ctx, STATUS_KEYS.secondaryReset, reset(snapshot?.secondary?.resetsAt), resetMeta(snapshot?.secondary));
+    set(
+      ctx,
+      STATUS_KEYS.extra,
+      extra?.length ? [{ text: `${ICONS.money} `, tone: "dim" }, ...extra] : undefined,
+      { label: provider.extraLabel }
+    );
   }
 
   async function fetchInto(ctx: Ctx, provider: UsageProvider, state: ProviderState): Promise<UsageSnapshot | null> {
@@ -202,9 +236,14 @@ export default function (pi: ExtensionAPI) {
     pollTimer = setInterval(() => {
       try {
         const provider = providerForModel(ctx.model);
-        if (!provider?.pollIntervalMs) return;
-        if (Date.now() - stateFor(provider).fetchedAt < provider.pollIntervalMs) return;
-        refreshInBackground(ctx, ctx.model, { force: true });
+        if (!provider) return;
+        const state = stateFor(provider);
+        if (Date.now() - state.fetchedAt >= POLL_MS) {
+          refreshInBackground(ctx, ctx.model, { force: true });
+        } else if (state.snapshot) {
+          // Keeps the reset countdowns current; unchanged statuses are not re-sent.
+          publish(ctx, provider, state);
+        }
       } catch {
         // A ctx invalidated by session replacement throws; session_shutdown stops the timer.
       }

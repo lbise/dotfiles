@@ -1,5 +1,5 @@
 // The conversation as the rows the timeline draws: each turn becomes its message,
-// its work line, its answer and its changed files.
+// its work line, its answer and its changed files; a compaction running now, its line.
 
 /**
  * @param {import("./model/chat.js").Chat} chat
@@ -23,6 +23,7 @@ export function conversationRows(chat, sent) {
     if (turn.files.length && !turn.live) rows.push({ key: `${turn.key}:files`, kind: "files", estimate: 48 + 34 * turn.files.length, turn });
   }
   if (sent && !sentBefore) rows.push(sentRow(sent));
+  if (chat.state && chat.state.status === "compacting") rows.push({ key: "compacting", kind: "compacting", estimate: 44 });
   return rows;
 }
 

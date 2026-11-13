@@ -50,10 +50,12 @@ test("anthropic maps 5h and weekly windows", async () => {
   assert.equal(captured.headers?.["anthropic-beta"], "oauth-2025-04-20");
   assert.deepEqual(snapshot.primary, {
     icon: ICONS.hours,
+    label: "5h",
     usedPercent: 42,
     resetsAt: Date.parse("2026-09-25T17:40:00.443Z"),
   });
   assert.equal(snapshot.secondary?.icon, ICONS.week);
+  assert.equal(snapshot.secondary?.label, "Week");
   assert.equal(snapshot.secondary?.usedPercent, 3);
 });
 
@@ -99,7 +101,7 @@ test("codex sends account id from the JWT and maps windows", async () => {
   const snapshot = await codexProvider.fetchUsage(auth({ "openai-codex": token }));
 
   assert.equal(captured.headers?.["chatgpt-account-id"], "acct-1");
-  assert.deepEqual(snapshot.primary, { icon: ICONS.hours, usedPercent: 12, resetsAt: 1_800_000_000_000 });
+  assert.deepEqual(snapshot.primary, { icon: ICONS.hours, label: "5h", usedPercent: 12, resetsAt: 1_800_000_000_000 });
   assert.equal(snapshot.secondary?.icon, ICONS.week);
   assert.ok(snapshot.secondary!.resetsAt! >= before + 3_600_000);
   assert.equal(text(snapshot.extra), "4.5cr");
@@ -120,7 +122,7 @@ test("codex headers update windows and keep previous extras", () => {
     { "X-Codex-Primary-Used-Percent": "33", "x-codex-primary-window-minutes": "300", "x-codex-primary-reset-at": "100" },
     previous
   );
-  assert.deepEqual(snapshot?.primary, { icon: ICONS.hours, usedPercent: 33, resetsAt: 100_000 });
+  assert.deepEqual(snapshot?.primary, { icon: ICONS.hours, label: "5h", usedPercent: 33, resetsAt: 100_000 });
   assert.equal(snapshot?.secondary?.usedPercent, 5);
   assert.equal(text(snapshot?.extra), "4 credits");
   assert.equal(codexProvider.usageFromHeaders!({}, previous), null);
@@ -207,12 +209,12 @@ test("copilot adds the cap window only when a credit cap is set", async () => {
 
 test("copilot tracker sums pi's per-turn cost as estimated credits", () => {
   const tracker = createCopilotPromptTracker();
-  assert.equal(text(tracker.segments()), "~0cr");
+  assert.equal(text(tracker.segments()), "~0cr $0.00");
   tracker.turnEnd({ usage: { cost: { total: 0.178 } } });
-  assert.equal(text(tracker.segments()), "~17.8cr");
+  assert.equal(text(tracker.segments()), "~17.8cr $0.18");
   tracker.turnEnd({ usage: { cost: { total: 0.023 } } });
   tracker.turnEnd({ usage: {} });
-  assert.equal(text(tracker.segments()), "~20.1cr");
+  assert.equal(text(tracker.segments()), "~20.1cr $0.20");
 });
 
 // Azure Foundry

@@ -205,6 +205,29 @@ components:
     textColor: "{colors.muted-grey}"
     rounded: "{rounded.frame}"
     padding: "4px"
+  session-title:
+    textColor: "{colors.chalk-text}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.control}"
+    height: "26px"
+    padding: "0 6px"
+  picker:
+    backgroundColor: "{colors.surface-grey}"
+    textColor: "{colors.muted-grey}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.frame}"
+    width: "560px"
+  picker-row:
+    textColor: "{colors.muted-grey}"
+    rounded: "{rounded.segment}"
+    height: "30px"
+    padding: "0 8px"
+  picker-switch-on:
+    backgroundColor: "{colors.chalk-accent}"
+    textColor: "{colors.accent-ink}"
+    rounded: "{rounded.track}"
+    width: "26px"
+    height: "16px"
   step-tooltip:
     backgroundColor: "{colors.surface-grey}"
     textColor: "{colors.chalk-text}"
@@ -269,7 +292,7 @@ Chat settings offers a second ground. Choosing it writes these overrides into `s
 ### Named Rules
 **The Pressable Chalk Rule.** The accent marks what can be pressed (send, stop, a primary button, the reply box) or what has been picked (an ask option). It never marks a heading, a status or a decoration. A spinner is chalk text, not accent.
 
-**The Cells Carry the Colour Rule.** Blue, violet, amber and rose mean a step's kind. Outside a cell the only hues are rose for a failure and green for added lines; everything else is a grey.
+**The Cells Carry the Colour Rule.** Blue, violet, amber and rose mean a step's kind. Outside a cell the only hues are rose for a failure, green for added lines, and amber and rose on a usage figure that warns (from 70 % and 90 %, as the terminal footer); everything else is a grey. Code blocks are the one exception: they are terminal text, so their syntax takes the terminal's ANSI slots the way Herdr's file viewer does (keywords `ansi5`, strings `ansi2`, functions `ansi4`, types `ansi3`, numbers and booleans `ansi1`, constants and escapes `ansi6`, comments muted).
 
 **The Terminal Keeps Tokyo Night Rule.** The terminal ANSI palette stays Tokyo Night. The terminals take the black ground; the cells borrow the ANSI slots rather than defining their own.
 
@@ -307,14 +330,14 @@ Chat settings offers a second ground. Choosing it writes these overrides into `s
 - **Chat frame:** the same 10px radius and rule border, so both views read as one card. Top to bottom: the 46px header, the conversation, the dock (question card and reply box), the 34px status bar.
 - **Reading column:** every row and the dock are centred at the reading width (760px by default; 680 or 900 in settings) with a 24px gutter each side. User bubbles sit right, at most 560px wide; everything else runs the column's width. Newest is at the bottom; scrolling up stops following and a 32px "Jump to latest" disc appears 10px above the dock.
 - **Vertical rhythm:** 18px before a user message, 10px before a work line, 4px between a work line and its answer (12px when there was no work), 14px before the changed-files card, 14px above the reply box and 12px below it.
-- **Status bar:** 14px inset, 10px between parts, a 1 × 12px rule between groups. When the pane narrows, words drop in a fixed order (labels, "of 1M", branch, reset text, usage detail); figures and cells never drop.
+- **Status bar:** 14px inset, 10px between parts, a 1 × 12px rule between groups. When the line does not fit, words drop in a fixed order: reset times first, then usage detail (used/limit, the month-end projection) and the branch, then "of 1M", then "Context"; figures, cells and usage labels never drop. Widths are measured, not estimated: each shorter version of the line is laid out once out of sight, and the longest that fits is shown. A usage figure that warns draws its filled cells and percentage in amber (70 % and up) or rose (90 % and up); its projection takes its own tone.
 
 ### Named Rules
 **The One Column Rule.** The conversation, question and reply box share one centred column. The header and status bar run full width; nothing else does.
 
 ## Elevation & Depth
 
-Flat. Depth comes from tone: black ground, a 50% well for code, surface grey for things you wrote or can type into, raised grey for hover. Only things that float over the conversation cast the platform's large shadow (`shadow_lg`): the settings panel, the model and thinking menus, a cell's tooltip and the jump-to-latest disc.
+Flat. Depth comes from tone: black ground, a 50% well for code, surface grey for things you wrote or can type into, raised grey for hover. Only things that float over the conversation cast the platform's large shadow (`shadow_lg`): the settings panel, the model, thinking and session menus, the slash menu and the pickers, a cell's tooltip and the jump-to-latest disc.
 
 ### Named Rules
 **The Float Only Rule.** A shadow means "this is above the conversation and will go away". Cards in the conversation (code, files, question, reply box) are bordered or toned, never shadowed.
@@ -327,6 +350,7 @@ Soft rectangles, with radius growing with size: 1.5px cells, 5px tags and option
 
 ### Pane header
 - **Structure:** a 22px surface tile with the program's icon, "Pi" (600), the session title (500, truncates), then machine · folder in muted grey (home as `~`), then the trailing controls. 46px high, 14px inset, 10px gaps, rule below.
+- **Session menu (chat only):** the title is a 26px chip (6px inset, 7px radius, a muted 13px chevron; "Session" in muted when the session has no name) that fills surface on hover and while open. It opens a 220px menu below it, in the menu style: New session, Resume…, Tree…, Compact, each with its icon and its slash command in muted at the right. While Pi is not idle the rows are dim and cannot be picked.
 - **Same in both views:** the chat and every Pi terminal pane draw the same header, so switching views does not move it. Terminal panes add split right, split down, zoom and close (28px icon buttons, shown on hover) and an agent status: a 13px spinner while working, a "Needs you" chip (blocked colour at 15%), or a 7px dot when done. Non-Pi panes get a plain header: program name and folder.
 
 ### Chat | Terminal switch
@@ -352,7 +376,7 @@ Opened under the work line between two rules, it opens and closes by height (180
 Surface grey, 14px radius, 10 × 14px padding, message type, right-aligned, at most 560px.
 
 ### Answer
-Markdown in prose type, selectable. Line breaks are kept as Pi wrote them. Code blocks: well black, 1px rule, 10px radius, 12 × 14px padding, terminal font, scroll sideways rather than wrap; a 26px copy button (surface, rule border, muted icon) appears top-right on hover and shows a check for 1.5s after copying.
+Markdown in prose type, selectable. Line breaks are kept as Pi wrote them. Code blocks: well black, 1px rule, 10px radius, 12 × 14px padding, terminal font on 20px lines, syntax coloured from the terminal's ANSI slots (see the Cells Carry the Colour Rule), scroll sideways rather than wrap; a 26px copy button (surface, rule border, muted icon) appears top-right on hover and shows a check for 1.5s after copying.
 
 ### Changed files
 A rule-bordered card (10px radius): a 34px heading row ("2 changed files" at 500 with total counts), then one 34px row per file (file icon, path in Geist Mono, counts), rows divided by rules. Counts are green +N and rose −N in Geist Mono.
@@ -361,12 +385,14 @@ A rule-bordered card (10px radius): a 34px heading row ("2 changed files" at 500
 - **Style:** surface grey, 14px radius, a 1px rule tinted toward the accent, 15px text growing from one to eight lines, placeholder "Reply to Pi".
 - **Under the text:** the model chip (chalk) and thinking chip (muted), each 24px, 7px radius; hover or open fills raised grey. They open a menu above (popover grey, rule border, 10px radius, 4px padding, 28px rows with a check on the current one).
 - **Send / stop:** a 28px chalk disc at the right with an up-arrow; idle (empty box) it is raised grey with a dim arrow. While Pi works it becomes a stop square. Hover fades it to 86%. Enter sends, Shift+Enter breaks a line, Esc stops.
+- **Slash menu:** a `/` at the start of the box opens a list above it, filtered as you type: Pi's session commands (/new, /compact, /resume, /tree) first, then its skills, prompt templates and extension commands. Rows are 30px: the command in chalk, its description in muted 12.5px (truncates), its kind in muted 12px at the right; at most nine show, the rest scroll. The highlighted row is hover grey mixed 6% toward chalk; ↑↓ move, Tab or Enter take it (a skill or command goes into the box, `/skill:tdd `; a session command runs or opens its picker), Esc closes it until the text changes. While Pi is not idle the session rows are dim and read "When Pi is idle". Typing `/compact focus on tests` and Enter compacts with those instructions.
+- **Pickers (Resume, Tree):** the same popover over the box, at most 560px wide (popover grey, rule border, 10px radius, large shadow). A 40px search line (search icon, 13px field, rule below), then 30px rows: ↑↓ move, Enter or a click picks, Esc closes, typing filters (every word must match). "Asking Pi…" with a spinner until Pi's list arrives. Resume rows: a check on the current session, the title (chalk when highlighted or current), then the message count and age in Geist Mono 12px at the right; it opens on the newest other session. Tree rows: your messages, indented 14px under each fork, each led by a 6px dot (chalk where you are, muted on the active branch, a dim ring elsewhere), its label as a raised tag, and "you are here" in muted; it opens where Pi is. Under the tree, a 36px row with a switch "Summarize the branch you leave" (off by default; a 26 × 16px track, raised off and accent on, its 12px knob sliding in 140ms) and a muted "Tab" that toggles it.
 
 ### Question card
 Above the reply box when Pi asks: a 14px-radius card with an input-grey border and 14px padding. The question in question type, then options as 36px rows (9px radius, rule border, surface on hover), each led by a 20px numbered tag in Geist Mono. Number keys pick. A picked option (multi-select) takes an accent border and an accent tag with a check. Under them, a 36px surface field "Or write your own answer", and for multi-select an "Answer" button (accent when something is picked, raised and dim when not).
 
 ### Status bar
-34px, Geist Mono 12px, muted, rule above. Groups, separated by short rules: Context with 40 cells (6 × 13px; used chalk-grey, unused outlined) and "113k of 1M"; branch icon, repository and branch; cost; each usage limit as 10 cells and a percentage. Values are chalk at 500; words stay muted.
+34px, Geist Mono 12px, muted, rule above. Groups, separated by short rules: Context with 40 cells (6 × 13px; used chalk-grey, unused outlined) and "113k of 1M"; branch icon, repository and branch; cost; each usage limit as its label, 10 cells and a percentage, then "resets 2h 10m" ("5h ▮▮▮▮▯▯▯▯▯▯ 38%  resets 2h 10m", "Week …"); a figure without a limit is its label and value ("Prompt ~0.5cr"). Values are chalk at 500; words stay muted. When Pi's usage entries carry no figures, they are read from the footer's text.
 
 ### Chat settings
 A 228px surface panel under the sliders button (12px radius, rule border, 14px padding, large shadow). Sections, each with a 12px muted label and, where useful, its value in Geist Mono at the right:
@@ -381,7 +407,7 @@ Choices are segmented: a black 2px-padded track (8px radius) with 26px segments;
 Centred in the conversation, at most 440px wide: a 15px title at 500, a 13px muted line, and when there is something to do, an accent button (30px, 8px radius, 13px at 500): "Open Terminal". Used for "Nothing here yet", "No chat for this Pi" (no extension or version mismatch) and "1-wsl is not answering". A silent machine also shows a rose notice above the reply box while the last conversation stays visible.
 
 ### Conversation motion
-New rows fade in and rise 6px (160ms, ease-out); rows already there when the chat opens do not animate. Spinners turn once per 900ms. The scroll thumb is a 4px rule-grey bar, 3px from the right edge.
+New rows fade in and rise 6px (160ms, ease-out); rows already there when the chat opens do not animate. Another session, or a move in its tree, starts the list over at its newest message with nothing open. While Pi compacts, the last row is a live line: a chalk spinner and "Compacting…"; a command Pi refused shows as the rose notice above the reply box ("Pi's chat extension reports: …"). Spinners turn once per 900ms. The scroll thumb is a 4px rule-grey bar, 3px from the right edge.
 
 ## Do's and Don'ts
 
@@ -395,7 +421,7 @@ New rows fade in and rise 6px (160ms, ease-out); rows already there when the cha
 
 ### Don't:
 - **Don't** use the accent for status, headings, rules or decoration; it marks what can be pressed or what is picked.
-- **Don't** use blue, violet or amber outside cells, or rose and green outside failures and line counts.
+- **Don't** use blue or violet outside cells, amber outside a warning usage figure, or rose and green outside failures, warnings and line counts.
 - **Don't** shadow anything that sits in the conversation; shadows are for things that float.
 - **Don't** change the terminal's ANSI palette away from Tokyo Night; the cells depend on it.
 - **Don't** let ligatures join typed signs, in the chat or the terminal.
@@ -407,4 +433,4 @@ New rows fade in and rise 6px (160ms, ease-out); rows already there when the cha
 - **Colour outside cells.** The contract keeps data colours to cells. The code also uses rose for failure text, removed-line counts and the invalid hex field, and green for added-line counts. Herdr's own sidebar (outside this config) shows coloured space avatars and green status dots in every screenshot.
 - **Accent ink.** The theme's `accent_foreground` is #000000. Saving the accent or ground from Chat settings writes a derived ink instead (for Chalk, about #131313). `settings.json` currently has no colour overrides, so the theme value holds.
 - **Status colours.** Pane headers use the theme's `working`, `blocked` and `done` colours, which `themes/leo.json` does not set; they come from Herdr's defaults and are not recorded here.
-- **Screenshots predate the code.** The review screenshots (`.impeccable/review/`) were taken before the last edits to `ask.js`, `chat-view.js`, `markdown.js`, `menu.js`, `settings-panel.js`, `states.js`, `steps.js`, `turn.js` and `ui.js`. No visible disagreement was found, but they may not show the latest details.
+- **Screenshots predate the code.** The first review screenshots (`chat-*.png`, `terminal-view.png` in `.impeccable/review/`) predate the session menu, slash menu, pickers, syntax colours and the measured status bar; `slash-menu.png`, `session-menu.png`, `resume-picker.png`, `tree-picker.png`, `status-bar.png` and `code-syntax.png` show those. The pickers' and slash menu's text sizes were snapped to the type scale (12px, 13px) after their screenshots.

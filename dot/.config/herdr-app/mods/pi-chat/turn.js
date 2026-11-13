@@ -197,7 +197,7 @@ export function drawRow(item, ui) {
   // An answer follows its turn's work line; one given without any work comes right after the message.
   if (item.kind === "answer") {
     const gap = item.turn.steps.length || item.turn.live ? 4 : 12;
-    return div().w_full().pt(gap).child(markdown(t, `pi-chat-md-${item.key}`, item.turn.answer, ui.chat.pointer));
+    return div().w_full().pt(gap).child(markdown(t, `pi-chat-md-${item.key}`, item.turn.answer, ui.chat.pointer, ui.chat.code));
   }
   if (item.kind === "files") return files(t, item.turn);
   if (item.kind === "end") {
@@ -205,5 +205,10 @@ export function drawRow(item, ui) {
     return div().w_full().pt(10).text_size(13).text_color(error ? t.ansi1 : t.muted).child(error ? `Pi stopped with an error: ${error}` : "Stopped.");
   }
   if (item.kind === "note") return quiet(t, NOTES[item.note.kind] || [item.note.title, item.note.text].filter(Boolean).join(": "));
+  if (item.kind === "compacting") {
+    return h_flex().w_full().pt(10).h(44).gap(10).items_center().text_size(13).text_color(t.foreground)
+      .child(icon("spinner", 13).spin(900))
+      .child(div().child("Compacting…"));
+  }
   return quiet(t, "Earlier messages are not loaded.");
 }

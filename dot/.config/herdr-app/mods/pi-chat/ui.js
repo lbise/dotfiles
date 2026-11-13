@@ -37,6 +37,15 @@ export function asTyped(text) {
   return text.replace(SIGNS, "$1\u200c") || " ";
 }
 
+// In a code view the pairs that open or close a comment stay whole, or the
+// highlighter would not see the comment.
+const CODE_SIGNS = /(?!\/\/|\/\*|\*\/|--)([-=<>!|&+*/:.#~])(?=[-=<>!|&+*/:.#~])/g;
+
+/** Code as typed, for a highlighted code view. */
+export function asCode(text) {
+  return text.replace(CODE_SIGNS, "$1\u200c");
+}
+
 /** Text for a monospaced line: tabs as spaces, no ligatures. */
 export function monoLine(text) {
   return asTyped(text.replace(/\t/g, "    "));

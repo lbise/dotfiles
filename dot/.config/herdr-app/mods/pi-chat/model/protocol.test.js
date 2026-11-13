@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { advance, base64, createCursor, inboxArgvs, parsePoll, pollArgv, splitAddress, utf8Bytes, utf8Length } from "./protocol.js";
+import { advance, base64, createCursor, inboxArgvs, listArgv, parsePoll, pollArgv, readArgv, splitAddress, utf8Bytes, utf8Length } from "./protocol.js";
 
 const RS = "\x1e";
 
@@ -235,4 +235,32 @@ test("a large inbox command goes in several commands and appears only with the l
 test("an inbox command without a type is refused", () => {
   assert.throws(() => inboxArgvs("t7", { text: "x" }), /type/);
   assert.throws(() => inboxArgvs("t7", null), /type/);
+});
+
+test("a list request drops its command and prints the file once Pi rewrote it", (t) => {
+  const m = machine(t);
+  writeFileSync(join(m.dir, "sessions.json"), '{"v":1,"at":1,"items":[]}');
+  // Pi: answers the command in inbox/ a moment later.
+  const pi = spawn("sh", ["-c", `for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.1; if ls "${m.dir}/inbox/"*.json >/dev/null 2>&1; then rm "${m.dir}/inbox/"*.json; printf '{"v":1,"at":2,"items":[]}' >"${m.dir}/sessions.json"; exit; fi; done`]);
+  t.after(() => pi.kill());
+  const out = m.exec(listArgv("t7", "sessions"));
+  assert.equal(out.code, 0, out.stderr);
+  assert.equal(out.stdout, '{"v":1,"at":2,"items":[]}');
+});
+
+test("a list request that Pi never answers exits 3, its command left in inbox/", (t) => {
+  const m = machine(t);
+  const argv = listArgv("t7", "tree", { now: 1794489190038, random: 0.5 });
+  const out = m.exec(argv);
+  assert.equal(out.code, 3);
+  assert.deepEqual(JSON.parse(readFileSync(join(m.dir, "inbox", "1794489190038-i00000.json"), "utf8")), { type: "list", what: "tree" });
+  assert.deepEqual(readdirSync(m.dir), ["inbox"]);
+  assert.throws(() => listArgv("t7", "other"), /no such list/);
+});
+
+test("a state file is read by name", (t) => {
+  const m = machine(t);
+  writeFileSync(join(m.dir, "commands.json"), '{"v":1,"commands":[]}');
+  assert.equal(m.exec(readArgv("t7", "commands.json")).stdout, '{"v":1,"commands":[]}');
+  assert.throws(() => readArgv("t7", "../x.json"), /bad state file/);
 });

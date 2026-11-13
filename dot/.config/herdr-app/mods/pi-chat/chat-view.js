@@ -1,21 +1,26 @@
 // The chat: header, conversation, question, reply box and status bar of the Pi
 // the focused tab runs. It reads that Pi's feed while it shows, and sends what
-// the person writes and picks.
+// the person writes and picks, session commands included.
 
 import { div } from "gpui-kit";
 import { Popup, h_flex, v_flex } from "gpui-base";
 import { nextCommand, setShared, settings, shared, theme } from "herdr";
 import { chatSettings } from "./model/settings.js";
 import { AskCard } from "./ask.js";
+import { CodeViews } from "./code.js";
 import { Composer } from "./composer.js";
-import { feedFor, feedLive, feedSilent, readFeed, sendCommand } from "./feeds.js";
+import { SharedDraft } from "./draft.js";
+import { feedFor, feedLive, feedSilent, readCommands, readFeed, sendCommand } from "./feeds.js";
 import { followFocus } from "./follow.js";
 import { HEADER_HEIGHT, headerButton, piHeader } from "./header.js";
+import { bindKeys } from "./keys.js";
 import { applyLook } from "./look.js";
 import { SENT_KEY, conversationRows } from "./rows.js";
+import { Picker } from "./picker.js";
+import { sessionMenu } from "./session-menu.js";
 import { SettingsPanel } from "./settings-panel.js";
 import { emptyChat, noExtension, silentMachine } from "./states.js";
-import { statusBar } from "./statusbar.js";
+import { StatusBar } from "./statusbar.js";
 import { viewSwitch } from "./switch.js";
 import { Timeline } from "./timeline.js";
 import { drawRow } from "./turn.js";
@@ -30,20 +35,25 @@ const HURRY = 4000; // after a command, read fast until its effect shows
 const SENT_FOR = 60000;
 const COPIED_FOR = 1500;
 const GROW_AFTER = 30;
+const CODE_AFTER = 16; // a code block drawn plain gets its coloured view this soon after
 
 export class ChatView {
   constructor(cx) {
     this.timeline = new Timeline();
+    this.code = new CodeViews();
     this.composer = new Composer(this);
+    this.draft = new SharedDraft(this.composer);
+    this.picker = new Picker(this);
+    this.status = new StatusBar();
+    this.sessionOpen = false;
+    this.sessionClosedAt = 0;
     this.ask = new AskCard((command, cx) => this.command(command, cx), cx);
     this.panel = new SettingsPanel((change, cx) => this.changeLook(change, cx));
     this.panelOpen = false;
     this.panelClosedAt = 0;
     this.width = 0; // of the whole chat, design px
-    this.session = ""; // the session on screen
-    this.drafted = ""; // the session whose draft is in the reply box
-    this.shown = ""; // the session on screen at the last tick; "" while the chat is hidden
-    this.drafts = new Map();
+    this.session = ""; // the Pi and Pi session on screen
+    this.shown = null; // the Pi on screen at the last tick; null while the chat is hidden
     this.openTurns = new Map(); // turn key -> open; a closed entry was open before
     this.openSteps = new Set();
     this.hoveredCell = null;
@@ -67,6 +77,7 @@ export class ChatView {
         });
       },
     };
+    bindKeys(cx);
     cx.timer.every(TICK, (cx) => this.tick(cx));
     cx.spawn(async () => {
       for (;;) {
@@ -81,17 +92,21 @@ export class ChatView {
 
   tick(cx) {
     followFocus(cx);
+    if (this.code.make()) cx.notify();
     const pi = target();
     const shown = Boolean(pi) && shownView() === "chat";
-    if (shown && this.shown !== pi.key) this.arrive(pi);
-    this.shown = shown ? pi.key : "";
+    if ((shown ? pi.key : "") !== (this.shown ? this.shown.key : "")) {
+      if (this.shown) this.leave(this.shown, cx);
+      if (shown) this.arrive(pi);
+      this.shown = shown ? pi : null;
+    }
     if (!shown) return;
     const feed = feedFor(pi);
     if (this.sent && Date.now() - this.sent.at > SENT_FOR) {
       this.sent = null;
       cx.notify();
     }
-    const fast = feed.chat.live || Date.now() < this.hurryUntil;
+    const fast = feed.chat.live || (feed.chat.state && feed.chat.state.status === "compacting") || Date.now() < this.hurryUntil;
     if (!feed.busy && Date.now() - feed.readAt >= (fast ? READ_LIVE : READ_IDLE)) this.read(feed, cx);
     // The running clock: one redraw a second.
     const second = feed.chat.live ? Math.floor(this.elapsed(feed) / 1000) : -1;
@@ -106,6 +121,9 @@ export class ChatView {
       if (!(await readFeed(feed))) return;
       this.arrived(feed);
       cx.notify();
+      cx.timer.after(CODE_AFTER, (cx) => {
+        if (this.code.make()) cx.notify();
+      });
       if (!this.growing.size) return;
       cx.timer.after(GROW_AFTER, (cx) => {
         this.growing.clear();
@@ -117,6 +135,7 @@ export class ChatView {
   // A read brought something new.
   arrived(feed) {
     const { chat } = feed;
+    if (this.shown && feedFor(this.shown) === feed) this.draft.follow(this.shown);
     if (this.sent) {
       const turn = chat.turns.find((entry) => entry.user && entry.user.text === this.sent.text && (entry.startedAt || 0) > this.sent.after);
       if (turn) {
@@ -145,10 +164,13 @@ export class ChatView {
     return turn && turn.live && turn.durationMs !== null ? turn.durationMs + (Date.now() - feed.changedAt) : 0;
   }
 
-  // Another session shows: nothing open, the newest message. Safe while drawing.
-  show(pi) {
-    if (pi.key === this.session) return;
-    this.session = pi.key;
+  // Another Pi, or another session of it, shows: nothing open, the newest message. Safe while drawing.
+  show(pi, chat) {
+    const session = `${pi.key}|${chat.epoch}`;
+    if (session === this.session) return;
+    this.session = session;
+    this.picker.kind = null;
+    this.sessionOpen = false;
     this.timeline.reset();
     this.openTurns.clear();
     this.openSteps.clear();
@@ -158,23 +180,92 @@ export class ChatView {
     this.notice = "";
   }
 
-  // The chat comes on screen, or shows another session: that session's draft is
-  // in the reply box, and the keyboard is where the person will type.
+  // The chat comes on screen, or shows another Pi: that Pi's draft is in the
+  // reply box (a fresh read follows at once), and the keyboard is where the person will type.
   arrive(pi) {
-    if (pi.key !== this.drafted) {
-      const draft = this.composer.text();
-      if (draft) this.drafts.set(this.drafted, draft);
-      else this.drafts.delete(this.drafted);
-      this.drafted = pi.key;
-      this.composer.set(this.drafts.get(pi.key) || "");
-    }
+    this.draft.arrive(pi);
+    this.hurryUntil = Date.now() + HURRY;
     const state = feedFor(pi).chat.state;
     this.ask.show(state ? state.ask : null);
     if (state && state.ask) this.ask.focus();
     else this.composer.focus();
   }
 
+  // The chat stops showing this Pi: its input box takes the reply box's draft.
+  leave(pi, cx) {
+    this.picker.kind = null;
+    this.draft.leave(pi, cx, (cx) => {
+      this.notice = "Pi did not take your draft. It is still in the reply box.";
+      cx.notify();
+    });
+  }
+
   // ---- what the person does ----
+
+  /** Pi takes no session command now. */
+  busy() {
+    const pi = target();
+    const state = pi ? feedFor(pi).chat.state : null;
+    return !state || state.status !== "idle";
+  }
+
+  slashCommands() {
+    const pi = target();
+    return pi ? feedFor(pi).commands : [];
+  }
+
+  // commands.json is read each time the slash menu opens; what was read before shows meanwhile.
+  loadCommands(cx) {
+    const pi = target();
+    if (!pi) return;
+    cx.spawn(async (cx) => {
+      if (await readCommands(feedFor(pi))) cx.notify();
+    });
+  }
+
+  /**
+   * A session command from the slash menu, the reply box or the session menu:
+   * new and compact run, resume and tree open their picker. False when Pi is busy.
+   */
+  runSession(action, instructions, cx) {
+    const pi = target();
+    if (!pi) return false;
+    if (this.busy()) {
+      this.notice = "Pi is busy. Session commands wait until it is idle.";
+      cx.notify();
+      return false;
+    }
+    if (action === "resume") this.picker.open("sessions", feedFor(pi), cx);
+    else if (action === "tree") this.picker.open("tree", feedFor(pi), cx);
+    else this.sessionCommand(action === "compact" && instructions ? { type: "session", action, instructions } : { type: "session", action }, cx);
+    return true;
+  }
+
+  sessionCommand(command, cx) {
+    // Going back to a message of yours puts it in Pi's input box: the reply box takes it.
+    if (command.action === "tree" && this.shown) this.draft.expect(this.shown, HURRY);
+    this.timeline.follow();
+    this.command(command, cx);
+  }
+
+  pickerClosed(cx) {
+    this.composer.focus();
+    cx.notify();
+  }
+
+  toggleSession(cx) {
+    // The press that closes the menu also lands on the title: that click must not open it again.
+    const reopens = !this.sessionOpen && Date.now() - this.sessionClosedAt < TICK;
+    this.sessionOpen = !this.sessionOpen && !reopens;
+    cx.notify();
+  }
+
+  closeSession(cx) {
+    if (!this.sessionOpen) return;
+    this.sessionOpen = false;
+    this.sessionClosedAt = Date.now();
+    cx.notify();
+  }
 
   command(command, cx) {
     const pi = target();
@@ -208,7 +299,7 @@ export class ChatView {
         await sendCommand(feed, { type: "prompt", text });
       } catch {
         if (this.sent === sent) this.sent = null;
-        if (this.session === pi.key && !this.composer.text()) this.composer.set(text);
+        if (this.shown && this.shown.key === pi.key && !this.composer.text()) this.composer.set(text);
         this.notice = `Not sent: ${pi.machine || "this computer"} did not take the message. It is back in the box.`;
         cx.notify();
       }
@@ -266,6 +357,20 @@ export class ChatView {
     return Popup.new("pi-chat-settings-popup", button)
       .anchor("top_right")
       .when(this.panelOpen, (el) => el.content(this.panel.render(t, look, close)));
+  }
+
+  titleMenu(t, state) {
+    return sessionMenu(t, {
+      title: state.title || "",
+      open: this.sessionOpen,
+      busy: state.status !== "idle",
+      toggle: (cx) => this.toggleSession(cx),
+      pick: (action, cx) => {
+        this.closeSession(cx);
+        this.runSession(action, "", cx);
+      },
+      close: (cx) => this.closeSession(cx),
+    });
   }
 
   jump(t) {
@@ -331,7 +436,7 @@ export class ChatView {
           .max_w(look.width)
           .when(notice, (el) => el.child(div().mt(10).text_size(13).text_color(t.ansi1).child(notice)))
           .when(state.ask, (el) => el.child(this.ask.render(t, state.ask)))
-          .child(this.composer.render(t, state)),
+          .child(this.composer.render(t, state, { picker: this.picker.render(t, Math.min(560, this.width - 48)), width: this.width - 48 })),
       );
   }
 
@@ -356,20 +461,20 @@ export class ChatView {
       .overflow_hidden()
       .text_color(t.foreground);
     if (!pi) return root;
-    this.show(pi);
     const look = chatSettings(shared(SETTINGS));
     const feed = feedFor(pi);
     const state = feed.chat.state;
     const live = feedLive(feed, pi);
+    this.show(pi, feed.chat);
     const openTerminal = () => chooseView(pi, "terminal");
     const header = div()
       .h(HEADER_HEIGHT)
       .flex_none()
-      .child(piHeader(t, pi, (live && state.title) || "", [this.settingsButton(t, look), viewSwitch(t, "chat", (mode) => chooseView(pi, mode))]));
+      .child(piHeader(t, pi, live ? this.titleMenu(t, state) : "", [this.settingsButton(t, look), viewSwitch(t, "chat", (mode) => chooseView(pi, mode))]));
     if (!live) {
       const body = feed.reads > 0 ? noExtension(t, feed.chat.problem, openTerminal) : feedSilent(feed) ? silentMachine(t, pi.machine, openTerminal) : div().flex_1();
       return root.child(header).child(body);
     }
-    return root.child(header).child(this.conversation(t, look, feed, zoom)).child(this.dock(t, look, pi, feed)).child(statusBar(t, state, this.width));
+    return root.child(header).child(this.conversation(t, look, feed, zoom)).child(this.dock(t, look, pi, feed)).child(this.status.render(t, state, zoom));
   }
 }

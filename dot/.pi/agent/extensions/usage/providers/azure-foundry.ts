@@ -107,11 +107,12 @@ function formatTokens(value: number): string {
 export function snapshotFromTotals(totals: AzureTotals, budget: number | undefined, now = Date.now()): UsageSnapshot {
   const extra: Segment[] = [{ text: `${formatTokens(totals.totalTokens)} tok · ${usd(totals.totalCost)} total` }];
   if (budget === undefined) {
-    return { summary: [{ text: `${ICONS.month} ${usd(totals.monthCost)} month`, tone: "success" }], extra };
+    return { summary: [{ text: `${ICONS.month} ${usd(totals.monthCost)} month`, tone: "success" }], summaryLabel: "Month", extra };
   }
   return {
     primary: {
       icon: ICONS.month,
+      label: "Month",
       usedPercent: (totals.monthCost / budget) * 100,
       resetsAt: monthStartUtc(now, 1),
       note: [{ text: `${usd(totals.monthCost)}/${usd(budget)}`, tone: "dim" }],
@@ -123,6 +124,7 @@ export function snapshotFromTotals(totals: AzureTotals, budget: number | undefin
 export const azureFoundryProvider: UsageProvider = {
   id: PROVIDER_ID,
   name: "Azure Foundry",
+  extraLabel: "Total",
   // Local files only, so a short TTL is cheap and keeps the footer current after each turn.
   cacheTtlMs: 10 * 1000,
 

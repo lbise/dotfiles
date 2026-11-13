@@ -23,6 +23,7 @@ The mod derives it from the terminal address (`1-wsl/t7` is machine `1-wsl`, id 
 
 The extension is active only when all hold: `HC_TERMINAL_ID` is set, the process was not started by
 another Pi, and the session has a UI (`ctx.hasUI`). Otherwise it writes nothing and registers no tool.
+In a herdr-core terminal it always registers its internal command (see session commands below).
 
 "Started by another Pi" means `PI_CODING_AGENT=true` in the environment the process was started with,
 read from `/proc/self/environ`. `process.env` cannot tell, because Pi sets the variable in its own
@@ -48,14 +49,15 @@ Pi event announces (a typed draft, entries from other extensions) is picked up w
   "cwd": "/home/u/andromeda/rom",
   "status": "idle",               // "idle" | "working" | "asking" | "compacting"
   "entries": 57,                  // counter, +1 whenever the session file gained an entry
+  "leaf": "e9f…",                 // id of the current entry (the end of the active branch), null in an empty session; changes on a tree move that adds no entry
   "model": { "provider": "azure-foundry", "id": "claude-fable-5-2", "name": "claude-fable-5-2" },  // null when none is selected
   "thinking": "high",
   "models": [ { "provider": "…", "id": "…", "name": "…" } ],   // what the picker offers: Pi's scoped models (`enabledModels`), or every model with credentials when there is no scope
   "thinkingLevels": ["off", "minimal", "low", "medium", "high", "xhigh"],  // the levels the current model supports
   "context": { "tokens": 113089, "window": 1000000 },          // each null when unknown (tokens: right after a compaction)
-  "cost": 1.42,                   // session cost in USD, null when unknown
+  "cost": 1.42,                   // session cost in USD as Pi's built-in footer counts it (messages, compactions, branch summaries), null when unknown
   "git": { "root": "rom", "branch": "dmtx-audit-fixes" },       // null outside a repository
-  "usage": [ { "key": "usage-primary", "text": "󰅐 ███░░░░░ 38%" } ],  // the footer's texts without ANSI, in footer order
+  "usage": [ { "key": "usage-primary", "text": "󰅐 ███░░░░░ 38%", "label": "5h", "percent": 38, "resets": "2h 10m" } ],  // the footer's texts without ANSI, in footer order
   "turn": {                       // the turn running now, or the last finished one; null before the first since Pi started or reloaded
     "startedAt": 1794489000000, "endedAt": null,
     "steps": [ { "id": "toolu_…", "kind": "look", "name": "read", "label": "src/a.c", "startedAt": 1, "endedAt": 2, "ok": true } ]
@@ -68,7 +70,9 @@ Pi event announces (a typed draft, entries from other extensions) is picked up w
 ```
 
 A turn is one agent run, from a prompt until Pi is idle again (`agent_start` to `agent_settled`): it
-spans every model call and tool call the prompt caused. `status` is `asking` while `ask` is set.
+spans every model call and tool call the prompt caused. A tree move ends the shown turn (`turn`
+becomes `null`). `status` is `asking` while `ask` is set, else `compacting` while a compaction
+(manual or automatic) or the branch summary of an inbox `tree` command runs.
 
 A step is one tool call of the transcript; `id` is its tool call id there (some providers make it
 several hundred characters long). Calls a tool makes itself (codemode scripts) are not steps.
@@ -83,6 +87,21 @@ pattern or command, at most 200 characters, empty when the call has none.
 figures out of them. Keys in order: `usage-primary`, `usage-primary-reset`, `usage-secondary`,
 `usage-secondary-reset`, `usage-extra`; a key is missing when the provider has no such value.
 
+Entries also carry, when the provider reports them, figures taken from the usage data (not parsed
+from the text): `label` names what the entry measures, `percent` (0 to 100, one decimal) is the
+share of the window used, `resets` the time left as short text (`"2h 10m"`, `"45m"`, `"3d"`,
+`"now"`). `usage-primary` and `usage-secondary` carry all three, their `-reset` keys `label` and
+`resets`, `usage-extra` only `label`. `usage-primary` and `usage-secondary` also carry, when there are any,
+`detail` (used/limit, `"10.8k/40k"`), `note` (what the footer prints after it: Copilot's month-end
+projection `"→27.8k"`, an overage `"+12 overage"`), and `tone`/`noteTone` (`"warning"` from 70 %,
+`"error"` from 90 % or on overage; absent when calm). The usage extension refetches every minute while
+idle and resends `resets` as it counts down, every 30 s. `session` also takes `"action": "reload"`, as
+`/reload`. Labels: `"5h"` (or the window's length in hours or days),
+`"Week"`, `"Month"`, `"Cap"` (Copilot usage against `usage.copilotCreditCap`), `"Extra"` (Claude
+extra usage), `"Credits"` (Codex credits), `"Prompt"` (Copilot's estimate for the running prompt),
+`"Total"` (Azure Foundry, all time). A primary entry that is a plain summary (`"active"`, Azure's
+month total without budget) has at most a `label`.
+
 `ask` comes from the `ask_user` tool this extension gives the model. The same question is open as a
 select prompt in Pi's TUI; the first answer wins and closes the other. A description is absent when
 the model gave none.
@@ -96,7 +115,8 @@ the model gave none.
 The list is `pi.getCommands()`: skills, prompt templates and the slash commands of extensions
 (`command`). `name` has no leading slash; `description` is `""` when there is none. Pi's built-in
 commands (`/new`, `/compact`, `/model`, ...) are not listed: Pi does not expose them to extensions and
-a `prompt` cannot run them. To run a listed one, send `{ "type": "prompt", "text": "/skill:tdd …" }`.
+a `prompt` cannot run them; `/new`, `/compact`, `/resume` and `/tree` are the inbox's `session`
+commands. To run a listed one, send `{ "type": "prompt", "text": "/skill:tdd …" }`.
 
 ### `inbox/` (mod writes, extension reads)
 
@@ -114,6 +134,7 @@ made the name does not matter. A command that cannot run sets `state.error`.
 { "type": "answer", "id": "a1", "value": ["Lime"] }               // labels chosen, or free text as one string; ignored when id is not the pending ask
 { "type": "draft", "text": "…" }                                  // set Pi's input box
 { "type": "session", "action": "new" }                          // like /new
+{ "type": "session", "action": "reload" }                       // like /reload
 { "type": "session", "action": "compact", "instructions": "…" }  // like /compact [instructions]; instructions optional
 { "type": "session", "action": "resume", "path": "/abs/….jsonl" } // like /resume, picking that session
 { "type": "session", "action": "tree", "entryId": "…", "summarize": false }  // like /tree, jumping to that entry
@@ -121,20 +142,33 @@ made the name does not matter. A command that cannot run sets `state.error`.
 { "type": "list", "what": "tree" }                               // write tree.json
 ```
 
-Session commands do what Pi's built-in command of the same name does. Pi only allows session
-control from a command handler, so the extension registers its own command and runs it. A session
-command that arrives while Pi is working or compacting is refused with `state.error`. While a
-compaction runs, `status` is `compacting`.
+Session commands do what Pi's built-in command of the same name does, with Pi's own messages in
+its TUI. Pi only allows session control (new, resume, tree) from a command handler, so the
+extension registers its own command, `/herdr-chat-internal-session` (not in `commands.json`; typed
+by hand it does nothing), and runs it the way `/usage-refresh` runs from a `prompt`: an extension
+command runs before Pi records anything, so it never reaches the conversation, the session file or
+the model. `compact` needs no command and calls Pi's compaction directly. A session command that
+arrives while Pi is working or compacting is refused with `state.error`; so are a `resume` path
+that is not an existing `.jsonl` file and a `tree` entry that does not exist. Failures Pi reports
+(`Nothing to compact (session too small)`, a switch an extension cancelled) also end up in
+`state.error`. `tree` to the current entry does nothing; `tree` to a user message, as in `/tree`,
+moves to its parent and puts its text in Pi's input box (`draft`). After `new`, `resume` (and
+Pi's own `/fork`, `/clone`, `/reload`) Pi restarts the extension: `state.json` and
+`commands.json` are rewritten for the new session at once, `turn` is `null`, and `usage` follows
+when the usage extension reports again. Commands still in the same inbox scan after a `new` or
+`resume` are dropped.
 
 ### `sessions.json` (extension writes on a `list` request)
 
 ```jsonc
 { "v": 1, "at": 1794489190038, "items": [
-  { "path": "/home/u/.pi/agent/sessions/--x--/….jsonl", "title": "AFH minimum channel check",  // title: session name, else first user message, one line
+  { "path": "/home/u/.pi/agent/sessions/--x--/….jsonl", "title": "AFH minimum channel check",  // title: session name, else first user message, one line, at most 200 characters
     "cwd": "/home/u/andromeda/rom", "modified": 1794489000000, "messages": 42, "current": false } ] }
 ```
 
-The sessions Pi's `/resume` offers for the current folder, newest first, at most 50.
+The sessions Pi's `/resume` offers for the current folder (`SessionManager.list`), newest first
+(last message time), at most 50. `messages` counts every message entry; `current` marks the open
+session, which is listed only once Pi has written its file (with the first user message).
 
 ### `tree.json` (extension writes on a `list` request)
 
@@ -144,11 +178,16 @@ The sessions Pi's `/resume` offers for the current folder, newest first, at most
     "timestamp": 1794489000000, "active": true, "label": null } ] }
 ```
 
-The entries Pi's `/tree` lets you jump to, in tree order. `parentId` is the nearest listed ancestor,
-`active` marks the current branch, `label` is the user's label for the entry.
-
-`usage` entries also carry, when the provider reports them: `label` (`"5h"`, `"Week"`, `"Month"`,
-`"Credits"`), `percent` (0 to 100) and `resets` (short text such as `"2h 10m"`).
+The entries Pi's `/tree` lets you jump to in its default view, in its order: depth first, the
+active branch first among siblings. Hidden as in `/tree`: settings entries (model, thinking level,
+labels, title, custom data) and assistant messages that only call tools (unless failed or the
+current entry). `parentId` is the nearest listed ancestor, `active` marks the current branch (root
+to `leaf`), `label` is the user's label for the entry, `timestamp` is in ms. `role` is the
+message's role (`user`, `assistant`, `toolResult`, `bashExecution`, `system`, …) or, for other
+entries, their type (`compaction`, `branch_summary`, `custom_message`). `text`: the message text;
+for a tool result the tool and its step label (`read src/a.c`); `(aborted)` or the error for a
+failed assistant message; `113k tokens` for a compaction; the summary for a branch summary; empty
+when there is none.
 
 ### Transcript
 
@@ -157,6 +196,8 @@ The conversation itself is Pi's session file (`state.sessionFile`, JSONL; see Pi
 Pi creates the file with the first user message; until then `sessionFile` names a file that does not
 exist yet while `entries` already counts the model and thinking entries Pi holds in memory. Entries
 are appended synchronously, so the file has an entry by the time `entries` counts it.
+The file holds every branch: the conversation is the path from `state.leaf` back to the root
+through `parentId`. A tree move without summary or label adds no entry; only `leaf` changes.
 
 ## The mod
 

@@ -75,7 +75,9 @@ import { clip, fileChange, stepKind, stepLabel } from "./tools.js";
  * @property {number} skipped Lines that were not session entries.
  * @property {Map<string, { step: Step, turn: Turn }>} steps The active branch's steps by id.
  * @property {Map<string, Entry>} entries Internal: every entry read, on any branch.
- * @property {string|null} leaf Internal: the last entry in the file, which is the tip of the active branch.
+ * @property {string|null} leaf Internal: the tip of the active branch: the last entry in the file, or where Pi moved in its tree.
+ * @property {number|null} lastAt Internal: when the last entry read was written.
+ * @property {number} rebuilds Times the turns were rebuilt for another branch.
  * @property {Turn|null} current Internal: the turn that takes what comes next.
  * @property {Step[]} unresolved Internal: steps of the last assistant message that have no result yet.
  * @property {Array<{ key: string, text: string }>} pending Internal: assistant text that is the answer unless a tool call follows.
@@ -118,6 +120,8 @@ export function createTranscript(cwd) {
     steps: new Map(),
     entries: new Map(),
     leaf: null,
+    lastAt: null,
+    rebuilds: 0,
     current: null,
     unresolved: [],
     pending: [],
@@ -155,11 +159,28 @@ export function appendLines(transcript, lines) {
     const continues = transcript.leaf === null || entry.parentId === transcript.leaf;
     transcript.entries.set(entry.id, entry);
     transcript.leaf = entry.id;
+    transcript.lastAt = entry.at;
     if (continues) fold(transcript, entry);
     else rebuild(transcript);
     changed = true;
   }
   if (changed) transcript.rev++;
+}
+
+/**
+ * Makes `id` the tip of the active branch: Pi moved in its tree without writing
+ * an entry. Null is the empty conversation (before the first message).
+ * @param {Transcript} transcript
+ * @param {string|null} id
+ * @returns {boolean} False when that entry has not been read.
+ */
+export function moveLeaf(transcript, id) {
+  if (id === transcript.leaf) return true;
+  if (id !== null && !transcript.entries.has(id)) return false;
+  transcript.leaf = id;
+  rebuild(transcript);
+  transcript.rev++;
+  return true;
 }
 
 /**
@@ -325,6 +346,7 @@ function blocksText(content, enough = Infinity, image = "[image]") {
 
 /** @param {Transcript} transcript */
 function rebuild(transcript) {
+  transcript.rebuilds++;
   const path = [];
   const seen = new Set();
   // Walk up from the tip; a parent that was never read (history cut by a first

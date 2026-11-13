@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { contextCells, formatCost, formatDuration, formatTokens, usageCells } from "./format.js";
+import { contextCells, formatCost, formatDuration, formatTokens, usageCells, usageGroups } from "./format.js";
 
 test("tokens", () => {
   assert.equal(formatTokens(113089), "113k");
@@ -82,4 +82,28 @@ test("usage text without a percentage", () => {
   assert.deepEqual([usage.label, usage.percent], ["4.5cr", null]);
   assert.deepEqual(usage.cells, new Array(10).fill(false));
   assert.equal(usageCells(undefined).label, "");
+});
+
+test("usage groups take the extension's figures, else the text's", () => {
+  const groups = usageGroups([
+    { key: "usage-primary", text: "󰅐 ███ 38%", label: "5h", percent: 38.4, resets: "2h 10m" },
+    { key: "usage-primary-reset", text: "󰑐 2h 10m", label: "5h", resets: "2h 10m" },
+    { key: "usage-secondary", text: "wk 53.9% 14.8k/27.5k" },
+    { key: "usage-secondary-reset", text: "󰑐 3d" },
+    { key: "usage-extra", text: "󱐋 ~0.5cr $0.01", label: "Prompt" },
+    { key: "usage-tertiary", text: "██ 76.9% 30.8k/40k →47.8k", label: "Cap", percent: 76.9, detail: "30.8k/40k", tone: "warning", note: "→47.8k", noteTone: "error" },
+  ]);
+  assert.deepEqual(
+    groups.map(({ label, percent, value, resets, words }) => ({ label, percent, value, resets, words })),
+    [
+      { label: "5h", percent: 38.4, value: "", resets: "2h 10m", words: [] },
+      { label: "wk", percent: 53.9, value: "", resets: "", words: ["14.8k/27.5k", "3d"] },
+      { label: "Prompt", percent: null, value: "~0.5cr $0.01", resets: "", words: [] },
+      { label: "Cap", percent: 76.9, value: "", resets: "", words: ["30.8k/40k"] },
+    ],
+  );
+  assert.equal(groups[0].cells.filter(Boolean).length, 4);
+  assert.deepEqual([groups[0].tone, groups[3].tone, groups[3].note, groups[3].noteTone], [null, "warning", "→47.8k", "error"]);
+  assert.deepEqual(usageGroups([{ key: "usage-primary", text: "unlimited" }]).map((group) => [group.label, group.value]), [["", "unlimited"]]);
+  assert.deepEqual(usageGroups(null), []);
 });

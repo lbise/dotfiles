@@ -96,3 +96,76 @@ export function usageCells(text) {
   cells.fill(true, 0, filledCells(percent / 100, USAGE_CELLS));
   return { label: before || after, percent, detail: before ? after : "", cells };
 }
+
+/**
+ * How long ago: "now", "5m ago", "3h ago", "2d ago", "3w ago", "4mo ago", "2y ago".
+ * @param {number|null} ms Epoch ms.
+ * @param {number} now Epoch ms.
+ */
+export function formatAge(ms, now) {
+  if (!Number.isFinite(ms)) return "";
+  const minutes = Math.floor(Math.max(0, now - ms) / 60000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 14) return `${days}d ago`;
+  if (days < 60) return `${Math.floor(days / 7)}w ago`;
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
+const alarm = (tone) => (tone === "warning" || tone === "error" ? tone : null);
+
+/**
+ * @typedef {object} UsageGroup One usage figure of the status bar.
+ * @property {string} label What it measures ("5h", "Week", "Prompt"), or "".
+ * @property {number|null} percent Of the limit used; null for a figure without a limit.
+ * @property {boolean[]} cells 10 entries, as usageCells gives them.
+ * @property {string} value The figure, when there is no percentage ("~0.1cr").
+ * @property {string} resets Time left until the limit resets ("2h 10m"), or "".
+ * @property {string[]} words What follows the figure: used/limit, or what an older usage extension wrote.
+ * @property {"warning"|"error"|null} tone The figure warns: drawn in amber or rose.
+ * @property {string} note After the words: Copilot's month-end projection, an overage ("").
+ * @property {"warning"|"error"|null} noteTone
+ */
+
+/**
+ * The footer's usage entries (state.usage) as the status bar's groups. Entries
+ * with `label`, `percent` and `resets` are taken as they are; without them the
+ * figures come out of the text, and a text without a percentage joins the
+ * limit before it.
+ * @param {Array<{ key?: string, text?: string, label?: string, percent?: number, resets?: string }>} entries
+ * @returns {UsageGroup[]}
+ */
+export function usageGroups(entries) {
+  const groups = [];
+  let last = null;
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const label = typeof entry.label === "string" ? entry.label : null;
+    const resets = typeof entry.resets === "string" ? entry.resets : "";
+    if (Number.isFinite(entry.percent)) {
+      const words = typeof entry.detail === "string" && entry.detail ? [entry.detail] : [];
+      const note = typeof entry.note === "string" ? entry.note : "";
+      last = { label: label || "", percent: entry.percent, cells: usageCells(`${entry.percent}%`).cells, value: "", resets, words, tone: alarm(entry.tone), note, noteTone: alarm(entry.noteTone) };
+      groups.push(last);
+      continue;
+    }
+    const usage = usageCells(entry.text);
+    if (usage.percent !== null) {
+      last = { label: usage.label, percent: usage.percent, cells: usage.cells, value: "", resets: "", words: usage.detail ? [usage.detail] : [], tone: null, note: "", noteTone: null };
+      groups.push(last);
+      continue;
+    }
+    if (resets && last && /-reset$/.test(String(entry.key))) {
+      last.resets = last.resets || resets;
+      continue;
+    }
+    if (!usage.label) continue;
+    if (label === null && last) last.words.push(usage.label);
+    else groups.push({ label: label || "", percent: null, cells: usage.cells, value: usage.label, resets: "", words: [], tone: null, note: "", noteTone: null });
+  }
+  return groups;
+}

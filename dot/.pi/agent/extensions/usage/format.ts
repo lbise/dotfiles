@@ -110,6 +110,27 @@ export function formatReset(resetsAt: number | undefined, now = Date.now()): str
   return `${ICONS.reset} ${text}`;
 }
 
+/** "2h 10m", "45m" or "3d" until `resetsAt`, without icon or clock time; undefined when unknown. */
+export function formatRemaining(resetsAt: number | undefined, now = Date.now()): string | undefined {
+  if (resetsAt === undefined || Number.isNaN(resetsAt)) return undefined;
+  const remaining = resetsAt - now;
+  if (remaining <= 0) return "now";
+  if (remaining >= DAY_MS) return `${Math.ceil(remaining / DAY_MS)}d`;
+  const minutes = Math.ceil(remaining / MINUTE_MS);
+  const hours = Math.floor(minutes / 60);
+  if (!hours) return `${minutes}m`;
+  return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+}
+
+/** Name of a rolling window given its length in minutes, on the same thresholds as windowIcon(). */
+export function windowLabel(minutes: number | undefined, fallbackMinutes: number): string {
+  const length = minutes && minutes > 0 ? minutes : fallbackMinutes;
+  if (length >= 28 * 24 * 60) return "Month";
+  if (length >= 7 * 24 * 60 - 60) return "Week";
+  if (length >= 24 * 60) return `${Math.round(length / (24 * 60))}d`;
+  return `${Math.round(length / 60)}h`;
+}
+
 /** Icon for a rolling window given its length in minutes. */
 export function windowIcon(minutes: number | undefined, fallbackMinutes: number): string {
   const length = minutes && minutes > 0 ? minutes : fallbackMinutes;

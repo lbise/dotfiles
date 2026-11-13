@@ -4,8 +4,12 @@
     "enabled": true
   },
   "font": "JetBrainsMono Nerd Font Mono",
-  "font_size": 16.0,
+  "font_size": 16,
   "font_ligatures": false,
-  "minimum_contrast": 1.0,
-  "theme": "leo"
+  "minimum_contrast": 1,
+  "theme": "leo",
+  "colors": {
+    "accent": "#EDEDED",
+    "accent_foreground": "#131313"
+  }
 }

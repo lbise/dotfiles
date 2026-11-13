@@ -93,7 +93,7 @@ async function getGitHubToken(auth: AuthSource): Promise<string | null> {
 
 /** Usage against a hard monthly cap, with pace marker and month-end projection. */
 export function capWindow(used: number, cap: number, resetsAt: number | undefined, now = Date.now()): UsageWindow {
-  const window: UsageWindow = { icon: ICONS.month, usedPercent: (used / cap) * 100, used, limit: cap };
+  const window: UsageWindow = { icon: ICONS.month, label: "Cap", usedPercent: (used / cap) * 100, used, limit: cap };
   if (resetsAt === undefined) return window;
 
   const start = new Date(resetsAt);
@@ -135,6 +135,7 @@ function snapshotFromQuota(quota: Quota | null, plan?: string, fallbackResetDate
   return {
     primary: {
       icon: ICONS.month,
+      label: "Month",
       usedPercent: Math.max(0, usedPercent),
       resetsAt,
       used,
@@ -179,7 +180,7 @@ export function snapshotFromHeaders(headers: Record<string, string>): UsageSnaps
   });
 }
 
-/** Estimated AI credits of the running prompt, summed from pi's per-turn cost. */
+/** Estimated AI credits of the running prompt and their price, summed from pi's per-turn cost. */
 export function createCopilotPromptTracker(): PromptTracker {
   let usd = 0;
   return {
@@ -189,7 +190,7 @@ export function createCopilotPromptTracker(): PromptTracker {
     },
     segments() {
       const credits = Math.round((usd / CREDIT_USD) * 10) / 10;
-      return [{ text: `~${formatAmount(credits)}cr` }];
+      return [{ text: `~${formatAmount(credits)}cr` }, { text: ` $${usd.toFixed(2)}`, tone: "dim" }];
     },
   };
 }
@@ -197,8 +198,8 @@ export function createCopilotPromptTracker(): PromptTracker {
 export const copilotProvider: UsageProvider = {
   id: "github-copilot",
   name: "Copilot",
+  extraLabel: "Prompt",
   cacheTtlMs: 2 * 60 * 1000,
-  pollIntervalMs: 2 * 60 * 1000,
 
   async fetchUsage(auth: AuthSource): Promise<UsageSnapshot> {
     const token = await getGitHubToken(auth);

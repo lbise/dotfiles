@@ -31,20 +31,23 @@ for (const argv of inboxArgvs(id, { type: "prompt", text })) {
 
 | Module | Export | What it does |
 | --- | --- | --- |
-| `chat.js` | `createChat()` | A chat: cursor, transcript, last state, merged `turns`, `live`, `truncated`. |
+| `chat.js` | `createChat()` | A chat: cursor, transcript, last state, merged `turns`, `live`, `truncated`, and `epoch`, which goes up when it is another session or branch. |
 | | `chatPollArgv(chat, terminalId)` | The argv of the chat's next poll. |
-| | `chatReceive(chat, stdout)` | Takes a poll's stdout, updates the chat in place, returns it. |
+| | `chatReceive(chat, stdout)` | Takes a poll's stdout, updates the chat in place, returns it. Follows `state.leaf` (a tree move adds no entry). |
 | `protocol.js` | `splitAddress(address)` | `"1-wsl/t7"` to `{ machine, id }`. |
 | | `createCursor()` | `{ sessionFile, offset, truncated }`: where the next poll resumes. |
 | | `pollArgv(terminalId, cursor)` | One `sh -c` that prints state.json, a separator, and the session file from the offset. |
 | | `parsePoll(stdout)` | `{ state, problem, file, chunk, complete }`. Never throws. |
 | | `advance(cursor, poll)` | `{ cursor, lines, reset }`: the complete lines read and the new byte offset. |
 | | `inboxArgvs(terminalId, command)` | The commands that drop one file into `inbox/` (one, or several for a long prompt). |
+| | `listArgv(terminalId, what)` | Sends `list` (`"sessions"` or `"tree"`) and prints the file once Pi rewrote it; exit 3 when it did not within 5 s. |
+| | `readArgv(terminalId, name)` | Prints one file of the state directory (`commands.json`). |
 | | `utf8Length`, `utf8Bytes`, `base64` | Hand-written, for the engine that has none. |
 | `transcript.js` | `createTranscript(cwd?)` | An empty transcript. |
 | | `appendLines(transcript, lines)` | Feeds session-file lines; `transcript.turns` is the active branch. |
 | | `trail(turn)` | The turn's steps, narration and notes in order, for the opened view. |
 | | `newTurn(key, user)` | An empty turn. |
+| | `moveLeaf(transcript, id)` | Makes `id` the end of the active branch (null: empty); false when that entry was not read. |
 | `live.js` | `mergeLive(transcript, state)` | `{ turns, live }`: the transcript plus what state.json knows of the running turn. |
 | | `isLive(state)` | True while `status` is `working` or `asking`. |
 | `tools.js` | `stepKind(name)`, `stepLabel(name, args, cwd?)` | A tool call's kind and one-line label, as the Pi extension gives them. |
@@ -54,6 +57,12 @@ for (const argv of inboxArgvs(id, { type: "prompt", text })) {
 | `format.js` | `formatTokens`, `formatDuration`, `formatCost` | `113k`, `1M`; `18s`, `2m 14s`; `$1.42`. |
 | | `contextCells({ tokens, window })` | 40 entries: a category (`"used"`) for a filled cell, `null` for an empty one. |
 | | `usageCells("5h 38%")` | `{ label: "5h", percent: 38, detail: "", cells: boolean[10] }`. |
+| | `usageGroups(state.usage)` | The status bar's usage figures: `label`, `percent`, `resets` as Pi gives them, else read from the text. |
+| | `formatAge(ms, now)` | `now`, `5m ago`, `3h ago`, `2d ago`. |
+| `lists.js` | `parseSessions`, `parseTree`, `parseCommands` | `sessions.json`, `tree.json` (your messages, indented under forks, `current` where Pi is), `commands.json`; null when not version 1. |
+| | `slashItems(query, commands)` | The slash menu: session commands first, then by how well the name matches. |
+| | `sessionCommand(text)` | `"/compact keep tests"` to `{ action, instructions }`, else null. |
+| | `matches(query, fields)`, `SESSION_COMMANDS` | The pickers' filter; the four commands the chat runs itself. |
 | `settings.js` | `chatSettings(stored)` | Valid `{ accent, ground, activity, width }`; bad fields take their default. |
 | | `parseAccent(value)` | A preset's name or `#rrggbb` to `"#RRGGBB"`, else `null`. |
 | | `ACCENTS`, `GROUNDS`, `ACTIVITIES`, `WIDTHS`, `DEFAULT_SETTINGS` | What the settings may be. |

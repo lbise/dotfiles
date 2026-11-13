@@ -8,7 +8,7 @@
  * what pi actually consumes.
  */
 
-import { formatAmount, formatBar, numberValue, windowIcon } from "../format.ts";
+import { formatAmount, formatBar, numberValue, windowIcon, windowLabel } from "../format.ts";
 import type { AuthSource, Segment, UsageProvider, UsageSnapshot, UsageWindow } from "../types.ts";
 
 const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
@@ -35,7 +35,7 @@ function windowFromRaw(raw: WindowRaw | undefined, minutes: number): UsageWindow
   const usedPercent = numberValue(raw?.utilization);
   if (usedPercent === undefined) return undefined;
   const resetsAt = raw?.resets_at ? Date.parse(raw.resets_at) : NaN;
-  return { icon: windowIcon(minutes, minutes), usedPercent, resetsAt: Number.isNaN(resetsAt) ? undefined : resetsAt };
+  return { icon: windowIcon(minutes, minutes), label: windowLabel(minutes, minutes), usedPercent, resetsAt: Number.isNaN(resetsAt) ? undefined : resetsAt };
 }
 
 function formatMoney(minor: number, decimals: number, currency: string | null | undefined): string {
@@ -79,6 +79,7 @@ export function snapshotFromPayload(payload: UsagePayload): UsageSnapshot {
 export const anthropicProvider: UsageProvider = {
   id: "anthropic",
   name: "Claude",
+  extraLabel: "Extra",
   cacheTtlMs: 60 * 1000,
 
   async fetchUsage(auth: AuthSource): Promise<UsageSnapshot> {

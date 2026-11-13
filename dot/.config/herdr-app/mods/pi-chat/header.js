@@ -16,7 +16,7 @@ function mark(t, program) {
 /**
  * @param {Record<string, string>} t The theme.
  * @param {object} pi The pane, from view.js.
- * @param {string} title The session's title, or "".
+ * @param {string|import("gpui-kit").Element} title The session's title, or "", or what stands in its place.
  * @param {import("gpui-kit").Element[]} trailing What stands at the right.
  */
 export function piHeader(t, pi, title, trailing) {
@@ -33,7 +33,7 @@ export function piHeader(t, pi, title, trailing) {
     .text_color(t.foreground)
     .child(mark(t, pi.program))
     .child(div().flex_none().font_semibold().child("Pi"))
-    .when(title, (el) => el.child(div().flex_shrink(1).min_w(0).truncate().font_medium().child(title)))
+    .when(title, (el) => el.child(typeof title === "string" ? div().flex_shrink(1).min_w(0).truncate().font_medium().child(title) : title))
     .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(where))
     .children(trailing);
 }

@@ -3,9 +3,11 @@
 
 import { exec } from "herdr";
 import { chatPollArgv, chatReceive, createChat } from "./model/chat.js";
-import { inboxArgvs } from "./model/protocol.js";
+import { parseCommands, parseSessions, parseTree } from "./model/lists.js";
+import { inboxArgvs, listArgv, readArgv } from "./model/protocol.js";
 
 const TIMEOUT = 8000;
+const LIST_TIMEOUT = 12000; // Pi has 5 s to answer a list request
 const KEPT = 8;
 // After this many failed reads in a row the machine counts as not answering.
 const SILENT_AFTER = 2;
@@ -26,6 +28,7 @@ export function feedFor(pi) {
       busy: false,
       readAt: 0,
       changedAt: 0, // when a read last brought something new, on this machine's clock
+      commands: [], // Pi's slash commands, from commands.json
     };
     feeds.delete(pi.address);
     feeds.set(pi.address, feed);
@@ -50,8 +53,8 @@ function signature(feed) {
   return `${state ? state.updated : ""}|${transcript.rev}|${problem}|${feedSilent(feed)}|${feed.reads > 0}`;
 }
 
-async function onMachine(feed, argv) {
-  const result = await exec(argv[0], argv.slice(1), { on: feed.machine, timeout: TIMEOUT });
+async function onMachine(feed, argv, timeout = TIMEOUT) {
+  const result = await exec(argv[0], argv.slice(1), { on: feed.machine, timeout });
   if (result.code !== 0) throw new Error(result.stderr.trim() || `exit ${result.code}`);
   return result.stdout;
 }
@@ -79,4 +82,24 @@ export async function readFeed(feed) {
 /** Drops one command into the feed's inbox. Rejects when it did not get there. */
 export async function sendCommand(feed, command) {
   for (const argv of inboxArgvs(feed.id, command)) await onMachine(feed, argv);
+}
+
+/** Reads Pi's slash commands into `feed.commands`. Resolves true when they changed. */
+export async function readCommands(feed) {
+  const commands = parseCommands(await onMachine(feed, readArgv(feed.id, "commands.json")).catch(() => ""));
+  if (!commands || JSON.stringify(commands) === JSON.stringify(feed.commands)) return false;
+  feed.commands = commands;
+  return true;
+}
+
+/**
+ * Asks Pi for its sessions or its tree. Resolves with the rows; rejects when Pi
+ * did not answer (an older extension) or the machine did not.
+ * @param {"sessions"|"tree"} what
+ */
+export async function askList(feed, what) {
+  const text = await onMachine(feed, listArgv(feed.id, what), LIST_TIMEOUT);
+  const rows = what === "sessions" ? parseSessions(text) : parseTree(text);
+  if (!rows) throw new Error(`unreadable ${what}`);
+  return rows;
 }

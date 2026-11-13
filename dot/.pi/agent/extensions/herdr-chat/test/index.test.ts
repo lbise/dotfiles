@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { afterEach } from "node:test";
 
-import extension, { activate, startedByPi, thinkingLevels } from "../index.ts";
+import extension, { activate, SESSION_COMMAND, startedByPi, thinkingLevels } from "../index.ts";
 
 const realTerminalId = process.env.HC_TERMINAL_ID;
 const cleanups: (() => unknown)[] = [];
@@ -34,6 +34,7 @@ function setup({ hasUI = true } = {}) {
   const handlers = new Map<string, (event: any, ctx: any) => Promise<void>>();
   const busHandlers = new Map<string, (data: unknown) => void>();
   const tools = new Map<string, any>();
+  const commands = new Map<string, any>();
   const calls: any[][] = [];
   const entries: any[] = [];
   const prompts: { options: string[]; signal?: AbortSignal }[] = [];
@@ -44,15 +45,21 @@ function setup({ hasUI = true } = {}) {
     on: (name: string, handler: any) => handlers.set(name, handler),
     events: { on: (channel: string, handler: any) => busHandlers.set(channel, handler) },
     registerTool: (tool: any) => tools.set(tool.name, tool),
+    registerCommand: (name: string, command: any) => commands.set(name, command),
     getCommands: () => [
       { name: "skill:tdd", description: "Test first", source: "skill" },
       { name: "review", source: "prompt" },
       { name: "usage-refresh", description: "Refresh", source: "extension" },
+      { name: SESSION_COMMAND, description: "Internal", source: "extension" },
     ],
     getThinkingLevel: () => thinking,
     setThinkingLevel: (level: string) => void (thinking = level),
     setModel: async (m: any) => (calls.push(["setModel", m.id]), m.provider !== "locked"),
-    sendUserMessage: (content: any, options: any) => calls.push(["sendUserMessage", content, options]),
+    sendUserMessage: (content: any, options: any) => {
+      calls.push(["sendUserMessage", content, options]);
+      const command = typeof content === "string" && options?.expandPromptTemplates && commands.get(content.slice(1));
+      if (command) void command.handler("", commandCtx);
+    },
     exec: async (_cmd: string, args: string[]) => ({
       code: 0,
       killed: false,
@@ -71,12 +78,18 @@ function setup({ hasUI = true } = {}) {
     },
     sessionManager: {
       getEntries: () => [...entries],
+      getEntry: (id: string) => entries.find((e) => e.id === id),
+      getLeafId: () => entries.at(-1)?.id ?? null,
+      getTree: () => [] as any[],
+      getCwd: () => "/home/u/rom",
+      getSessionDir: () => "/sessions",
       getSessionFile: () => "/sessions/s.jsonl",
       getSessionId: () => "01a1",
       getSessionName: () => undefined as string | undefined,
     },
     isIdle: () => true,
     abort: () => calls.push(["abort"]),
+    compact: (options: any) => calls.push(["compact", options]),
     getContextUsage: () => ({ tokens: 1200, contextWindow: 200000, percent: 0.6 }),
     ui: {
       getEditorText: () => draft,
@@ -91,13 +104,29 @@ function setup({ hasUI = true } = {}) {
     },
   };
 
-  activate(pi as any, dir);
+  const commandCtx = {
+    ...ctx,
+    newSession: async () => (calls.push(["newSession"]), { cancelled: false }),
+    reload: async () => void calls.push(["reload"]),
+    switchSession: async (path: string) => (calls.push(["switchSession", path]), { cancelled: path.includes("veto") }),
+    navigateTree: async (id: string, options: any) => (calls.push(["navigateTree", id, options]), { cancelled: false }),
+  };
+  const listed: string[][] = [];
+  const sessions = async (cwd: string, sessionDir: string) => {
+    listed.push([cwd, sessionDir]);
+    return [
+      { path: "/sessions/s.jsonl", cwd: "/home/u/rom", name: "AFH check", firstMessage: "hi", modified: new Date(2000), messageCount: 4 },
+      { path: "/sessions/o.jsonl", cwd: "/home/u/rom", firstMessage: "fix\n  the bug", modified: new Date(1000), messageCount: 2 },
+    ];
+  };
+
+  activate(pi as any, dir, sessions);
   const emit = (name: string, event: any = {}) => handlers.get(name)!(event, ctx);
   cleanups.push(() => emit("session_shutdown"));
   const state = () => JSON.parse(readFileSync(join(dir, "state.json"), "utf8"));
   let seq = 0;
   const send = (command: unknown) => writeFileSync(join(dir, "inbox", `${Date.now()}-${seq++}.json`), JSON.stringify(command));
-  return { dir, pi, ctx, handlers, busHandlers, tools, calls, entries, prompts, emit, state, send };
+  return { dir, pi, ctx, handlers, busHandlers, tools, commands, calls, entries, prompts, listed, emit, state, send };
 }
 
 test("registers nothing outside a herdr-core terminal", () => {
@@ -127,7 +156,11 @@ test("a session without a UI writes nothing and registers no tool", async () => 
 
 test("session start publishes the state and the commands", async () => {
   const h = setup();
-  h.entries.push({ type: "message", message: { role: "user" } }, { type: "message", message: { role: "assistant", usage: { cost: { total: 0.25 } } } });
+  h.entries.push(
+    { type: "message", message: { role: "user" } },
+    { type: "message", message: { role: "assistant", usage: { cost: { total: 0.2 } } } },
+    { type: "branch_summary", usage: { cost: { total: 0.05 } } }
+  );
   await h.emit("session_start");
   h.busHandlers.get("usage:status")!([{ key: "usage-primary", text: "5h 38%" }, { bogus: true }]);
 
@@ -144,7 +177,8 @@ test("session start publishes the state and the commands", async () => {
       title: null,
       cwd: "/home/u/rom",
       status: "idle",
-      entries: 2,
+      entries: 3,
+      leaf: null,
       model: { provider: "anthropic", id: "claude-opus-5-5", name: "Claude Opus 5.5" },
       thinking: "high",
       models: [
@@ -299,4 +333,130 @@ test("ask_user shows the question in the state and takes the answer from the inb
   assert.deepEqual(await result, { content: [{ type: "text", text: "The user chose: Teal" }], details: { answer: ["Teal"] } });
   assert.equal(h.prompts[0].signal!.aborted, true);
   assert.equal((await until(() => h.state().ask === null && h.state(), "ask cleared")).status, "idle");
+});
+
+test("usage entries keep their label, percent and time left", async () => {
+  const h = setup();
+  await h.emit("session_start");
+  h.busHandlers.get("usage:status")!([
+    { key: "usage-primary", text: "5h 38%", label: "5h", percent: 38.5, resets: "2h 10m", extra: 1 },
+    { key: "usage-extra", text: "off", label: 3, percent: "38" },
+  ]);
+  assert.deepEqual((await until(() => h.state().usage.length && h.state(), "usage")).usage, [
+    { key: "usage-primary", text: "5h 38%", label: "5h", percent: 38.5, resets: "2h 10m" },
+    { key: "usage-extra", text: "off" },
+  ]);
+});
+
+test("session commands run through the internal command, which does nothing typed by hand", async () => {
+  const h = setup();
+  h.entries.push({ id: "e1", type: "message", message: { role: "user" } }, { id: "e2", type: "message", message: { role: "assistant" } });
+  await h.emit("session_start");
+  await until(() => h.state());
+  await h.commands.get(SESSION_COMMAND).handler("", h.ctx); // no pending command: no-op
+
+  const session = join(h.dir, "old.jsonl");
+  writeFileSync(session, "");
+  h.send({ type: "session", action: "new" });
+  h.send({ type: "session", action: "resume", path: session });
+  h.send({ type: "session", action: "tree", entryId: "e1", summarize: true });
+  h.send({ type: "session", action: "tree", entryId: "e2" }); // the leaf: nothing to do
+  h.send({ type: "session", action: "reload" });
+  h.send({ type: "session", action: "compact", instructions: " keep the plan " });
+  await until(() => h.calls.some((c) => c[0] === "compact"), "compact");
+  const internal = ["sendUserMessage", `/${SESSION_COMMAND}`, { expandPromptTemplates: true }];
+  assert.deepEqual(h.calls.slice(0, -1), [
+    internal,
+    ["newSession"],
+    internal,
+    ["switchSession", session],
+    internal,
+    ["navigateTree", "e1", { summarize: true }],
+    internal,
+    internal,
+    ["reload"],
+  ]);
+  assert.equal(h.calls.at(-1)![1].customInstructions, "keep the plan");
+  assert.equal((await until(() => h.state().status === "compacting" && h.state(), "compacting")).error, null);
+
+  // Refused while compacting; the end of the compaction clears the status.
+  h.send({ type: "session", action: "new" });
+  await until(() => h.state().error === "session: wait, Pi is compacting", "refused");
+  h.calls.at(-1)![1].onComplete({});
+  await until(() => h.state().status === "idle", "idle");
+
+  for (const [command, message] of [
+    [{ type: "session", action: "resume", path: join(h.dir, "missing.jsonl") }, `session: no session file ${join(h.dir, "missing.jsonl")}`],
+    [{ type: "session", action: "tree", entryId: "nope" }, "session: no entry nope"],
+    [{ type: "session", action: "fly" }, "session: unknown action fly"],
+    [{ type: "list", what: "everything" }, "list: unknown list everything"],
+  ] as const) {
+    h.send(command);
+    await until(() => h.state().error === message, message);
+  }
+  const vetoed = join(h.dir, "veto.jsonl");
+  writeFileSync(vetoed, "");
+  h.send({ type: "session", action: "resume", path: vetoed });
+  await until(() => h.state().error === "session: resume was cancelled", "cancelled");
+
+  h.ctx.isIdle = () => false;
+  h.send({ type: "session", action: "compact" });
+  await until(() => h.state().error === "session: wait, Pi is working", "refused while working");
+});
+
+test("compaction from anywhere shows as compacting; a failed one sets no status", async () => {
+  const h = setup();
+  await h.emit("session_start");
+  h.ctx.isIdle = () => false;
+  await h.emit("session_before_compact", { reason: "threshold" });
+  assert.equal((await until(() => h.state().status === "compacting" && h.state(), "compacting")).status, "compacting");
+  await h.emit("session_compact_failed", { reason: "threshold" });
+  await until(() => h.state().status === "idle", "idle");
+
+  h.send({ type: "session", action: "compact" }); // not idle: refused before it starts
+  await until(() => h.state().error, "refused");
+  h.ctx.isIdle = () => true;
+  h.send({ type: "session", action: "compact" });
+  await until(() => h.calls.length === 1, "compact");
+  h.calls[0][1].onError(new Error("Nothing to compact (session too small)"));
+  const state = await until(() => h.state().error?.startsWith("Nothing") && h.state(), "error");
+  assert.equal(state.status, "idle");
+});
+
+test("moving in the tree recounts the context and ends the shown turn", async () => {
+  const h = setup();
+  await h.emit("session_start");
+  await h.emit("agent_start");
+  await h.emit("agent_settled");
+  assert.ok((await until(() => h.state().turn && h.state(), "turn")).turn.endedAt);
+  h.ctx.getContextUsage = () => ({ tokens: 300, contextWindow: 200000, percent: 0.1 });
+  h.ctx.sessionManager.getLeafId = () => "e1";
+  await h.emit("session_tree", { newLeafId: "e1" });
+  const state = await until(() => h.state().turn === null && h.state(), "turn cleared");
+  assert.deepEqual(state.context, { tokens: 300, window: 200000 });
+  assert.equal(state.leaf, "e1");
+});
+
+test("list requests write sessions.json and tree.json", async () => {
+  const h = setup();
+  h.entries.push({ id: "u1", parentId: null, type: "message", timestamp: "2026-01-01T00:00:00.000Z", message: { role: "user", content: "hi" } });
+  h.ctx.sessionManager.getTree = () => [{ entry: h.entries[0], children: [], label: "start" }];
+  await h.emit("session_start");
+  await until(() => h.state());
+
+  h.send({ type: "list", what: "sessions" });
+  h.send({ type: "list", what: "tree" });
+  const read = (name: string) => JSON.parse(readFileSync(join(h.dir, name), "utf8"));
+  const sessions = await until(() => read("sessions.json"), "sessions.json");
+  assert.deepEqual(h.listed, [["/home/u/rom", "/sessions"]]);
+  assert.equal(typeof sessions.at, "number");
+  assert.deepEqual(sessions.items, [
+    { path: "/sessions/s.jsonl", title: "AFH check", cwd: "/home/u/rom", modified: 2000, messages: 4, current: true },
+    { path: "/sessions/o.jsonl", title: "fix the bug", cwd: "/home/u/rom", modified: 1000, messages: 2, current: false },
+  ]);
+  const tree = await until(() => read("tree.json"), "tree.json");
+  assert.equal(tree.leaf, "u1");
+  assert.deepEqual(tree.items, [
+    { id: "u1", parentId: null, role: "user", text: "hi", timestamp: Date.parse("2026-01-01T00:00:00.000Z"), active: true, label: "start" },
+  ]);
 });

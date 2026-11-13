@@ -3,6 +3,7 @@ import test, { afterEach, mock } from "node:test";
 
 import { ICONS } from "../format.ts";
 import extension, { STATUS_KEYS, USAGE_EVENT, providerForModel } from "../index.ts";
+import { setCopilotCreditCap } from "../providers/copilot.ts";
 
 const realFetch = globalThis.fetch;
 const realEnv = { HOME: process.env.HOME, GITHUB_TOKEN: process.env.GITHUB_TOKEN };
@@ -171,15 +172,15 @@ test("copilot shows the running prompt estimate and keeps it after the prompt", 
   assert.equal(h.statuses.has(STATUS_KEYS.extra), false);
 
   await h.emit("agent_start");
-  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~0cr`);
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~0cr $0.00`);
   await h.emit("turn_end", { message: { usage: { cost: { total: 0.178 } } } });
-  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~17.8cr`);
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~17.8cr $0.18`);
   await h.emit("turn_end", { message: { usage: { cost: { total: 0.023 } } } });
   await h.emit("agent_end");
-  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~20.1cr`);
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~20.1cr $0.20`);
 
   await h.emit("agent_start");
-  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~0cr`);
+  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} ~0cr $0.00`);
 });
 
 test("copilot reads the credit cap from settings.json", async () => {
@@ -212,7 +213,7 @@ test("copilot polls for late-booked usage until shutdown", async () => {
   await h.emit("session_start");
   assert.equal(h.fetches(), 1);
 
-  mock.timers.tick(90_000);
+  mock.timers.tick(30_000);
   await settle();
   assert.equal(h.fetches(), 1);
 
@@ -224,4 +225,99 @@ test("copilot polls for late-booked usage until shutdown", async () => {
   mock.timers.tick(600_000);
   await settle();
   assert.equal(h.fetches(), 2);
+});
+
+test("plain statuses carry the window label, percent and time left; the footer is unchanged", async () => {
+  mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-10T10:00:00Z") });
+  const h = setup({
+    five_hour: { utilization: 42.25, resets_at: "2026-10-10T12:10:00Z" },
+    seven_day: { utilization: 3, resets_at: "2026-10-13T10:00:00Z" },
+    extra_usage: { is_enabled: false },
+  });
+  h.ctx.ui.theme.fg = (color: string, text: string) => `<${color}>${text}</>`;
+  await h.emit("session_start");
+
+  const at = (iso: string) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  const day = (iso: string) => {
+    const d = new Date(iso);
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  assert.deepEqual(Object.fromEntries(h.statuses), {
+    [STATUS_KEYS.primary]: `<success>${ICONS.hours} </><success>███</><dim>░░░░░</><success> 42.3%</>`,
+    [STATUS_KEYS.primaryReset]: `<dim>${ICONS.reset} 2h10m ${at("2026-10-10T12:10:00Z")}</>`,
+    [STATUS_KEYS.secondary]: `<success>${ICONS.week} </><success>█</><dim>░░░░░░░</><success> 3%</>`,
+    [STATUS_KEYS.secondaryReset]: `<dim>${ICONS.reset} 3d ${day("2026-10-13T10:00:00Z")}</>`,
+    [STATUS_KEYS.extra]: `<dim>${ICONS.money} </><warning>off</>`,
+  });
+  assert.deepEqual(
+    h.events.at(-1)!.data.map(({ text, ...meta }: any) => meta),
+    [
+      { key: STATUS_KEYS.primary, label: "5h", resets: "2h 10m", percent: 42.3 },
+      { key: STATUS_KEYS.primaryReset, label: "5h", resets: "2h 10m" },
+      { key: STATUS_KEYS.secondary, label: "Week", resets: "3d", percent: 3 },
+      { key: STATUS_KEYS.secondaryReset, label: "Week", resets: "3d" },
+      { key: STATUS_KEYS.extra, label: "Extra" },
+    ]
+  );
+});
+
+test("copilot statuses carry the figures after the bar and the warning tones", async () => {
+  const h = setupCopilot();
+  await h.emit("session_start");
+  const primary = h.events.at(-1)!.data.find((item: any) => item.key === STATUS_KEYS.primary);
+  assert.equal(primary.label, "Month");
+  assert.equal(primary.detail, "14.8k/27.5k");
+  assert.equal(primary.tone, undefined);
+  assert.equal(primary.note, undefined);
+});
+
+test("every provider is polled every minute, countdowns redrawn every 30 s", async () => {
+  mock.timers.enable({ apis: ["Date", "setInterval"], now: Date.parse("2026-10-10T10:00:00Z") });
+  const h = setup({ five_hour: { utilization: 42, resets_at: "2026-10-10T12:10:20Z" } });
+  await h.emit("session_start");
+  assert.equal(h.fetches(), 1);
+  const resets = () => h.events.at(-1)!.data.find((item: any) => item.key === STATUS_KEYS.primary).resets;
+  assert.equal(resets(), "2h 11m");
+
+  mock.timers.tick(30_000);
+  await settle();
+  assert.equal(h.fetches(), 1);
+  assert.equal(resets(), "2h 10m");
+
+  mock.timers.tick(30_000);
+  await settle();
+  assert.equal(h.fetches(), 2);
+
+  await h.emit("session_shutdown");
+});
+
+test("warning tones travel with the figures they colour", async () => {
+  mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-21T00:00:00Z") });
+  process.env.GITHUB_TOKEN = "gho_test";
+  const h = setup({
+    quota_reset_date_utc: "2026-11-01T00:00:00Z",
+    quota_snapshots: { premium_models: { entitlement: 16000, remaining: 1200 } },
+  });
+  h.ctx.model = { provider: "github-copilot", id: "claude-opus-5.5" };
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  process.env.HOME = await mkdtemp(join(tmpdir(), "usage-home-"));
+  await mkdir(join(process.env.HOME, ".pi", "agent"), { recursive: true });
+  await writeFile(join(process.env.HOME, ".pi", "agent", "settings.json"), JSON.stringify({ usage: { copilotCreditCap: 20000 } }));
+  try {
+    await h.emit("session_start");
+    const sent = (key: string) => h.events.at(-1)!.data.find((item: any) => item.key === key);
+    assert.deepEqual(
+      [sent(STATUS_KEYS.primary).tone, sent(STATUS_KEYS.primary).detail],
+      ["error", "14.8k/16k"]
+    );
+    const cap = sent(STATUS_KEYS.secondary);
+    assert.deepEqual([cap.label, cap.tone, cap.detail, cap.note, cap.noteTone], ["Cap", "warning", "14.8k/20k", "→22.9k", "error"]);
+  } finally {
+    setCopilotCreditCap(undefined);
+  }
 });

@@ -7,7 +7,7 @@
 
 import { advance, createCursor, parsePoll, pollArgv } from "./protocol.js";
 import { mergeLive } from "./live.js";
-import { appendLines, createTranscript } from "./transcript.js";
+import { appendLines, createTranscript, moveLeaf } from "./transcript.js";
 
 /**
  * @typedef {object} Chat
@@ -18,11 +18,12 @@ import { appendLines, createTranscript } from "./transcript.js";
  * @property {import("./transcript.js").Turn[]} turns The rows: transcript and live state merged.
  * @property {boolean} live Pi is working or asking.
  * @property {boolean} truncated The file's start was skipped: earlier history is not loaded.
+ * @property {number} epoch Goes up when the conversation is another one: another session, or another branch of it.
  */
 
 /** @returns {Chat} */
 export function createChat() {
-  return { cursor: createCursor(), transcript: createTranscript(), state: null, problem: "missing", turns: [], live: false, truncated: false };
+  return { cursor: createCursor(), transcript: createTranscript(), state: null, problem: "missing", turns: [], live: false, truncated: false, epoch: 0 };
 }
 
 /**
@@ -43,8 +44,15 @@ export function chatPollArgv(chat, terminalId) {
 export function chatReceive(chat, stdout) {
   const poll = parsePoll(stdout);
   const read = advance(chat.cursor, poll);
+  const rebuilds = chat.transcript.rebuilds;
   if (read.reset) chat.transcript = createTranscript(poll.state && poll.state.cwd);
   appendLines(chat.transcript, read.lines);
+  // A tree move adds no entry: Pi's leaf says where the branch ends. Unless the
+  // file holds an entry written after this state (it was read a moment earlier).
+  const leaf = poll.state ? poll.state.leaf : undefined;
+  const transcript = chat.transcript;
+  if (leaf !== undefined && leaf !== transcript.leaf && !(transcript.lastAt > poll.state.updated)) moveLeaf(transcript, leaf);
+  if (read.reset || transcript.rebuilds !== rebuilds) chat.epoch++;
   chat.cursor = read.cursor;
   // state.json is replaced atomically; should one read still be unusable, the
   // state from the poll before is closer to the truth than none.

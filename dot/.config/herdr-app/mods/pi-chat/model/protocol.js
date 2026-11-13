@@ -37,7 +37,7 @@
  * @property {string} sessionId
  * @property {string|null} title
  * @property {string} cwd
- * @property {"idle"|"working"|"asking"} status
+ * @property {"idle"|"working"|"asking"|"compacting"} status
  * @property {number} entries
  * @property {ModelRef|null} model
  * @property {string} thinking
@@ -46,7 +46,7 @@
  * @property {{ tokens: number, window: number|null }|null} context
  * @property {number|null} cost
  * @property {{ root: string, branch: string }|null} git
- * @property {Array<{ key: string, text: string }>} usage
+ * @property {Array<{ key: string, text: string, label?: string, percent?: number, resets?: string }>} usage
  * @property {{ startedAt: number, endedAt: number|null, steps: LiveStep[] }|null} turn
  * @property {{ text: string, thinking: boolean }|null} stream
  * @property {{ id: string, question: string, options: Array<{ label: string, description?: string }>, multi: boolean }|null} ask
@@ -116,6 +116,29 @@ const INBOX_SCRIPT = oneLine([
   `rm -f "$t.b64" "$t.tmp";`,
   `exit $r`,
 ]);
+
+// $1 terminal id, $2 file name without ".json", $3 the command as base64, $4 the file the command makes Pi write.
+// Drops the command into inbox/, then prints that file once it changed; exits 3 when it did not within 5 s.
+const ASK_SCRIPT = oneLine([
+  `${STATE_DIR};`,
+  `f="$d/$4";`,
+  `o=$(cksum <"$f" 2>/dev/null);`,
+  `t="$d/.inbox-$2";`,
+  `mkdir -p "$d/inbox" && printf '%s' "$3" | base64 -d >"$t.tmp" && mv "$t.tmp" "$d/inbox/$2.json" || { rm -f "$t.tmp"; exit 1; };`,
+  `i=0;`,
+  `while [ $i -lt 25 ]; do`,
+  `sleep 0.2;`,
+  `n=$(cksum <"$f" 2>/dev/null);`,
+  `if [ -n "$n" ] && [ "$n" != "$o" ]; then cat "$f"; exit 0; fi;`,
+  `i=$((i + 1));`,
+  `done;`,
+  `exit 3`,
+]);
+
+// $1 terminal id, $2 a file of the state directory.
+const READ_SCRIPT = `${STATE_DIR}; cat "$d/$2"`;
+
+const ANSWERS = { sessions: "sessions.json", tree: "tree.json" };
 
 /**
  * Splits a terminal address: "1-wsl/t7" is machine "1-wsl", id "t7".
@@ -244,6 +267,31 @@ export function inboxArgvs(terminalId, command, options = {}) {
     argvs.push(["sh", "-c", INBOX_SCRIPT, "herdr-chat", id, name, data.slice(at, at + B64_PER_COMMAND), end]);
   }
   return argvs;
+}
+
+/**
+ * The command that asks Pi for a list (`list` inbox command) and prints the
+ * file Pi writes in answer: exit 0 with the file, 3 when Pi did not answer in time.
+ * @param {string} terminalId
+ * @param {"sessions"|"tree"} what
+ * @param {{ now?: number, random?: number }} [options] For tests.
+ * @returns {string[]}
+ */
+export function listArgv(terminalId, what, options = {}) {
+  if (!ANSWERS[what]) throw new Error(`no such list: ${what}`);
+  const [argv] = inboxArgvs(terminalId, { type: "list", what }, options);
+  return ["sh", "-c", ASK_SCRIPT, "herdr-chat", argv[4], argv[5], argv[6], ANSWERS[what]];
+}
+
+/**
+ * The command that prints one file of the state directory (`commands.json`).
+ * @param {string} terminalId
+ * @param {string} name
+ * @returns {string[]}
+ */
+export function readArgv(terminalId, name) {
+  if (!/^[a-z]+\.json$/.test(name)) throw new Error(`bad state file: ${name}`);
+  return ["sh", "-c", READ_SCRIPT, "herdr-chat", checkedId(terminalId), name];
 }
 
 /**

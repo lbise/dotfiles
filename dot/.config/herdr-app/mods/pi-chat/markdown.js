@@ -2,13 +2,14 @@
 // with a copy button that shows while the pointer is on the block.
 
 import { div } from "gpui-kit";
-import { TextView, v_flex } from "gpui-base";
+import { Editor, TextView, v_flex } from "gpui-base";
 import { codeFont, icon, mix, monoLine } from "./ui.js";
 
 const FENCE = /```([^\n`]*)\n([\s\S]*?)(?:\n```|$)/g;
 // Pi shows an answer's lines as written; markdown would join them. Two spaces
 // before a line end keep the break.
 const SOFT_BREAK = /([^\n])\n(?=[^\n])/g;
+const LINE = 20; // a code line, px
 /** The text split at its fenced code blocks; a fence still being written runs to the end. */
 function blocks(text) {
   const parts = [];
@@ -16,7 +17,7 @@ function blocks(text) {
   for (const match of text.matchAll(FENCE)) {
     const before = text.slice(at, match.index).trim();
     if (before) parts.push({ code: false, text: before });
-    parts.push({ code: true, text: match[2] });
+    parts.push({ code: true, text: match[2], info: match[1].trim().split(/\s+/)[0].toLowerCase() });
     at = match.index + match[0].length;
   }
   const rest = text.slice(at).trim();
@@ -24,8 +25,10 @@ function blocks(text) {
   return parts;
 }
 
-function codeBlock(t, id, code, pointer) {
+function codeBlock(t, id, code, info, pointer, views) {
   const shows = pointer.hovered === id || pointer.copied === id;
+  const view = views.view(id, code, info);
+  const lines = code.split("\n");
   return div()
     .id(id)
     .relative()
@@ -40,16 +43,18 @@ function codeBlock(t, id, code, pointer) {
       cx.notify();
     })
     .child(
-      v_flex()
-        .id(`${id}-text`)
-        .px(14)
-        .py(12)
-        .overflow_x_scroll()
-        .font_family(codeFont())
-        .text_size(12.5)
-        .line_height(1.6)
-        .text_color(t.foreground)
-        .children(code.split("\n").map((line) => div().flex_none().whitespace_nowrap().child(monoLine(line)))),
+      view
+        ? div().px(14).py(12).child(Editor.new(view).w_full().h(lines.length * LINE))
+        : v_flex()
+            .id(`${id}-text`)
+            .px(14)
+            .py(12)
+            .overflow_x_scroll()
+            .font_family(codeFont())
+            .text_size(12.5)
+            .line_height(LINE / 12.5)
+            .text_color(t.foreground)
+            .children(lines.map((line) => div().flex_none().whitespace_nowrap().child(monoLine(line)))),
     )
     .when(shows, (el) =>
       el.child(
@@ -82,10 +87,11 @@ function codeBlock(t, id, code, pointer) {
  * @param {string} id Unique and stable for this text.
  * @param {string} text Markdown.
  * @param {{ hovered: string|null, copied: string|null, copy: (id: string, code: string, cx: object) => void }} pointer
+ * @param {import("./code.js").CodeViews} views
  */
-export function markdown(t, id, text, pointer) {
+export function markdown(t, id, text, pointer, views) {
   const parts = blocks(text).map((part, index) =>
-    part.code ? codeBlock(t, `${id}-code-${index}`, part.text, pointer) : TextView.markdown(`${id}-text-${index}`, part.text.replace(SOFT_BREAK, "$1  \n")).selectable(true),
+    part.code ? codeBlock(t, `${id}-code-${index}`, part.text, part.info, pointer, views) : TextView.markdown(`${id}-text-${index}`, part.text.replace(SOFT_BREAK, "$1  \n")).selectable(true),
   );
   return v_flex().w_full().gap(12).text_size(15).line_height(1.6).text_color(t.foreground).children(parts);
 }

@@ -9,19 +9,26 @@
  * handler lets an error reach pi: errors end up in state.error.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { type FSWatcher, mkdirSync, readFileSync, watch } from "node:fs";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { existsSync, type FSWatcher, mkdirSync, readFileSync, watch } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 
 import { type AskOption, createAsker, describeAnswer } from "./ask.ts";
 import { type Command, takeInbox } from "./inbox.ts";
+import { type SessionInfo, sessionItems, treeItems } from "./lists.ts";
 import { createPublisher, writeJsonAtomic } from "./publish.ts";
 import { type Step, stepKind, stepLabel } from "./steps.ts";
 
-/** Sent by the usage extension: [{ key, text }] in footer order, plain text. */
+/** Sent by the usage extension: [{ key, text, label?, percent?, resets?, detail?, tone?, note?, noteTone? }] in footer order, plain text. */
 const USAGE_EVENT = "usage:status";
+/**
+ * Pi allows session control (new, resume, tree) only in a command handler, so the inbox runs this
+ * command of its own through sendUserMessage: an extension command runs before anything reaches the
+ * conversation. Not listed in commands.json; typed by hand it does nothing.
+ */
+export const SESSION_COMMAND = "herdr-chat-internal-session";
 const TICK_MS = 1000;
 const MAX_ERROR = 200;
 
@@ -36,6 +43,23 @@ const IMAGE_TYPES: Record<string, string> = {
 const COMMAND_KINDS: Record<string, string> = { skill: "skill", prompt: "prompt", extension: "command" };
 
 type Turn = { startedAt: number; endedAt: number | null; steps: Step[] };
+type UsageEntry = {
+  key: string;
+  text: string;
+  label?: string;
+  percent?: number;
+  resets?: string;
+  detail?: string;
+  tone?: string;
+  note?: string;
+  noteTone?: string;
+};
+
+/** Pi's SessionManager.list(), loaded when needed: plain `node --test` cannot import pi. */
+async function listSessions(cwd: string, sessionDir: string): Promise<SessionInfo[]> {
+  const { SessionManager } = await import("@earendil-works/pi-coding-agent");
+  return SessionManager.list(cwd, sessionDir);
+}
 
 /**
  * Whether another pi started this process. Pi sets PI_CODING_AGENT=true in its own environment
@@ -93,19 +117,24 @@ export default function (pi: ExtensionAPI) {
 }
 
 /** Wires the extension to the state directory `dir`. Nothing is written until a session with a UI starts. */
-export function activate(pi: ExtensionAPI, dir: string) {
+export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions) {
   const inboxDir = join(dir, "inbox");
 
   /** Set while a session with a UI runs; everything else is a no-op without it. */
   let ctx: ExtensionContext | undefined;
   let error: string | null = null;
   let working = false;
+  /** A compaction, or a branch summary of the inbox's tree command, runs. */
+  let compacting = false;
+  /** The inbox's session command, waiting for SESSION_COMMAND to run it. */
+  let pending: { command: Command; resolve: () => void; reject: (err: unknown) => void } | undefined;
   let turn: Turn | null = null;
   let streaming: { message: unknown; thinking: boolean } | null = null;
-  let usage: { key: string; text: string }[] = [];
+  let usage: UsageEntry[] = [];
   let git: { root: string; branch: string } | null = null;
   // Derived from the session entries, recomputed only when their number changes.
   let entries = -1;
+  let stale = false; // the branch moved: context and cost need a recount though entries did not change
   let cost: number | null = null;
   let context: { tokens: number | null; window: number | null } = { tokens: null, window: null };
 
@@ -134,9 +163,11 @@ export function activate(pi: ExtensionAPI, dir: string) {
   function build() {
     const c = ctx!;
     const all = c.sessionManager.getEntries();
-    if (all.length !== entries) {
+    if (all.length !== entries || stale) {
       entries = all.length;
-      const total = all.reduce((sum, entry: any) => sum + (entry.message?.role === "assistant" ? (entry.message.usage?.cost?.total ?? 0) : 0), 0);
+      stale = false;
+      // As Pi's session stats: messages, compactions, branch summaries and usage entries carry usage.
+      const total = all.reduce((sum, entry: any) => sum + ((entry.type === "message" ? entry.message : entry).usage?.cost?.total ?? 0), 0);
       cost = Math.round(total * 1e4) / 1e4;
       const used = c.getContextUsage();
       context = { tokens: used?.tokens ?? null, window: used?.contextWindow ?? null };
@@ -150,8 +181,9 @@ export function activate(pi: ExtensionAPI, dir: string) {
       sessionId: c.sessionManager.getSessionId(),
       title: c.sessionManager.getSessionName() ?? null,
       cwd: c.cwd,
-      status: asker.current() ? "asking" : working ? "working" : "idle",
+      status: asker.current() ? "asking" : compacting ? "compacting" : working ? "working" : "idle",
       entries,
+      leaf: c.sessionManager.getLeafId() ?? null,
       model: c.model ? modelRef(c.model) : null,
       thinking: pi.getThinkingLevel(),
       models: (scoped.length ? scoped.map((s) => s.model) : c.modelRegistry.getAvailable()).map(modelRef),
@@ -220,8 +252,79 @@ export function activate(pi: ExtensionAPI, dir: string) {
       case "draft":
         c.ui.setEditorText(typeof command.text === "string" ? command.text : "");
         return;
+      case "session":
+        if (working || compacting || !c.isIdle()) throw new Error(`session: wait, Pi is ${compacting ? "compacting" : "working"}`);
+        if (command.action === "compact") {
+          // ctx.compact() needs no command context; it reports through its callbacks.
+          compacting = true;
+          c.compact({
+            customInstructions: typeof command.instructions === "string" && command.instructions.trim() ? command.instructions.trim() : undefined,
+            onComplete: () => {
+              compacting = false;
+              if (ctx) publisher.schedule();
+            },
+            onError: (err) => {
+              compacting = false;
+              fail(err);
+            },
+          });
+          return;
+        }
+        if (!["new", "resume", "tree", "reload"].includes(command.action as string)) throw new Error(`session: unknown action ${command.action}`);
+        if (command.action === "resume" && !(typeof command.path === "string" && command.path.endsWith(".jsonl") && existsSync(command.path))) {
+          throw new Error(`session: no session file ${command.path}`);
+        }
+        if (command.action === "tree" && !(typeof command.entryId === "string" && c.sessionManager.getEntry(command.entryId))) {
+          throw new Error(`session: no entry ${command.entryId}`);
+        }
+        await new Promise<void>((resolve, reject) => {
+          pending = { command, resolve, reject };
+          pi.sendUserMessage(`/${SESSION_COMMAND}`, { expandPromptTemplates: true });
+        });
+        return;
+      case "list":
+        if (command.what === "sessions") {
+          const sm = c.sessionManager;
+          const items = sessionItems(await sessions(sm.getCwd(), sm.getSessionDir()), sm.getSessionFile());
+          writeJsonAtomic(join(dir, "sessions.json"), { v: 1, at: Date.now(), items });
+        } else if (command.what === "tree") {
+          const sm = c.sessionManager;
+          const leaf = sm.getLeafId();
+          writeJsonAtomic(join(dir, "tree.json"), { v: 1, at: Date.now(), leaf, items: treeItems(sm.getTree(), leaf, c.cwd) });
+        } else {
+          throw new Error(`list: unknown list ${command.what}`);
+        }
+        return;
       default:
         throw new Error(`unknown command type ${command.type}`);
+    }
+  }
+
+  /** Runs a session command with the command context only SESSION_COMMAND gets. */
+  async function sessionCommand(command: Command, c: ExtensionCommandContext) {
+    const cancelled = (result: { cancelled: boolean }) => {
+      if (result.cancelled) throw new Error(`session: ${command.action} was cancelled`);
+    };
+    switch (command.action) {
+      case "reload":
+        // As /reload: this instance shuts down and the reloaded one takes over state.json.
+        await c.reload();
+        return;
+      case "new":
+        return cancelled(await c.newSession());
+      case "resume":
+        return cancelled(await c.switchSession(command.path as string));
+      case "tree": {
+        const id = command.entryId as string;
+        if (id === c.sessionManager.getLeafId()) return; // already there, as in /tree
+        const summarize = command.summarize === true;
+        if (summarize) compacting = true;
+        try {
+          return cancelled(await c.navigateTree(id, { summarize }));
+        } finally {
+          compacting = false;
+        }
+      }
     }
   }
 
@@ -241,6 +344,7 @@ export function activate(pi: ExtensionAPI, dir: string) {
           if (!ctx) return;
           try {
             await run(command, ctx);
+            if (!ctx) return; // the session was replaced: the new instance publishes
             error = null;
             publisher.schedule();
           } catch (err) {
@@ -326,9 +430,36 @@ export function activate(pi: ExtensionAPI, dir: string) {
     });
   }
 
+  pi.registerCommand(SESSION_COMMAND, {
+    description: "Internal to herdr-chat: runs the Herdr app's session commands. Does nothing when typed",
+    handler: async (_args, c) => {
+      const job = pending;
+      pending = undefined;
+      if (!job) return;
+      try {
+        await sessionCommand(job.command, c);
+        job.resolve();
+      } catch (err) {
+        job.reject(err);
+      }
+    },
+  });
+
   pi.events.on(USAGE_EVENT, (data) => {
     if (!Array.isArray(data)) return;
-    usage = data.filter((item) => typeof item?.key === "string" && typeof item?.text === "string").map(({ key, text }) => ({ key, text }));
+    usage = data
+      .filter((item) => typeof item?.key === "string" && typeof item?.text === "string")
+      .map(({ key, text, label, percent, resets, detail, tone, note, noteTone }): UsageEntry => ({
+        key,
+        text,
+        ...(typeof label === "string" && { label }),
+        ...(Number.isFinite(percent) && { percent }),
+        ...(typeof resets === "string" && { resets }),
+        ...(typeof detail === "string" && { detail }),
+        ...(typeof tone === "string" && { tone }),
+        ...(typeof note === "string" && { note }),
+        ...(typeof noteTone === "string" && { noteTone }),
+      }));
     if (ctx) publisher.schedule();
   });
 
@@ -340,7 +471,7 @@ export function activate(pi: ExtensionAPI, dir: string) {
     registerAskTool();
     writeJsonAtomic(join(dir, "commands.json"), {
       v: 1,
-      commands: pi.getCommands().map((command) => ({
+      commands: pi.getCommands().filter((command) => command.name !== SESSION_COMMAND).map((command) => ({
         name: command.name,
         description: command.description ?? "",
         kind: COMMAND_KINDS[command.source] ?? "command",
@@ -430,8 +561,19 @@ export function activate(pi: ExtensionAPI, dir: string) {
     if (event.message?.role === "assistant") streaming = null;
   });
 
+  // Automatic compactions too; the manual ones of the inbox set the flag earlier.
+  on("session_before_compact", () => void (compacting = true));
+  on("session_compact", () => void (compacting = false));
+  on("session_compact_failed", () => void (compacting = false));
+
+  // The branch moved: the last turn may be on the branch left, and context and cost change.
+  on("session_tree", () => {
+    stale = true;
+    if (!working) turn = null;
+  });
+
   // Nothing to track, but the state they change should go out at once.
-  for (const event of ["turn_end", "model_select", "thinking_level_select", "session_info_changed", "session_compact", "session_tree"]) {
+  for (const event of ["turn_end", "model_select", "thinking_level_select", "session_info_changed"]) {
     on(event);
   }
 }

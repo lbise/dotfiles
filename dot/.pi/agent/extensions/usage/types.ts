@@ -7,6 +7,8 @@ export type Segment = { text: string; tone?: Tone; bold?: boolean };
 export type UsageWindow = {
   /** Nerd Font glyph shown before the bar; see ICONS and windowIcon(). */
   icon: string;
+  /** Window name for plain-text consumers: "5h", "Week", "Month"; see windowLabel(). */
+  label?: string;
   usedPercent: number;
   /** Epoch milliseconds. */
   resetsAt?: number;
@@ -26,6 +28,8 @@ export type UsageSnapshot = {
   secondary?: UsageWindow;
   /** Shown in place of the primary window when the provider reports none (e.g. "unlimited"). */
   summary?: Segment[];
+  /** Name of what the summary measures, e.g. "Month". */
+  summaryLabel?: string;
   /** Provider-specific extras: credits balance, extra usage, ... Rendered after a money icon. */
   extra?: Segment[];
 };
@@ -59,13 +63,10 @@ export interface UsageProvider {
   /** Display name for errors and notifications. */
   name: string;
   cacheTtlMs: number;
+  /** Name of what snapshot.extra shows, e.g. "Credits". */
+  extraLabel?: string;
   fetchUsage(auth: AuthSource): Promise<UsageSnapshot>;
   /** Update usage from provider response headers without an extra request. */
   usageFromHeaders?(headers: Record<string, string>, previous: UsageSnapshot | null): UsageSnapshot | null;
   createPromptTracker?(): PromptTracker;
-  /**
-   * Re-fetch at this interval even between prompts, for providers that book
-   * usage with a delay.
-   */
-  pollIntervalMs?: number;
 }
