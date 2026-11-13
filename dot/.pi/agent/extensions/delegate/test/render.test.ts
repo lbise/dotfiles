@@ -1,23 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BackgroundTaskPool } from "../background.ts";
 import {
   BackgroundTasksWidget,
   createDelegateRenderer,
-  createDelegateResultRenderer,
   renderBackgroundTasks,
   renderDelegateCompletion,
 } from "../render.ts";
-import type { RunTaskRequest, TaskProgress, TaskResult } from "../runner.ts";
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise;
-  });
-  return { promise, resolve };
-}
+import type { TaskProgress } from "../runner.ts";
 
 function progress(overrides: Partial<TaskProgress> = {}): TaskProgress {
   return {
@@ -35,16 +25,11 @@ const theme = {
   bold: (value: string) => value,
 } as any;
 
-const request = {
-  agent: { name: "explore" },
-  title: "Inspect code",
-} as RunTaskRequest;
-
 function renderRow(renderer: ReturnType<typeof createDelegateRenderer>, state: object, initial: TaskProgress) {
   let invalidations = 0;
   const invalidate = () => { invalidations += 1; };
   const row = renderer.renderCall(
-    { title: initial.title, subagent_type: initial.agent, mode: "background" },
+    { title: initial.title, subagent_type: initial.agent, run_in_background: true },
     theme,
     { state, executionStarted: true, invalidate },
   );
@@ -53,7 +38,7 @@ function renderRow(renderer: ReturnType<typeof createDelegateRenderer>, state: o
     { expanded: false, isPartial: false },
     theme,
     {
-      args: { title: initial.title, subagent_type: initial.agent, mode: "background" },
+      args: { title: initial.title, subagent_type: initial.agent, run_in_background: true },
       state,
       isError: false,
       invalidate,
@@ -65,47 +50,6 @@ function renderRow(renderer: ReturnType<typeof createDelegateRenderer>, state: o
     dispose: () => (row as { dispose?(): void }).dispose?.(),
   };
 }
-
-test("delegate_result renders a compact result without exposing the task envelope", () => {
-  const renderer = createDelegateResultRenderer();
-  const rendererState = {};
-  const args = { task_id: "task-123", mode: "wait" };
-  const row = renderer.renderCall(args, theme, {
-    state: rendererState,
-    executionStarted: true,
-    invalidate: () => {},
-  });
-  renderer.renderResult(
-    {
-      content: [{
-        type: "text",
-        text: '<task id="task-123" state="completed" background="true">\ndone\n</task>',
-      }],
-      details: {
-        status: "completed",
-        taskId: "task-123",
-        agent: "explore",
-        title: "Inspect code",
-        settled: true,
-      },
-    },
-    { expanded: false, isPartial: false },
-    theme,
-    {
-      args,
-      state: rendererState,
-      isError: false,
-      invalidate: () => {},
-    },
-  );
-
-  const lines = row.render(120);
-  const text = lines.join("\n");
-  assert.doesNotMatch(text, /<\/?task/);
-  assert.match(text, /done/);
-  assert.match(text, /completed/);
-  assert.ok(lines[0].length < 120, "short delegate_result content should not produce a full-width border");
-});
 
 test("a completed delegate message fits its border to short content", () => {
   const component = renderDelegateCompletion(
@@ -139,38 +83,18 @@ test("a finalized background delegate row keeps animating while its task runs", 
   }
 });
 
-test("background progress updates both the summary and original delegate row through completion", async () => {
-  const completion = deferred<TaskResult>();
+test("background progress updates both the summary and original delegate row through completion", () => {
   const renderer = createDelegateRenderer();
-  let emitProgress: ((value: TaskProgress) => void) | undefined;
-  let summary: string[] = [];
-  const pool = new BackgroundTaskPool({
-    maxConcurrent: 1,
-    runTask: async (_request, onProgress, onStarted) => {
-      emitProgress = onProgress;
-      onStarted?.(progress());
-      return completion.promise;
-    },
-    onSettled: (event) => renderer.updateBackgroundTask(event.progress, event.error),
-    onChange: () => {
-      const tasks = pool.list();
-      for (const task of tasks) renderer.updateBackgroundTask(task);
-      summary = renderBackgroundTasks(tasks, theme);
-    },
-  });
-
-  const started = await pool.start(request);
+  const started = progress();
   const rendererState = {};
   const rendered = renderRow(renderer, rendererState, started);
   try {
-    emitProgress?.(progress({ currentTool: "read", activity: ["started read"] }));
-    assert.match(summary.join("\n"), /reading/);
+    const reading = progress({ currentTool: "read", activity: ["started read"] });
+    renderer.updateBackgroundTask(reading);
+    assert.match(renderBackgroundTasks([reading], theme).join("\n"), /reading/);
     assert.match(rendered.row.render(100).join("\n"), /reading/);
 
-    completion.resolve({ ...progress({ status: "completed" }), output: "done" });
-    await completion.promise;
-    await new Promise((resolve) => setImmediate(resolve));
-
+    renderer.updateBackgroundTask(progress({ status: "completed" }));
     // Pi rebuilds the tool row from its persisted "background started" result
     // whenever the row invalidates. The detached completion must win over it.
     renderer.renderResult(
@@ -178,7 +102,7 @@ test("background progress updates both the summary and original delegate row thr
       { expanded: false, isPartial: false },
       theme,
       {
-        args: { title: started.title, subagent_type: started.agent, mode: "background" },
+        args: { title: started.title, subagent_type: started.agent, run_in_background: true },
         state: rendererState,
         isError: false,
         invalidate: () => {},

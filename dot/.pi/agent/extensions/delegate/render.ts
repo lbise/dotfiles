@@ -40,10 +40,13 @@ type RoundedBoxOptions = {
 };
 
 class RoundedBox implements Component {
-  constructor(
-    private readonly options: RoundedBoxOptions,
-    private readonly theme: Theme,
-  ) {}
+  private readonly options: RoundedBoxOptions;
+  private readonly theme: Theme;
+
+  constructor(options: RoundedBoxOptions, theme: Theme) {
+    this.options = options;
+    this.theme = theme;
+  }
 
   render(availableWidth: number): string[] {
     const width = this.options.fitContent
@@ -80,14 +83,14 @@ function agentIcon(agent: string): string {
 function statusIcon(status: string): string {
   if (status === "completed") return "󰄬";
   if (status === "failed") return "󰅖";
-  if (status === "aborted") return "󰜺";
+  if (status === "aborted" || status === "interrupted") return "󰜺";
   if (status === "queued") return "󰔛";
   return "󰑮";
 }
 
 function statusColor(status: string): HeaderColor {
   if (status === "completed") return "success";
-  if (status === "failed" || status === "aborted") return "error";
+  if (status === "failed" || status === "aborted" || status === "interrupted") return "error";
   return "warning";
 }
 
@@ -231,11 +234,12 @@ export class BackgroundTasksWidget implements Component {
   #spinnerFrame = 0;
   readonly #spinnerTimer: ReturnType<typeof setInterval>;
 
-  constructor(
-    private readonly tasks: readonly TaskProgress[],
-    private readonly theme: Theme,
-    requestRender: () => void,
-  ) {
+  private readonly tasks: readonly TaskProgress[];
+  private readonly theme: Theme;
+
+  constructor(tasks: readonly TaskProgress[], theme: Theme, requestRender: () => void) {
+    this.tasks = tasks;
+    this.theme = theme;
     this.#spinnerTimer = setInterval(() => {
       this.#spinnerFrame = (this.#spinnerFrame + 1) % SPINNER_FRAMES.length;
       requestRender();
@@ -263,13 +267,19 @@ type BackgroundTaskDetail = {
 export class BackgroundTaskDetailOverlay implements Focusable {
   focused = false;
 
-  constructor(
-    private readonly shortcut: string,
-    private readonly theme: Theme,
-    private readonly task: () => BackgroundTaskDetail | undefined,
-    private readonly done: (result: void) => void,
-    private readonly onDispose: () => void,
-  ) {}
+  private readonly shortcut: string;
+  private readonly theme: Theme;
+  private readonly task: () => BackgroundTaskDetail | undefined;
+  private readonly done: (result: void) => void;
+  private readonly onDispose: () => void;
+
+  constructor(shortcut: string, theme: Theme, task: () => BackgroundTaskDetail | undefined, done: (result: void) => void, onDispose: () => void) {
+    this.shortcut = shortcut;
+    this.theme = theme;
+    this.task = task;
+    this.done = done;
+    this.onDispose = onDispose;
+  }
 
   handleInput(data: string): void {
     if (
@@ -329,11 +339,10 @@ class DelegateToolRow implements Component {
   #result?: { result: RenderResult; options: RenderOptions; isError: boolean };
   #backgroundTaskId?: string;
 
-  constructor(
-    args: Record<string, unknown>,
-    theme: Theme,
-    private readonly backgroundTasks: BackgroundDelegateRenderState,
-  ) {
+  private readonly backgroundTasks: BackgroundDelegateRenderState;
+
+  constructor(args: Record<string, unknown>, theme: Theme, backgroundTasks: BackgroundDelegateRenderState) {
+    this.backgroundTasks = backgroundTasks;
     this.#args = args;
     this.#theme = theme;
   }
@@ -424,9 +433,10 @@ class DelegateToolRow implements Component {
 
   render(width: number): string[] {
     const agent = typeof this.#args.subagent_type === "string" ? this.#args.subagent_type : "delegate";
-    const mode = this.#args.mode === "background" ? "background" : "foreground";
     const title = typeof this.#args.title === "string" ? this.#args.title : "...";
     const details = this.#result?.result.details as DelegateResultDetails | undefined;
+    const background = details?.background ?? (this.#args.run_in_background !== false && this.#args.mode !== "foreground");
+    const mode = background ? "background" : "foreground";
     const status = details?.status ?? (
       this.#result?.isError ? "failed" :
       this.#result ? (this.#result.options.isPartial ? "running" : "completed") :
@@ -485,75 +495,6 @@ class DelegateToolRow implements Component {
   }
 }
 
-type DelegateResultRenderState = { row?: DelegateResultToolRow };
-
-class DelegateResultToolRow implements Component {
-  #args: Record<string, unknown>;
-  #theme: Theme;
-  #executionStarted = false;
-  #result?: { result: RenderResult; options: RenderOptions; isError: boolean };
-
-  constructor(args: Record<string, unknown>, theme: Theme) {
-    this.#args = args;
-    this.#theme = theme;
-  }
-
-  updateCall(args: Record<string, unknown>, theme: Theme, executionStarted: boolean): void {
-    this.#args = args;
-    this.#theme = theme;
-    this.#executionStarted = executionStarted;
-  }
-
-  updateResult(result: RenderResult, options: RenderOptions, theme: Theme, isError: boolean): void {
-    this.#result = { result, options, isError };
-    this.#theme = theme;
-  }
-
-  render(width: number): string[] {
-    const mode = this.#args.mode === "wait" ? "wait" : "poll";
-    const details = this.#result?.result.details as DelegateResultDetails | undefined;
-    const taskId = details?.taskId ?? (typeof this.#args.task_id === "string" ? this.#args.task_id : "...");
-    const status = details?.status ?? (this.#result?.isError ? "failed" : this.#executionStarted ? "running" : "queued");
-    const agent = details?.agent;
-    const title = details?.title;
-    const lines: string[] = [];
-
-    if (agent || title) {
-      lines.push(this.#theme.fg("dim", `${agentIcon(agent ?? "delegate")} ${agent ?? "delegate"}${title ? ` · ${title}` : ""}`));
-    }
-
-    if (!this.#result) {
-      const action = mode === "wait" ? "waiting for task" : "checking task";
-      lines.push(this.#theme.fg("warning", `${statusIcon("running")} ${action}`));
-    } else {
-      lines.push(this.#theme.fg(statusColor(status), `${statusIcon(status)} ${status}`));
-      const output = details?.output || stripTaskEnvelope(resultText(this.#result.result.content));
-      if (output) {
-        const outputLines = new Markdown(output, 0, 0, getMarkdownTheme()).render(1_000);
-        const visibleOutput = this.#result.options.expanded ? outputLines : outputLines.slice(0, 6);
-        lines.push("", ...visibleOutput);
-        if (!this.#result.options.expanded && outputLines.length > visibleOutput.length) {
-          lines.push(this.#theme.fg("muted", "… expand to see the full result"));
-        }
-      }
-      if (details?.error) lines.push("", this.#theme.fg("error", details.error));
-      const usage = usageText(details ?? {});
-      if (usage) lines.push("", this.#theme.fg("dim", `󰍛 ${usage}`));
-    }
-
-    lines.push(this.#theme.fg("dim", `󰆧 ${taskId}`));
-    const boxTitle = `󰆍 delegate result · ${mode}`;
-    return new RoundedBox({
-      title: boxTitle,
-      titleColor: this.#result?.isError ? "error" : statusColor(status),
-      lines,
-      fitContent: true,
-    }, this.#theme).render(width);
-  }
-
-  invalidate(): void {}
-}
-
 class EmptyComponent implements Component {
   render(): string[] {
     return [];
@@ -564,37 +505,6 @@ class EmptyComponent implements Component {
 
 function state(value: unknown): DelegateRenderState {
   return value as DelegateRenderState;
-}
-
-function resultState(value: unknown): DelegateResultRenderState {
-  return value as DelegateResultRenderState;
-}
-
-export function createDelegateResultRenderer() {
-  return {
-    renderCall(args: Record<string, unknown>, theme: Theme, context: {
-      state: unknown;
-      executionStarted: boolean;
-      invalidate: () => void;
-    }): Component {
-      const rendererState = resultState(context.state);
-      const row = rendererState.row ??= new DelegateResultToolRow(args, theme);
-      row.updateCall(args, theme, context.executionStarted);
-      return row;
-    },
-
-    renderResult(
-      result: RenderResult,
-      options: RenderOptions,
-      theme: Theme,
-      context: { args: Record<string, unknown>; state: unknown; isError: boolean; invalidate: () => void },
-    ): Component {
-      const rendererState = resultState(context.state);
-      const row = rendererState.row ??= new DelegateResultToolRow(context.args, theme);
-      row.updateResult(result, options, theme, context.isError);
-      return new EmptyComponent();
-    },
-  };
 }
 
 export function createDelegateRenderer() {

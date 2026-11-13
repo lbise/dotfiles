@@ -10,11 +10,12 @@ const task = {
   subagent_type: "explore",
 };
 
-test("delegate defaults to foreground when mode is omitted", () => {
+test("delegate accepts a call without run_in_background", () => {
   assert.equal(Check(DelegateParameters, task), true);
 });
 
-test("delegate still accepts explicit foreground and background modes", () => {
-  assert.equal(Check(DelegateParameters, { ...task, mode: "foreground" }), true);
-  assert.equal(Check(DelegateParameters, { ...task, mode: "background" }), true);
+test("delegate accepts run_in_background either way and rejects other types", () => {
+  assert.equal(Check(DelegateParameters, { ...task, run_in_background: false }), true);
+  assert.equal(Check(DelegateParameters, { ...task, run_in_background: true }), true);
+  assert.equal(Check(DelegateParameters, { ...task, run_in_background: "yes" }), false);
 });

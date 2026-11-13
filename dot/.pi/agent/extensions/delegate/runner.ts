@@ -17,7 +17,7 @@ import { resolveResumeSession, taskAgentName, taskSessionName } from "./sessions
 
 const MAX_ACTIVITY = 8;
 
-export type TaskStatus = "queued" | "running" | "completed" | "failed" | "aborted";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "aborted" | "interrupted";
 export type TaskProgress = {
   status: TaskStatus;
   taskId: string;

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
@@ -14,19 +15,21 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { discoverAgents, type TaskAgent } from "./agents.ts";
 import { configureAgents } from "./config.ts";
-import { completionDeliveryOptions, type ParentActivity } from "./delivery.ts";
 import {
-  BackgroundTaskPool,
-  type BackgroundTaskEvent,
-  type BackgroundTaskSnapshot,
-} from "./background.ts";
-import { DelegateParameters, DelegateResultParameters } from "./parameters.ts";
+  COMPLETION_TYPE,
+  completionText,
+  type EndedRecord,
+  interruptedRecord,
+  LEDGER_TYPE,
+  reconcile,
+  type StartedRecord,
+} from "./ledger.ts";
+import { DelegateParameters } from "./parameters.ts";
 import { childToolAllowlist } from "./policy.ts";
 import {
   BackgroundTaskDetailOverlay,
   BackgroundTasksWidget,
   createDelegateRenderer,
-  createDelegateResultRenderer,
   renderDelegateCompletion,
 } from "./render.ts";
 import { runTask, type RunTaskRequest, type TaskProgress } from "./runner.ts";
@@ -37,10 +40,9 @@ const extensionDir = dirname(fileURLToPath(import.meta.url));
 const packagedDir = join(extensionDir, "agents");
 const projectConfirmations = new Map<string, Set<string>>();
 const MAX_BACKGROUND_TASKS = 8;
-let sharedBackgroundTasks: BackgroundTaskPool | undefined;
-let backgroundParent: ParentActivity | undefined;
-let backgroundUi: ExtensionContext["ui"] | undefined;
-let backgroundDetailTui: { requestRender(): void } | undefined;
+const SHUTDOWN_WAIT_MS = 5_000;
+/** pi.events channel with the running subagents (foreground and background), for herdr-chat. */
+export const TASKS_EVENT = "delegate:tasks";
 const TASK_SHORTCUTS = ["ctrl+1", "ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5", "ctrl+6", "ctrl+7", "ctrl+8", "ctrl+9", "ctrl+0"] as const;
 type TaskShortcut = typeof TASK_SHORTCUTS[number];
 type TaskShortcutEntry = {
@@ -50,6 +52,19 @@ type TaskShortcutEntry = {
   sessionPath?: string;
   title: string;
   progress?: TaskProgress;
+};
+
+/** A background subagent of this extension instance. Instances never share runs. */
+type Run = {
+  runId: string;
+  toolCallId: string;
+  startedAt: number;
+  controller: AbortController;
+  progress: TaskProgress;
+  /** Set once the child session exists and the ledger has its `started` row. */
+  started?: StartedRecord;
+  rejectStart: (error: Error) => void;
+  done: Promise<void>;
 };
 
 function userAgentsDir(): string {
@@ -62,56 +77,29 @@ function discovery(ctx: { cwd: string; isProjectTrusted(): boolean }) {
   return configureAgents(found, loadDelegateConfiguration(ctx.cwd, projectTrusted));
 }
 
+// Wording follows Claude Code's Agent tool (docs/research/subagents-value-and-execution-modes.md).
 function delegateDescription(agents: TaskAgent[]): string {
   const choices = agents.filter((agent) => !agent.hidden).map((agent) => `- ${agent.name}: ${agent.description}`).join("\n") || "- none";
   return [
-    "Launch a named child agent in its own isolated context window.",
-    "A fresh child receives its prompt and normal project context, but not the parent transcript. A resumed child also retains only its own prior history. Only final results return to the parent.",
-    "Use delegation to keep subtask exploration and tool output out of the parent context.",
-    "The title is human-facing. The prompt is the child's complete instruction and must include the goal, relevant context and constraints, and expected result.",
-    "Choose subagent_type from the names below. User and trusted-project agent definitions may extend or override the packaged general and explore agents.",
-    "Use separate delegate calls for independent work. Do not duplicate delegated work. The child cannot delegate further.",
-    "Delegation defaults to foreground and waits for the child result. Omit mode for normal delegation. Set mode to background only when useful parent work can continue without the result.",
-    "A background call returns only a task_id, not the child result. If it finishes while the parent is running, its result is delivered before the next model call. If the parent has settled, the result starts a follow-up turn. Inspect the <task> body and use or summarize it before claiming the delegated work is complete.",
-    "Do not poll background tasks in a loop. Use delegate_result wait only when a task now blocks progress and its completion message has not arrived; use poll only for a one-off status check.",
+    "Launch a subagent: a named child agent with its own isolated context window. It receives its prompt and normal project context, never your transcript, and returns only its final report.",
+    "**Do not spawn subagents unless the user asks.** Each spawn starts cold and re-derives context you already have. A task with \"multiple angles,\" \"thorough,\" or several parts is not a request to spawn; handle it inline with your own tools. Only use this tool when the user explicitly says to use a subagent, names one of the available agent types, or a skill or AGENTS.md instruction tells you to.",
+    "Subagents run in the background; you'll be notified when one completes. Pass run_in_background: false only when your very next action depends on the result and nothing else could usefully happen while it runs.",
+    "Never fabricate or predict a pending subagent's results. The notification is never something you write yourself; if the user asks before it arrives, say it's still running. Once you have delegated work, don't also do it yourself.",
+    "The subagent's final report is not a reply to the user: relay what matters.",
+    "The prompt is the child's complete instruction: include the goal, relevant context and constraints, and the expected result. The title is a short human-facing label.",
+    "Pass task_id to continue an earlier subagent with its context intact; a call without task_id starts fresh. Subagents cannot spawn subagents.",
     "Available subagents:", choices,
   ].join("\n");
 }
 
-function truncateTaskOutput(output: string, progress: TaskProgress): string {
+function truncateTaskOutput(output: string, sessionPath: string | undefined): string {
   const truncation = truncateHead(output, {
     maxBytes: DEFAULT_MAX_BYTES - 1_024,
     maxLines: DEFAULT_MAX_LINES - 10,
   });
   if (!truncation.truncated) return truncation.content;
-  const location = progress.sessionPath ? ` Full output remains in child session ${progress.sessionPath}.` : "";
+  const location = sessionPath ? ` Full output remains in child session ${sessionPath}.` : "";
   return `${truncation.content}\n\n[Output truncated: ${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}.${location}]`;
-}
-
-function settledTaskText(snapshot: BackgroundTaskSnapshot): string {
-  const state = snapshot.result?.status ?? snapshot.progress.status;
-  const output = truncateTaskOutput(
-    snapshot.result?.output || snapshot.error?.message || (snapshot.settled ? "(no output)" : "Task is still running."),
-    snapshot.progress,
-  );
-  return [
-    `<task id="${snapshot.progress.taskId}" state="${state}" background="true">`,
-    output,
-    "</task>",
-  ].join("\n");
-}
-
-function backgroundCompletionText(event: BackgroundTaskEvent): string {
-  const state = event.result?.status ?? event.progress.status;
-  const output = truncateTaskOutput(
-    event.result?.output || event.error?.message || "(no output)",
-    event.progress,
-  );
-  return [
-    `<task id="${event.progress.taskId}" state="${state}" background="true">`,
-    output,
-    "</task>",
-  ].join("\n");
 }
 
 function parentSessionPath(ctx: ExtensionContext): string | undefined {
@@ -134,25 +122,135 @@ async function confirmProjectAgent(agent: TaskAgent, ctx: ExtensionContext): Pro
   return confirmed;
 }
 
+function copy(progress: TaskProgress): TaskProgress {
+  return { ...progress, activity: [...progress.activity] };
+}
+
 export default function delegateExtension(pi: ExtensionAPI) {
   const activeTaskIds = new Set<string>();
+  const runs = new Map<string, Run>();
+  /** Foreground subagents by tool call id. */
+  const foreground = new Map<string, { startedAt: number; progress: TaskProgress }>();
   const taskShortcuts = new Map<string, Map<TaskShortcut, TaskShortcutEntry>>();
   const delegateRenderer = createDelegateRenderer();
-  const delegateResultRenderer = createDelegateResultRenderer();
+  let ui: ExtensionContext["ui"] | undefined;
+  let detailTui: { requestRender(): void } | undefined;
 
-  function refreshBackgroundWidget(): void {
-    const tasks = backgroundTasks.list();
+  function publishTasks(): void {
+    const live = (id: string, startedAt: number, progress: TaskProgress, background: boolean) => ({
+      id, background, startedAt, taskId: progress.taskId || null, title: progress.title, agent: progress.agent,
+      status: progress.status, sessionPath: progress.sessionPath ?? null, currentTool: progress.currentTool ?? null,
+      model: progress.model ?? null, turns: progress.turns ?? 0, tokens: progress.tokens ?? 0, cost: progress.cost ?? 0,
+    });
+    pi.events.emit(TASKS_EVENT, [
+      ...[...foreground].map(([id, run]) => live(id, run.startedAt, run.progress, false)),
+      ...[...runs.values()].map((run) => live(run.toolCallId, run.startedAt, run.progress, true)),
+    ]);
+  }
+
+  function refreshWidget(): void {
+    publishTasks();
+    const tasks = [...runs.values()].map((run) => copy(run.progress));
     for (const task of tasks) delegateRenderer.updateBackgroundTask(task);
-    if (backgroundUi) {
-      backgroundUi.setWidget(
-        "delegate-background-tasks",
-        tasks.length
-          ? (tui, theme) => new BackgroundTasksWidget(tasks, theme, () => tui.requestRender())
-          : undefined,
-        { placement: "aboveEditor" },
-      );
+    ui?.setWidget(
+      "delegate-background-tasks",
+      tasks.length ? (tui, theme) => new BackgroundTasksWidget(tasks, theme, () => tui.requestRender()) : undefined,
+      { placement: "aboveEditor" },
+    );
+    try { detailTui?.requestRender(); } catch {}
+  }
+
+  /** Puts an ended run in front of the model: at once (a turn when idle) or, on reconcile, stored for the next prompt. */
+  function deliver(ended: EndedRecord, triggerTurn: boolean): void {
+    const output = truncateTaskOutput(ended.output || ended.error || "(no output)", ended.sessionPath);
+    pi.sendMessage(
+      {
+        customType: COMPLETION_TYPE,
+        content: completionText(ended, output),
+        display: true,
+        details: { ...ended, background: true, error: ended.error?.slice(0, 500) },
+      },
+      { deliverAs: "followUp", triggerTurn },
+    );
+  }
+
+  function settle(run: Run, progress: TaskProgress, output?: string, error?: unknown): void {
+    if (runs.get(run.runId) !== run) return; // shutdown already closed it
+    runs.delete(run.runId);
+    const message = error === undefined ? undefined : error instanceof Error ? error.message : String(error);
+    const final = { ...copy(progress), currentTool: undefined };
+    if (final.status === "queued" || final.status === "running") final.status = run.controller.signal.aborted ? "aborted" : "failed";
+    delegateRenderer.updateBackgroundTask(final, message ? new Error(message) : undefined);
+    refreshWidget();
+    if (!run.started) {
+      run.rejectStart(new Error(message ?? "Subagent finished before reporting its task_id"));
+      return;
     }
-    try { backgroundDetailTui?.requestRender(); } catch {}
+    const ended: EndedRecord = {
+      ...run.started, phase: "ended", status: final.status, output, error: message ?? final.error,
+      model: final.model, turns: final.turns, tokens: final.tokens, cost: final.cost,
+    };
+    pi.appendEntry(LEDGER_TYPE, ended);
+    deliver(ended, true);
+  }
+
+  /** Resolves with the child's progress once its session exists; the run then continues on its own. */
+  function startBackground(request: RunTaskRequest, toolCallId: string): Promise<TaskProgress> {
+    if (runs.size >= MAX_BACKGROUND_TASKS) {
+      return Promise.reject(new Error(`Too many background subagents. Maximum: ${MAX_BACKGROUND_TASKS}`));
+    }
+    return new Promise<TaskProgress>((resolveStart, rejectStart) => {
+      const run: Run = {
+        runId: randomUUID(),
+        toolCallId,
+        startedAt: Date.now(),
+        controller: new AbortController(),
+        progress: {
+          status: "queued", taskId: request.taskId ?? "", agent: request.agent.name,
+          title: request.title, shortcut: request.shortcut, activity: [],
+        },
+        rejectStart,
+        done: Promise.resolve(),
+      };
+      runs.set(run.runId, run);
+      refreshWidget();
+      const current = () => runs.get(run.runId) === run;
+      // A parent abort (Esc) must not reach a background child: it gets its own signal.
+      run.done = runTaskWithShortcuts(
+        { ...request, signal: run.controller.signal },
+        (progress) => {
+          if (!current()) return;
+          run.progress = copy(progress);
+          refreshWidget();
+        },
+        (progress) => {
+          if (!current()) return;
+          run.progress = copy(progress);
+          run.started = {
+            runId: run.runId, phase: "started", taskId: progress.taskId, sessionPath: progress.sessionPath,
+            agent: progress.agent, title: progress.title,
+          };
+          pi.appendEntry(LEDGER_TYPE, run.started);
+          resolveStart(copy(progress));
+        },
+      ).then(
+        (result) => settle(run, result, result.output),
+        (error) => settle(run, run.progress, undefined, error),
+      );
+    });
+  }
+
+  function runningTaskIds(): Set<string> {
+    return new Set([...activeTaskIds, ...[...runs.values()].map((run) => run.progress.taskId).filter(Boolean)]);
+  }
+
+  /** Switching away from this session interrupts its background subagents; ask first. */
+  async function confirmLeave(ctx: ExtensionContext): Promise<boolean> {
+    if (runs.size === 0 || !ctx.hasUI) return true;
+    return ctx.ui.confirm(
+      "Interrupt background subagents?",
+      `${runs.size} background subagent${runs.size === 1 ? " is" : "s are"} running. Switching sessions interrupts ${runs.size === 1 ? "it" : "them"}; each can be continued later with its task_id.`,
+    );
   }
 
   function shortcutsFor(parent: string, create = false): Map<TaskShortcut, TaskShortcutEntry> | undefined {
@@ -184,7 +282,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
     if (!entry) return;
     entry.taskId = progress.taskId;
     entry.sessionPath = progress.sessionPath;
-    entry.progress = { ...progress, activity: [...progress.activity] };
+    entry.progress = copy(progress);
   }
 
   function releaseTaskShortcut(parent: string | undefined, key: TaskShortcut | undefined): void {
@@ -210,6 +308,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
       ctx.ui.notify(`${key} is assigned to ${entry.title}, but its session is not ready yet.`, "info");
       return;
     }
+    if (!(await confirmLeave(ctx))) return;
     try {
       await ctx.switchSession(entry.sessionPath);
     } catch (error) {
@@ -230,26 +329,21 @@ export default function delegateExtension(pi: ExtensionAPI) {
       return;
     }
     const snapshot = () => {
-      if (entry.taskId) {
-        const background = backgroundTasks.lookup(entry.taskId);
-        if (background) return background;
-      }
+      const run = [...runs.values()].find((candidate) => entry.taskId && candidate.progress.taskId === entry.taskId);
+      if (run) return { progress: copy(run.progress), settled: false };
       if (!entry.progress) return undefined;
-      return {
-        progress: entry.progress,
-        settled: !["queued", "running"].includes(entry.progress.status),
-      };
+      return { progress: entry.progress, settled: !["queued", "running"].includes(entry.progress.status) };
     };
     await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
-      backgroundDetailTui = tui;
+      detailTui = tui;
       return new BackgroundTaskDetailOverlay(key, theme, snapshot, done, () => {
-        if (backgroundDetailTui === tui) backgroundDetailTui = undefined;
+        if (detailTui === tui) detailTui = undefined;
       });
     }, {
       overlay: true,
       overlayOptions: { anchor: "center", width: "80%", maxHeight: "80%", minWidth: 60 },
     });
-    backgroundDetailTui = undefined;
+    detailTui = undefined;
   }
 
   pi.registerCommand("delegate-open", {
@@ -277,52 +371,24 @@ export default function delegateExtension(pi: ExtensionAPI) {
     onProgress?.(progress);
   }, onStarted);
 
-  const backgroundCallbacks = {
-    onChange: refreshBackgroundWidget,
-    onSettled(event: BackgroundTaskEvent) {
-      activeTaskIds.delete(event.progress.taskId);
-      delegateRenderer.updateBackgroundTask(event.progress, event.error);
-      pi.sendMessage(
-        {
-          customType: "delegate-completion",
-          content: backgroundCompletionText(event),
-          display: true,
-          details: {
-            ...event.progress,
-            background: true,
-            output: event.result?.output,
-            error: event.error?.message.slice(0, 500),
-          },
-        },
-        completionDeliveryOptions(backgroundParent),
-      );
-    },
-  };
-  const backgroundTasks = sharedBackgroundTasks ?? new BackgroundTaskPool({
-    maxConcurrent: MAX_BACKGROUND_TASKS,
-    runTask: runTaskWithShortcuts,
-    ...backgroundCallbacks,
-  });
-  sharedBackgroundTasks = backgroundTasks;
-
-  pi.registerMessageRenderer("delegate-completion", renderDelegateCompletion);
+  pi.registerMessageRenderer(COMPLETION_TYPE, renderDelegateCompletion);
 
   pi.registerTool({
     name: "delegate",
     label: "Delegate",
-    description: "Run a named child agent in an isolated context window so subtask reasoning and tool output do not pollute the parent context. A fresh child receives its prompt plus normal project context; a resumed child also retains its own history. Neither receives the parent transcript. Delegation waits for the child by default. Set mode to background only while independent work remains, then consume the delivered result before claiming the task is complete.",
-    promptSnippet: "Delegate bounded work to a named child agent with an isolated context window",
+    description: "Run a named subagent in an isolated context window. It runs in the background by default and you are notified when it completes. Do not spawn subagents unless the user asks.",
+    promptSnippet: "Spawn a subagent, only when the user asks for one",
     promptGuidelines: [
-      "After calling delegate, do not duplicate the child's assigned work in the parent.",
-      "Omit delegate mode for normal delegation; it defaults to foreground and waits for the child result.",
-      "Set delegate mode background only when useful parent work can continue independently of the result.",
-      "When a delegate completion message arrives, inspect its <task> body and use or summarize the child result before claiming the delegated work is complete.",
+      "Do not call delegate unless the user explicitly asks for a subagent or names an agent type, or a skill or AGENTS.md instruction says to. Thoroughness, several angles or several parts are not such a request.",
+      "delegate runs in the background by default; pass run_in_background: false only when your very next action depends on the result and nothing else could usefully happen meanwhile.",
+      "Never fabricate or predict a pending subagent's result; if asked before its delegate-completion message arrives, say it is still running.",
+      "When a delegate-completion message arrives, read its <task> body and relay what matters to the user; the subagent's report is not shown as your answer.",
     ],
     renderShell: "self",
     parameters: DelegateParameters,
     renderCall: delegateRenderer.renderCall,
     renderResult: delegateRenderer.renderResult,
-    async execute(_id, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       const found = discovery(ctx);
       const agent = found.agents.find((candidate) => candidate.name === params.subagent_type);
       if (!agent) {
@@ -331,17 +397,15 @@ export default function delegateExtension(pi: ExtensionAPI) {
       if (!(await confirmProjectAgent(agent, ctx))) {
         throw new Error("Project agent execution was not approved.");
       }
-      if (params.mode === "background" && ctx.mode !== "tui" && ctx.mode !== "rpc") {
-        throw new Error("Background delegation requires TUI or RPC mode.");
-      }
-      if (params.task_id && activeTaskIds.has(params.task_id)) {
+      if (params.task_id && runningTaskIds().has(params.task_id)) {
         throw new Error(`task_id is already running: ${params.task_id}`);
       }
       const parentTools = childToolAllowlist(pi.getActiveTools().filter((tool) => tool !== "delegate"), agent.tools);
       if (agent.tools && parentTools.length === 0) {
         throw new Error(`No permitted tools remain for ${agent.name}.`);
       }
-      if (params.task_id) activeTaskIds.add(params.task_id);
+      // Completions need a follow-up turn, which only TUI and RPC sessions have.
+      const background = params.run_in_background !== false && (ctx.mode === "tui" || ctx.mode === "rpc");
       const shortcut = allocateTaskShortcut(ctx, params.title, params.task_id);
       const request: RunTaskRequest = {
         agent, title: params.title, prompt: params.prompt, taskId: params.task_id, shortcut,
@@ -360,37 +424,37 @@ export default function delegateExtension(pi: ExtensionAPI) {
         });
       }
 
-      if (params.mode === "background") {
-        backgroundParent = ctx;
-        if (ctx.mode === "tui") backgroundUi = ctx.ui;
+      if (background) {
+        if (ctx.mode === "tui") ui = ctx.ui;
         try {
-          // Background work is detached immediately. A parent-session abort must not cancel startup.
-          const started = await backgroundTasks.start(request);
-          if (backgroundTasks.has(started.taskId)) activeTaskIds.add(started.taskId);
+          const started = await startBackground(request, toolCallId);
           return {
             content: [{
               type: "text",
-              text: `<task id="${started.taskId}" state="running" background="true">\nBackground task started. This is only a task_id, not the child result. Continue with independent work. A completion message will deliver the result; use delegate_result with mode wait only if this task later blocks progress before that message arrives.\n</task>`,
+              text: `<task id="${started.taskId}" state="running" background="true">\nSubagent started in the background. This is only its task_id, not its result. You will be notified when it completes: do not wait, poll or predict the result. Continue with independent work, or tell the user it is running.\n</task>`,
             }],
             details: { ...started, background: true },
           };
         } catch (error) {
-          if (params.task_id) activeTaskIds.delete(params.task_id);
           releaseTaskShortcut(request.parentSessionPath, shortcut);
           const message = error instanceof Error ? error.message : String(error);
-          throw new Error(`Background delegation failed to start: ${message}`, { cause: error });
+          throw new Error(`Background subagent failed to start: ${message}`, { cause: error });
         }
       }
 
+      const startedAt = Date.now();
       const update = (progress: TaskProgress) => {
+        foreground.set(toolCallId, { startedAt, progress: copy(progress) });
+        publishTasks();
         onUpdate?.({
           content: [{ type: "text", text: `${progress.status}: ${progress.currentTool ?? progress.outputPreview ?? "working"}` }],
           details: progress,
         });
       };
+      if (params.task_id) activeTaskIds.add(params.task_id);
       try {
         const result = await runTaskWithShortcuts({ ...request, signal }, update);
-        const output = truncateTaskOutput(result.output || "(no output)", result);
+        const output = truncateTaskOutput(result.output || "(no output)", result.sessionPath);
         return {
           content: [{ type: "text", text: `<task id="${result.taskId}" state="${result.status}">\n${output}\n</task>` }],
           details: { ...result, background: false },
@@ -398,40 +462,8 @@ export default function delegateExtension(pi: ExtensionAPI) {
       } finally {
         if (params.task_id) activeTaskIds.delete(params.task_id);
         releaseTaskShortcut(request.parentSessionPath, shortcut);
+        if (foreground.delete(toolCallId)) publishTasks();
       }
-    },
-  });
-
-  pi.registerTool({
-    name: "delegate_result",
-    label: "Delegate Result",
-    description: "Get the status or final result of a background delegate task in the current parent session. Poll performs one immediate status check; wait blocks until the task settles or the timeout expires. Do not poll in a loop.",
-    promptSnippet: "Poll or wait for a background delegated task result",
-    promptGuidelines: [
-      "Do not call delegate_result poll in a loop; use mode poll only for a one-off status check.",
-      "Use delegate_result mode wait as a barrier when a known background task now blocks the next action and its completion message has not arrived.",
-      "Read and use the <task> result returned by delegate_result before continuing.",
-    ],
-    renderShell: "self",
-    parameters: DelegateResultParameters,
-    renderCall: delegateResultRenderer.renderCall,
-    renderResult: delegateResultRenderer.renderResult,
-    async execute(_id, params, signal) {
-      const snapshot = params.mode === "wait"
-        ? await backgroundTasks.waitFor(params.task_id, (params.timeout_seconds ?? 30) * 1_000, signal)
-        : backgroundTasks.lookup(params.task_id);
-      if (!snapshot) {
-        throw new Error(`Unknown background task_id in this parent session: ${params.task_id}`);
-      }
-      return {
-        content: [{ type: "text", text: settledTaskText(snapshot) }],
-        details: {
-          ...snapshot.progress,
-          background: true,
-          settled: snapshot.settled,
-          error: snapshot.error?.message.slice(0, 500),
-        },
-      };
     },
   });
 
@@ -439,35 +471,52 @@ export default function delegateExtension(pi: ExtensionAPI) {
     const found = discovery(ctx);
     const modeNote = ctx.mode === "tui" || ctx.mode === "rpc"
       ? ""
-      : "\nBackground delegation is unavailable in this mode; omit mode to use foreground.";
-    return { systemPrompt: `${event.systemPrompt}\n\nSubagents available to delegate:\n${delegateDescription(found.agents)}${modeNote}` };
+      : "\nIn this mode subagents run in the foreground: delegate waits for the result.";
+    return { systemPrompt: `${event.systemPrompt}\n\nSubagents:\n${delegateDescription(found.agents)}${modeNote}` };
   });
 
   pi.on("session_start", (_event, ctx) => {
-    // Rebind after the replacement session is ready. setCallbacks replays any
-    // completion that settled while the previous extension instance was down.
-    backgroundParent = ctx;
-    backgroundTasks.setCallbacks({ ...backgroundCallbacks, runTask: runTaskWithShortcuts });
-    if (ctx.mode !== "tui") return;
-    backgroundUi = ctx.ui;
-    refreshBackgroundWidget();
+    ui = ctx.mode === "tui" ? ctx.ui : undefined;
+    refreshWidget();
+    // Finish what a reload, switch, exit or crash left in this session's ledger. Stored without starting
+    // a turn: the model reads it with the next prompt, and the transcript shows it now.
+    const { interrupted, undelivered } = reconcile(ctx.sessionManager.getEntries());
+    for (const started of interrupted) {
+      const ended = interruptedRecord(started);
+      pi.appendEntry(LEDGER_TYPE, ended);
+      deliver(ended, false);
+    }
+    for (const ended of undelivered) deliver(ended, false);
   });
 
-  pi.on("session_shutdown", async (event) => {
-    backgroundUi?.setWidget("delegate-background-tasks", undefined);
-    backgroundParent = undefined;
-    backgroundUi = undefined;
-    backgroundDetailTui = undefined;
-
-    if (event.reason === "quit" || event.reason === "reload") {
-      await backgroundTasks.shutdown();
-      if (sharedBackgroundTasks === backgroundTasks) sharedBackgroundTasks = undefined;
-      return;
+  pi.on("session_shutdown", async () => {
+    // Background subagents belong to this session and end with it, as in Claude Code.
+    ui?.setWidget("delegate-background-tasks", undefined);
+    ui = undefined;
+    detailTui = undefined;
+    const open = [...runs.values()];
+    runs.clear();
+    foreground.clear();
+    publishTasks();
+    for (const run of open) {
+      run.controller.abort();
+      if (!run.started) {
+        run.rejectStart(new Error("Background subagent stopped during startup"));
+        continue;
+      }
+      try {
+        pi.appendEntry(LEDGER_TYPE, interruptedRecord(run.started));
+      } catch {
+        // The next session_start of this session reconciles the open run.
+      }
     }
-
-    // Session replacement invalidates this extension instance, but detached background work continues.
-    // Queue completions until the replacement instance binds fresh delivery callbacks.
-    backgroundTasks.suspendCallbacks();
+    // Let aborted children close their session files.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.allSettled(open.map((run) => run.done)),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, SHUTDOWN_WAIT_MS); }),
+    ]);
+    clearTimeout(timer);
   });
 
   pi.registerCommand("agents", {
@@ -501,7 +550,7 @@ export default function delegateExtension(pi: ExtensionAPI) {
     const labels = found.siblings.map(childSessionLabel);
     const selected = await ctx.ui.select("Task sessions", labels);
     const index = selected ? labels.indexOf(selected) : -1;
-    if (index >= 0) await ctx.switchSession(found.siblings[index].path);
+    if (index >= 0 && await confirmLeave(ctx)) await ctx.switchSession(found.siblings[index].path);
   }
 
   async function switchChild(ctx: ExtensionCommandContext, offset: number) {
@@ -509,23 +558,24 @@ export default function delegateExtension(pi: ExtensionAPI) {
     if (!found) return;
     const target = siblingPath(found.current, found.siblings, offset);
     if (!target) return ctx.ui.notify("No child task sessions found.", "info");
-    await ctx.switchSession(target);
+    if (await confirmLeave(ctx)) await ctx.switchSession(target);
   }
 
   pi.registerCommand("tasks", { description: "Select a child task session", handler: (_args, ctx) => chooseChild(ctx) });
   pi.registerCommand("task-cancel", {
-    description: "Cancel a running background task by task_id",
+    description: "Cancel a running background subagent by task_id",
     handler: async (args, ctx) => {
       const taskId = args.trim();
       if (!taskId) {
-        const running = backgroundTasks.list().map((task) => `${task.taskId} ${task.agent}: ${task.title}`).join("\n");
-        ctx.ui.notify(running || "No background tasks are running. Usage: /task-cancel <task_id>", running ? "info" : "warning");
+        const running = [...runs.values()].map((run) => `${run.progress.taskId} ${run.progress.agent}: ${run.progress.title}`).join("\n");
+        ctx.ui.notify(running || "No background subagents are running. Usage: /task-cancel <task_id>", running ? "info" : "warning");
         return;
       }
-      const cancelled = backgroundTasks.cancel(taskId);
+      const run = [...runs.values()].find((candidate) => candidate.progress.taskId === taskId);
+      run?.controller.abort();
       ctx.ui.notify(
-        cancelled ? `Cancellation requested for ${taskId}.` : `No running background task: ${taskId}`,
-        cancelled ? "info" : "warning",
+        run ? `Cancellation requested for ${taskId}.` : `No running background subagent: ${taskId}`,
+        run ? "info" : "warning",
       );
     },
   });

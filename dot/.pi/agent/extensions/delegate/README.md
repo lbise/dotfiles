@@ -1,6 +1,6 @@
 # Delegate extension
 
-OpenCode-style subagents for Pi. The extension registers `delegate` and `delegate_result`. Each delegated task runs in a child session with its own isolated context window and returns a reusable `task_id`.
+Claude Code-style subagents for Pi. The extension registers one tool, `delegate`. Each delegated task runs in a child session with its own isolated context window and returns a reusable `task_id`.
 
 ## Default agents
 
@@ -14,18 +14,24 @@ A `delegate` call has distinct human and agent fields:
 - `title` is a short human-facing label for the tool row and child session.
 - `prompt` is the child's instruction. For a fresh task, include the goal, relevant context and constraints, and expected result. A resumed task may refer to its child history, but never assume parent history.
 - `subagent_type` selects `general`, `explore`, or a discovered user or trusted-project agent.
-- `mode` is optional. It defaults to `foreground`; set it to `background` only for detached work.
+- `run_in_background` is optional and defaults to `true`.
+- `task_id` continues an earlier child with its history (Claude Code's `SendMessage`).
+
+The model is told not to spawn subagents unless the user asks for one, names an agent type, or a skill or AGENTS.md says to. This is the same rule Claude Code uses. It lives in the prompt and is not enforced. To forbid delegation, remove `delegate` from the active tools.
 
 ## Execution modes
 
-Omitting `mode` uses foreground execution. The tool blocks until the child finishes and returns its final result. Set `mode: "foreground"` only when an explicit value is useful.
+Subagents run in the background by default. The call returns the child's `task_id` once its session exists. When the child settles, a `delegate-completion` message is queued as a follow-up: it is delivered when the parent's current run ends, or it starts a new turn if the parent is idle. The parent must not wait for it, poll it or predict it, and it relays what matters to the user. There is no poll tool. In the TUI, a widget above the command line lists the running children. Up to eight can run at once. The running children, foreground ones included, are also sent on Pi's event bus as `delegate:tasks`. The herdr-chat extension shows them in the Herdr chat (`docs/herdr-chat.md`).
 
-Use `mode: "background"` only while the parent has work that does not depend on the child result. The tool initially returns a running `task_id`, not the result. When the child settles while the parent is still running, the extension steers the completion into the active run before its next model call. If the parent has already settled, the completion starts a follow-up turn. The parent must inspect and use or summarize that result before claiming the delegated work is complete. In the TUI, a widget above the command line lists every running background delegate with an animated spinner and its current activity. Up to eight background tasks can run at once in a parent session.
+`run_in_background: false` blocks until the child finishes and returns its result as the tool result. Use it only when the very next action depends on the result. Print and JSON modes always run in the foreground, because they have no follow-up turn.
 
-`delegate_result` can retrieve a background task explicitly. Do not poll in a loop.
+### Lifecycle
 
-- `mode: "poll"` performs one immediate status check.
-- `mode: "wait"` acts as a barrier when the task now blocks progress and its completion message has not arrived. It waits until the task settles or `timeout_seconds` expires. A timeout does not cancel the background task.
+Background children belong to the parent session and end with it, as in Claude Code. Esc on the parent does not stop them. `/reload`, `/new`, `/resume`, fork and exit interrupt them. Their child sessions stay saved, so `task_id` can continue one.
+
+The parent session file records each background run in a `delegate-task` entry. These entries are not part of the model's context. A run writes `started` when its child session exists. It writes `ended` when the child settles, or on shutdown with status `interrupted`. The rule is that every `started` gets exactly one `ended`, and every `ended` exactly one `delegate-completion` message.
+
+On `session_start`, the extension reconciles the ledger. A run with no `ended` (a crash) gets an `interrupted` ending. An ending that was never delivered (a follow-up lost on reload) is delivered. Both are stored without starting a turn: the transcript shows them at once, and the model reads them with the next prompt.
 
 ## Model settings
 
@@ -98,12 +104,12 @@ In a saved parent session, the first ten delegated tasks get shortcuts in order:
 
 Shortcuts are registered for the current parent session and reset after `/reload` or switching sessions.
 
-Foreground delegation follows the parent tool's abort signal. Aborting the parent prompt aborts the child `AgentSession` and disposes it after the run settles. Background delegation is detached after startup; use `/task-cancel <task_id>` to stop it.
+Foreground delegation follows the parent tool's abort signal. Aborting the parent prompt aborts the child `AgentSession` and disposes it after the run settles. Background delegation gets its own signal; use `/task-cancel <task_id>` to stop it.
 
 ## Commands
 
 - `/agents` lists agents and configuration errors.
-- `/tasks` selects a child session.
+- `/tasks` selects a child session. Switching sessions interrupts running background children, so it asks first.
 - `/task-parent` returns to the parent session.
 - `/task-next` and `/task-prev` move between sibling tasks.
 - `/task-cancel <task_id>` cancels a running background task. Without an id, it lists running background tasks.
@@ -111,8 +117,7 @@ Foreground delegation follows the parent tool's abort signal. Aborting the paren
 ## Limits
 
 - Background execution requires TUI or RPC mode.
-- Background jobs and `delegate_result` retention are process-local. Session replacement keeps running jobs alive and rebinds the delegate UI; `/reload` and exiting cancel them and clear retained results. Shutdown waits up to five seconds for cancellation. Child sessions remain saved, but running jobs do not survive restart.
-- `delegate_result` retains the latest 100 settled background results per parent-session process.
+- Running background children do not survive their parent session (see Lifecycle). Shutdown waits up to five seconds for them to stop.
 - No nested delegation.
 - No chain or workflow parameters. Pi can issue several `delegate` calls in one response for parallel work.
 - Child sessions load no extensions except those listed in `delegate.extensions`. Only Pi's built-in coding tools can pass through the parent and agent allowlists.
@@ -121,3 +126,12 @@ Foreground delegation follows the parent tool's abort signal. Aborting the paren
 - Parallel writers share the same checkout unless the caller provides isolation outside this extension.
 
 Settings and agent-file changes are read on the next prompt or delegation. Run `/reload` after changing the extension code.
+
+## Tests
+
+```sh
+cd dot/.pi/agent/extensions
+node --import ./delegate/test/pi-resolve.mjs --test delegate/test/*.test.ts
+```
+
+`pi-resolve.mjs` resolves Pi's packages from the managed install. `lifecycle.test.ts` runs real Pi sessions with pi-ai's faux provider (`harness.ts`). It scripts parent and child replies, and it decides when each child settles. Nothing touches the network or `~/.pi`.
