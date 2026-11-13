@@ -23,6 +23,7 @@ import { type Step, stepKind, stepLabel } from "./steps.ts";
 
 /** Sent by the usage extension: [{ key, text, label?, percent?, resets?, detail?, tone?, note?, noteTone? }] in footer order, plain text. */
 const USAGE_EVENT = "usage:status";
+const TASKS_EVENT = "delegate:tasks"; // the delegate extension's running subagents
 /**
  * Pi allows session control (new, resume, tree) only in a command handler, so the inbox runs this
  * command of its own through sendUserMessage: an extension command runs before anything reaches the
@@ -43,6 +44,36 @@ const IMAGE_TYPES: Record<string, string> = {
 const COMMAND_KINDS: Record<string, string> = { skill: "skill", prompt: "prompt", extension: "command" };
 
 type Turn = { startedAt: number; endedAt: number | null; steps: Step[] };
+type Task = {
+  id: string;
+  background: boolean;
+  startedAt: number;
+  taskId: string | null;
+  title: string;
+  agent: string;
+  status: string;
+  sessionPath: string | null;
+  currentTool: string | null;
+  model: string | null;
+  turns: number;
+  tokens: number;
+  cost: number;
+};
+
+/** The delegate extension's task list, keeping only well-formed rows and known fields. */
+export function parseTasks(data: unknown): Task[] {
+  if (!Array.isArray(data)) return [];
+  const str = (v: unknown) => (typeof v === "string" ? v : null);
+  const num = (v: unknown) => (Number.isFinite(v) ? (v as number) : 0);
+  return data
+    .filter((t) => typeof t?.id === "string" && typeof t?.title === "string" && typeof t?.agent === "string" && typeof t?.status === "string")
+    .map((t) => ({
+      id: t.id, background: t.background === true, startedAt: num(t.startedAt), taskId: str(t.taskId),
+      title: t.title, agent: t.agent, status: t.status, sessionPath: str(t.sessionPath),
+      currentTool: str(t.currentTool), model: str(t.model), turns: num(t.turns), tokens: num(t.tokens), cost: num(t.cost),
+    }));
+}
+
 type UsageEntry = {
   key: string;
   text: string;
@@ -152,6 +183,7 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
   let turn: Turn | null = null;
   let streaming: { message: unknown; thinking: boolean } | null = null;
   let usage: UsageEntry[] = [];
+  let tasks: Task[] = [];
   let git: { root: string; branch: string } | null = null;
   // Derived from the session entries, recomputed only when their number changes.
   let entries = -1;
@@ -223,6 +255,7 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
       git,
       usage,
       turn,
+      tasks,
       stream: streaming ? { text: messageText(streaming.message), thinking: streaming.thinking } : null,
       ask: asker.current(),
       draft: c.ui.getEditorText(),
@@ -524,6 +557,11 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
         ...(typeof note === "string" && { note }),
         ...(typeof noteTone === "string" && { noteTone }),
       }));
+    if (ctx) publisher.schedule();
+  });
+
+  pi.events.on(TASKS_EVENT, (data) => {
+    tasks = parseTasks(data);
     if (ctx) publisher.schedule();
   });
 

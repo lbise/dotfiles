@@ -28,7 +28,8 @@ In a herdr-core terminal it always registers its internal command (see session c
 "Started by another Pi" means `PI_CODING_AGENT=true` in the environment the process was started with,
 read from `/proc/self/environ`. `process.env` cannot tell, because Pi sets the variable in its own
 environment before it loads extensions. Without `/proc` (not Linux) the check passes. Delegate children
-run inside the parent's process and do not load this extension; the parent shows a delegate as one step.
+run inside the parent's process and do not load this extension. The parent publishes them in `tasks`, and the
+chat reads their session files (see Subagents).
 
 The files stay behind when Pi exits: `pid` tells a live Pi from a stale file.
 
@@ -62,6 +63,9 @@ Pi event announces (a typed draft, entries from other extensions) is picked up w
     "startedAt": 1794489000000, "endedAt": null,
     "steps": [ { "id": "toolu_…", "kind": "look", "name": "read", "label": "src/a.c", "startedAt": 1, "endedAt": 2, "ok": true } ]
   },
+  "tasks": [ { "id": "toolu_…", "background": true, "startedAt": 1, "taskId": "01a1…", "title": "Audit", "agent": "explore",
+    "status": "running", "sessionPath": "/home/u/.pi/agent/sessions/--x--/…jsonl", "currentTool": "grep",
+    "model": "anthropic/claude-…", "turns": 2, "tokens": 9000, "cost": 0.01 } ],  // running subagents, see Subagents
   "stream": { "text": "The check belongs in…", "thinking": false },  // assistant message being written, else null; thinking: the model is reasoning right now
   "ask": { "id": "a1", "question": "Which accent?", "options": [ { "label": "Lime", "description": "…" } ], "multi": false },  // else null
   "draft": "",                    // text in Pi's input box
@@ -205,6 +209,26 @@ therefore changes what the chat offers and cycles through at once (for every ses
 process) and saves `enabledModels`, but Pi's own Ctrl+P in its terminal keeps the startup scope
 until Pi restarts.
 
+### Subagents
+
+`tasks` lists the subagents of the `delegate` extension that run now: foreground ones (their tool call still
+runs) and background ones (they outlive the call and the turn). The delegate extension sends the list
+on Pi's event bus as `delegate:tasks`, and this extension copies it. `id` is the `delegate` tool call that
+started the subagent, `status` is `queued` or `running`, and `currentTool` is the subagent's running tool
+(null while it thinks). A subagent leaves the list when it ends. The transcript then records how it
+ended:
+
+- a foreground subagent: the `delegate` tool result. Its `details` carry `taskId`, `sessionPath`, `agent`,
+  `title` and `status`.
+- a background subagent: the tool result (`status: "running"`, with the same fields), then a
+  `custom_message` with `customType: "delegate-completion"`, whose `details` carry the final `status`
+  (`completed`, `failed`, `aborted` or `interrupted`).
+
+Each subagent is a Pi session file of its own, in the folder of the parent's session file. The mod
+reads one with the parent's poll command, given the file's path (see The mod). It only reads a path
+that is an absolute `.jsonl` file in the same folder as `sessionFile`, with no `..`, because the path
+comes from files on the agent's machine.
+
 ### Transcript
 
 The conversation itself is Pi's session file (`state.sessionFile`, JSONL; see Pi's
@@ -226,6 +250,13 @@ when idle, never when hidden.
 - Prose in the UI font, figures in Geist Mono, code in the terminal font (`settings().font_family`).
 - Chat settings (accent, ground, tool activity, reading width) live in `shared()` state; accent and
   ground are written to `settings.json` as `colors` overrides.
+- Running subagents show in a strip over the reply box. The mod reads at the live pace while any
+  subagent runs, also when Pi itself is idle. A finished background subagent shows as one line where
+  its completion message stands, and a delegate step opens its subagent.
+- Pressing a subagent shows its conversation in place of Pi's, read only. The header has a back button,
+  Esc goes back, and nothing can be sent. Pi keeps running; unlike Pi's `/tasks`, nothing switches
+  session. The poll is the same command, given the subagent's file as a fourth argument. It still
+  prints Pi's `state.json`, from which the view knows whether the subagent is still running.
 
 ## Development
 

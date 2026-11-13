@@ -24,6 +24,21 @@
  * @property {number} [endedAt] Absent while it runs.
  * @property {boolean} [ok] Absent while it runs.
  *
+ * @typedef {object} LiveTask A running subagent as state.json reports it.
+ * @property {string} id The delegate tool call that started it.
+ * @property {boolean} background
+ * @property {number} startedAt Epoch ms.
+ * @property {string|null} taskId
+ * @property {string} title
+ * @property {string} agent
+ * @property {string} status "queued" or "running".
+ * @property {string|null} sessionPath
+ * @property {string|null} currentTool
+ * @property {string|null} model
+ * @property {number} turns
+ * @property {number} tokens
+ * @property {number} cost
+ *
  * @typedef {object} ModelRef
  * @property {string} provider
  * @property {string} id
@@ -48,6 +63,7 @@
  * @property {{ root: string, branch: string }|null} git
  * @property {Array<{ key: string, text: string, label?: string, percent?: number, resets?: string }>} usage
  * @property {{ startedAt: number, endedAt: number|null, steps: LiveStep[] }|null} turn
+ * @property {LiveTask[]} [tasks] Running subagents; absent from an older extension.
  * @property {{ text: string, thinking: boolean }|null} stream
  * @property {{ id: string, question: string, options: Array<{ label: string, description?: string }>, multi: boolean }|null} ask
  * @property {string} draft
@@ -72,7 +88,8 @@ const STATE_DIR = 'd="${XDG_STATE_HOME:-$HOME/.local/state}/herdr-chat/$1"';
 // they survive a transport that dislikes newlines inside an argument.
 const oneLine = (/** @type {string[]} */ lines) => lines.join(" ");
 
-// $1 terminal id, $2 last known session file, $3 bytes of it already consumed.
+// $1 terminal id, $2 last known session file, $3 bytes of it already consumed,
+// $4 the session file to read instead of state.json's (a subagent's), or empty.
 // Prints: state.json, RS, "<start> <size> <path>" or an empty line, the session
 // file from <start>, RS.
 // It starts over (from 0, or from the first line start in the last 2 MB) when the
@@ -85,7 +102,9 @@ const POLL_SCRIPT = oneLine([
   `${STATE_DIR};`,
   `s=$(cat "$d/state.json" 2>/dev/null);`,
   `printf '%s\\036' "$s";`,
+  `if [ -n "$4" ]; then f=$4; else`,
   `f=$(printf '%s' "$s" | sed -n 's/.*"sessionFile"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' | head -n 1);`,
+  `fi;`,
   `if [ -n "$f" ] && [ -r "$f" ]; then`,
   `n=$(($(wc -c <"$f")));`,
   `o=$3;`,
@@ -168,11 +187,33 @@ export function createCursor() {
  * The argv of one poll: `exec(argv[0], argv.slice(1), { on: machine })`.
  * @param {string} terminalId
  * @param {Cursor} [cursor]
+ * @param {string|null} [file] A subagent's session file to read instead of Pi's own (see isChildSession).
  * @returns {string[]}
  */
-export function pollArgv(terminalId, cursor = createCursor()) {
+export function pollArgv(terminalId, cursor = createCursor(), file = null) {
   const offset = Number.isFinite(cursor.offset) ? Math.max(0, Math.floor(cursor.offset)) : 0;
-  return ["sh", "-c", POLL_SCRIPT, "herdr-chat", checkedId(terminalId), cursor.sessionFile || "", String(offset)];
+  if (file !== null && !sessionPath(file)) throw new Error(`bad session file: ${file}`);
+  return ["sh", "-c", POLL_SCRIPT, "herdr-chat", checkedId(terminalId), cursor.sessionFile || "", String(offset), file || ""];
+}
+
+/** @param {unknown} path An absolute `.jsonl` path without `..` or control characters. */
+function sessionPath(path) {
+  return typeof path === "string" && /^\/[^\0-\x1f]*\.jsonl$/.test(path) && !path.split("/").includes("..");
+}
+
+/** @param {string} path */
+const folderOf = (path) => path.slice(0, path.lastIndexOf("/"));
+
+/**
+ * True when `path` may be read as one of Pi's subagents: a session file beside Pi's
+ * own, which is where the delegate extension saves them. The path comes from files
+ * on the agent's machine, so it is checked before it is read.
+ * @param {State|null} state
+ * @param {unknown} path
+ */
+export function isChildSession(state, path) {
+  const own = state && state.sessionFile;
+  return sessionPath(path) && sessionPath(own) && path !== own && folderOf(/** @type {string} */ (path)) === folderOf(/** @type {string} */ (own));
 }
 
 /**

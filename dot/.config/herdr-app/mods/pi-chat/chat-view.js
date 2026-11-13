@@ -6,13 +6,15 @@ import { div } from "gpui-kit";
 import { Popup, h_flex, v_flex } from "gpui-base";
 import { nextCommand, setShared, settings, shared, theme } from "herdr";
 import { chatSettings } from "./model/settings.js";
+import { childTask } from "./model/chat.js";
+import { isChildSession } from "./model/protocol.js";
 import { AskCard } from "./ask.js";
 import { CodeViews } from "./code.js";
 import { editInNeovim } from "./editor.js";
 import { loadImages } from "./images.js";
 import { Composer } from "./composer.js";
 import { SharedDraft } from "./draft.js";
-import { feedFor, feedFree, feedLive, feedSilent, readCommands, readFeed, sendCommand } from "./feeds.js";
+import { childFeedFor, feedFor, feedFree, feedLive, feedSilent, readCommands, readFeed, sendCommand } from "./feeds.js";
 import { followFocus } from "./follow.js";
 import { HEADER_HEIGHT, headerButton, piHeader } from "./header.js";
 import { bindKeys } from "./keys.js";
@@ -23,6 +25,7 @@ import { sessionMenu } from "./session-menu.js";
 import { SettingsPanel } from "./settings-panel.js";
 import { emptyChat, noExtension, silentMachine } from "./states.js";
 import { StatusBar } from "./statusbar.js";
+import { taskStrip } from "./subagents.js";
 import { viewSwitch } from "./switch.js";
 import { Timeline } from "./timeline.js";
 import { drawRow } from "./turn.js";
@@ -66,6 +69,8 @@ export class ChatView {
     this.notice = "";
     this.hurryUntil = 0;
     this.second = -1;
+    this.child = null; // { key, path, title, agent }: a subagent's conversation shows instead of Pi's
+    this.childKeys = cx.focus_handle();
     this.pointer = {
       hovered: new Set(),
       copied: null,
@@ -105,15 +110,18 @@ export class ChatView {
       this.shown = shown ? pi : null;
     }
     if (!shown) return;
-    const feed = feedFor(pi);
+    if (this.child && this.child.key !== pi.key) this.child = null;
+    const feed = this.feedOn(pi);
     if (this.sent && Date.now() - this.sent.at > SENT_FOR) {
       this.sent = null;
       cx.notify();
     }
-    const fast = feed.chat.live || (feed.chat.state && feed.chat.state.status === "compacting") || Date.now() < this.hurryUntil;
+    // Running subagents keep the strip and their conversations current while Pi itself idles.
+    const tasks = runningTasks(feed.chat.state).length > 0;
+    const fast = feed.chat.live || tasks || (feed.chat.state && feed.chat.state.status === "compacting") || Date.now() < this.hurryUntil;
     if (feedFree(feed) && Date.now() - feed.readAt >= (fast ? READ_LIVE : READ_IDLE)) this.read(feed, cx);
     // The running clock: one redraw a second.
-    const second = feed.chat.live ? Math.floor(this.elapsed(feed) / 1000) : -1;
+    const second = feed.chat.live || tasks ? Math.floor(Date.now() / 1000) : -1;
     if (second !== this.second) {
       this.second = second;
       cx.notify();
@@ -139,6 +147,7 @@ export class ChatView {
   // A read brought something new.
   arrived(feed) {
     const { chat } = feed;
+    if (chat.file) return; // a subagent's: nothing to answer, nothing sent there
     if (this.shown && feedFor(this.shown) === feed) this.draft.follow(this.shown);
     if (this.sent) {
       const turn = chat.turns.find((entry) => entry.user && entry.user.text === this.sent.text && (entry.startedAt || 0) > this.sent.after);
@@ -170,7 +179,7 @@ export class ChatView {
 
   // Another Pi, or another session of it, shows: nothing open, the newest message. Safe while drawing.
   show(pi, chat) {
-    const session = `${pi.key}|${chat.epoch}`;
+    const session = `${pi.key}|${this.child ? this.child.path : ""}|${chat.epoch}`;
     if (session === this.session) return;
     this.session = session;
     this.picker.kind = null;
@@ -205,7 +214,44 @@ export class ChatView {
     });
   }
 
+  /** The feed on screen: Pi's own, or the subagent's opened from it. */
+  feedOn(pi) {
+    return this.child && this.child.key === pi.key ? childFeedFor(pi, this.child.path) : feedFor(pi);
+  }
+
   // ---- what the person does ----
+
+  /** A delegate step's subagent: from its result, or from Pi's state while it runs. Null for any other step. */
+  taskFor(step) {
+    if (step.name !== "delegate") return null;
+    if (step.task) return step.task;
+    const state = this.shown ? feedFor(this.shown).chat.state : null;
+    return runningTasks(state).find((task) => task.id === step.id && task.sessionPath) || null;
+  }
+
+  /** Shows a subagent's conversation, read only, until Back or Esc. Pi itself keeps running. */
+  openChild(task, cx) {
+    const pi = target();
+    if (!pi) return;
+    if (!isChildSession(feedFor(pi).chat.state, task.sessionPath)) {
+      this.notice = "This subagent's session is not beside Pi's own, so the chat does not open it.";
+      cx.notify();
+      return;
+    }
+    this.child = { key: pi.key, path: task.sessionPath, title: task.title || "", agent: task.agent || "subagent" };
+    this.hurryUntil = Date.now() + HURRY;
+    this.notice = "";
+    this.childKeys.focus();
+    cx.notify();
+  }
+
+  closeChild(cx) {
+    if (!this.child) return;
+    this.child = null;
+    this.hurryUntil = Date.now() + HURRY;
+    this.composer.focus();
+    cx.notify();
+  }
 
   /** Pi takes no session command now. */
   busy() {
@@ -437,11 +483,11 @@ export class ChatView {
   }
 
   conversation(t, look, feed, zoom) {
-    const items = conversationRows(feed.chat, this.sent);
-    if (!items.length) return emptyChat(t);
-    // The agent machine's time now: its last state, plus the time since that read.
-    const now = Number.isFinite(feed.chat.state.updated) ? feed.chat.state.updated + (Date.now() - feed.changedAt) : null;
-    const ui = { t, look, width: look.width, elapsed: this.elapsed(feed), now, asking: feed.chat.state.status === "asking", chat: this };
+    const child = Boolean(feed.chat.file);
+    const items = conversationRows(feed.chat, child ? null : this.sent);
+    if (!items.length) return child ? div().flex_1() : emptyChat(t);
+    const now = agentNow(feed);
+    const ui = { t, look, width: look.width, elapsed: this.elapsed(feed), now, asking: !child && feed.chat.state.status === "asking", chat: this };
     const list = this.timeline.render({
       items,
       row: (item) => drawRow(item, ui),
@@ -469,8 +515,42 @@ export class ChatView {
           .max_w(look.width)
           .when(notice, (el) => el.child(div().mt(10).text_size(13).text_color(t.ansi1).child(notice)))
           .when(state.ask, (el) => el.child(this.ask.render(t, state.ask)))
+          .children([taskStrip(t, runningTasks(state), agentNow(feed), (task, cx) => this.openChild(task, cx))].filter(Boolean))
           .child(this.composer.render(t, state, { picker: this.picker.render(t, Math.min(560, this.width - 48)), width: this.width - 48 })),
       );
+  }
+
+  // A subagent's conversation in place of Pi's: Back (or Esc) returns, nothing can be sent.
+  renderChild(t, look, pi, zoom, root) {
+    const child = this.child;
+    const feed = childFeedFor(pi, child.path);
+    this.show(pi, feed.chat);
+    const state = feed.chat.state || feedFor(pi).chat.state;
+    const back = headerButton(t, "pi-chat-back", icon("arrow-left"), "Back to Pi's conversation", false, (cx) => this.closeChild(cx));
+    const title = h_flex().flex_shrink(1).min_w(0).gap(8).items_center()
+      .child(back)
+      .child(div().flex_none().font_family("Geist Mono").text_size(12).text_color(t.muted).child(child.agent))
+      .child(div().flex_shrink(1).min_w(0).truncate().font_medium().child(child.title || "Subagent"));
+    const header = div().h(HEADER_HEIGHT).flex_none().child(piHeader(t, pi, title, [viewSwitch(t, "chat", (mode) => chooseView(pi, mode))]));
+    const task = childTask(feed.chat);
+    const ended = feed.chat.state && !task;
+    const line = h_flex().w_full().max_w(look.width).h(40).gap(8).items_center().text_size(13).text_color(t.muted)
+      .when(Boolean(task), (el) => el.child(icon("spinner", 12).spin(900)).child(div().text_color(t.foreground).child("Running")))
+      .when(ended, (el) => el.child(div().child("Finished")))
+      .child(div().flex_1().min_w(0).truncate().child(task ? "Read only. Pi gets its report when it ends." : "Read only."))
+      .child(div().flex_none().font_family("Geist Mono").text_size(12).child("Esc to go back"));
+    const body = feed.reads === 0 && feedSilent(feed)
+      ? silentMachine(t, pi.machine, () => chooseView(pi, "terminal"))
+      : this.conversation(t, look, feed, zoom);
+    return root
+      .track_focus(this.childKeys)
+      .on_key_down((event, cx) => {
+        if (event.keystroke === "escape") this.closeChild(cx);
+      })
+      .child(header)
+      .child(body)
+      .child(h_flex().w_full().flex_none().justify_center().px(24).child(line))
+      .when(Boolean(state), (el) => el.child(this.status.render(t, state, zoom)));
   }
 
   render() {
@@ -504,10 +584,22 @@ export class ChatView {
       .h(HEADER_HEIGHT)
       .flex_none()
       .child(piHeader(t, pi, live ? this.titleMenu(t, state) : "", [this.settingsButton(t, look), viewSwitch(t, "chat", (mode) => chooseView(pi, mode))]));
+    if (live && this.child && this.child.key === pi.key) return this.renderChild(t, look, pi, zoom, root);
     if (!live) {
       const body = feed.reads > 0 ? noExtension(t, feed.chat.problem, openTerminal) : feedSilent(feed) ? silentMachine(t, pi.machine, openTerminal) : div().flex_1();
       return root.child(header).child(body);
     }
     return root.child(header).child(this.conversation(t, look, feed, zoom)).child(this.dock(t, look, pi, feed)).child(this.status.render(t, state, zoom));
   }
+}
+
+/** Pi's running subagents, from its state; none from an older extension. */
+function runningTasks(state) {
+  return state && Array.isArray(state.tasks) ? state.tasks.filter((task) => task && typeof task.id === "string") : [];
+}
+
+/** The agent machine's time now: its last state, plus the time since that read. Null before a state. */
+function agentNow(feed) {
+  const state = feed.chat.state;
+  return state && Number.isFinite(state.updated) ? state.updated + (Date.now() - feed.changedAt) : null;
 }

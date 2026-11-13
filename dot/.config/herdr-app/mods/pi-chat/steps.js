@@ -12,6 +12,7 @@ import { trail } from "./model/transcript.js";
 import { cell, stepColor } from "./cells.js";
 import { copyButton, hoverArea } from "./copy.js";
 import { imageFor } from "./images.js";
+import { subagentRemark } from "./subagents.js";
 import { MONO, codeFont, icon, mix, monoLine } from "./ui.js";
 
 const LINE = 24;
@@ -270,6 +271,13 @@ export function liveTail(t, turn, now, open) {
 }
 
 function stepLine(t, step, open, toggle, ui) {
+  // A delegate call opens its subagent's conversation instead.
+  const task = ui.taskFor ? ui.taskFor(step) : null;
+  if (task) {
+    return [stepRow(t, `pi-chat-step-${step.id}`, step, ui.now === undefined ? null : ui.now)
+      .cursor_pointer().hover((s) => s.bg(t.surface)).tooltip("Open its conversation")
+      .on_click((_event, cx) => ui.openTask(task, cx))];
+  }
   const opens = Boolean(step.result || step.detail || step.diff);
   const line = stepRow(t, `pi-chat-step-${step.id}`, step, ui.now === undefined ? null : ui.now).when(opens, (el) =>
     el.cursor_pointer().hover((s) => s.bg(t.surface)).on_click((_event, cx) => toggle(step.id, cx)),
@@ -285,8 +293,9 @@ function stepLine(t, step, open, toggle, ui) {
  * @param {boolean} open Closed keeps the lines, at no height, so it closes with motion too.
  * @param {Set<string>} openSteps Ids of the steps showing their result.
  * @param {(id: string, cx: object) => void} toggle
- * @param {{ views: import("./code.js").CodeViews, pointer: object, width: number, machine: string|null, now: number|null }} ui
- *   The code views, the pointer (copy buttons), the reading width, Pi's machine (pictures), the agent machine's time (running clocks).
+ * @param {{ views: import("./code.js").CodeViews, pointer: object, width: number, machine: string|null, now: number|null, taskFor?: (step: object) => object|null, openTask?: (task: object, cx: object) => void }} ui
+ *   The code views, the pointer (copy buttons), the reading width, Pi's machine (pictures), the agent machine's time (running clocks),
+ *   and a delegate step's subagent and how to open it.
  */
 export function stepList(t, turn, open, openSteps, toggle, ui) {
   const lines = [];
@@ -294,7 +303,7 @@ export function stepList(t, turn, open, openSteps, toggle, ui) {
     if (row.type === "step") lines.push(...stepLine(t, row.step, openSteps.has(row.step.id), toggle, ui));
     else if (row.type === "text" && row.thought) lines.push(...thoughtLine(t, row.key, row.text, openSteps.has(row.key), toggle, ui));
     else if (row.type === "text") lines.push(remark(t, row.key, row.text));
-    else lines.push(remark(t, row.key, NOTES[row.note.kind] || row.note.title || row.note.text));
+    else lines.push(remark(t, row.key, row.note.task ? subagentRemark(row.note.task) : NOTES[row.note.kind] || row.note.title || row.note.text));
   }
   return div()
     .id(`pi-chat-steps-${turn.key}`)

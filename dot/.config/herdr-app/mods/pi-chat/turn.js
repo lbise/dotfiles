@@ -8,6 +8,7 @@ import { copyButton, hoverArea, typedText } from "./copy.js";
 import { STEP_CELL, stepCell } from "./cells.js";
 import { markdown } from "./markdown.js";
 import { liveTail, stepList, stepVerb } from "./steps.js";
+import { subagentNote } from "./subagents.js";
 import { MONO, icon, monoLine } from "./ui.js";
 
 // What a work line holds besides its cells: the words, the chevron, the count.
@@ -154,7 +155,7 @@ function work(ui, turn) {
     .pt(10)
     .child(workLine(ui, turn, open === true))
     .when(tail !== null, (el) => el.child(tail))
-    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer, width: ui.width, machine: chat.shown ? chat.shown.machine : null, now: ui.now })));
+    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer, width: ui.width, machine: chat.shown ? chat.shown.machine : null, now: ui.now, taskFor: (step) => chat.taskFor(step), openTask: (task, cx) => chat.openChild(task, cx) })));
 }
 
 function files(t, turn) {
@@ -236,6 +237,7 @@ export function drawRow(item, ui) {
   }
   if (item.kind === "note") {
     if (NOTES[item.note.kind]) return quiet(t, NOTES[item.note.kind]);
+    if (item.note.task) return subagentNote(t, item.key, item.note.task, (task, cx) => ui.chat.openChild(task, cx));
     return copyLine(t, `pi-chat-note-${item.key}`, [item.note.title, item.note.text].filter(Boolean).join(": "), t.muted, pointer);
   }
   if (item.kind === "compacting") {

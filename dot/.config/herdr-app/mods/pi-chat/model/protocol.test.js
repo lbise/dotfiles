@@ -4,7 +4,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { advance, base64, createCursor, inboxArgvs, listArgv, parsePoll, pollArgv, readArgv, splitAddress, utf8Bytes, utf8Length } from "./protocol.js";
+import { advance, base64, createCursor, inboxArgvs, isChildSession, listArgv, parsePoll, pollArgv, readArgv, splitAddress, utf8Bytes, utf8Length } from "./protocol.js";
 
 const RS = "\x1e";
 
@@ -263,4 +263,35 @@ test("a state file is read by name", (t) => {
   writeFileSync(join(m.dir, "commands.json"), '{"v":1,"commands":[]}');
   assert.equal(m.exec(readArgv("t7", "commands.json")).stdout, '{"v":1,"commands":[]}');
   assert.throws(() => readArgv("t7", "../x.json"), /bad state file/);
+});
+
+test("a poll can read a subagent's session file instead of Pi's own", (t) => {
+  const m = machine(t);
+  const child = join(m.dir, "..", "..", "child.jsonl");
+  writeFileSync(m.session, '{"type":"session"}\n');
+  writeFileSync(child, '{"type":"session","id":"child"}\n');
+  m.state({});
+  const out = m.exec(pollArgv("t7", createCursor(), child));
+  assert.equal(out.code, 0, out.stderr);
+  const poll = parsePoll(out.stdout);
+  assert.equal(poll.state.sessionFile, m.session);
+  assert.equal(poll.file.path, child);
+  assert.equal(poll.chunk, '{"type":"session","id":"child"}\n');
+});
+
+test("only an absolute .jsonl path is passed to the poll", () => {
+  for (const bad of ["child.jsonl", "/s/child.txt", "/s/../etc/x.jsonl", "/s/a\nb.jsonl", 3]) {
+    assert.throws(() => pollArgv("t7", createCursor(), bad), /bad session file/);
+  }
+});
+
+test("a subagent session must sit beside Pi's own", () => {
+  const state = { sessionFile: "/home/u/.pi/agent/sessions/--rom--/parent.jsonl" };
+  assert.equal(isChildSession(state, "/home/u/.pi/agent/sessions/--rom--/child.jsonl"), true);
+  assert.equal(isChildSession(state, state.sessionFile), false);
+  assert.equal(isChildSession(state, "/home/u/.pi/agent/sessions/--other--/child.jsonl"), false);
+  assert.equal(isChildSession(state, "/home/u/.pi/agent/sessions/--rom--/../--rom--/child.jsonl"), false);
+  assert.equal(isChildSession(state, "/etc/passwd"), false);
+  assert.equal(isChildSession({ sessionFile: null }, "/a/child.jsonl"), false);
+  assert.equal(isChildSession(null, "/a/child.jsonl"), false);
 });

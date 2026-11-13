@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { afterEach } from "node:test";
 
-import extension, { activate, SESSION_COMMAND, startedByPi, thinkingLevels } from "../index.ts";
+import extension, { activate, parseTasks, SESSION_COMMAND, startedByPi, thinkingLevels } from "../index.ts";
 
 const realTerminalId = process.env.HC_TERMINAL_ID;
 const cleanups: (() => unknown)[] = [];
@@ -193,6 +193,7 @@ test("session start publishes the state and the commands", async () => {
       git: { root: "rom", branch: "main" },
       usage: [{ key: "usage-primary", text: "5h 38%" }],
       turn: null,
+      tasks: [],
       stream: null,
       ask: null,
       draft: "",
@@ -489,4 +490,26 @@ test("list requests write sessions.json and tree.json", async () => {
   assert.deepEqual(tree.items, [
     { id: "u1", parentId: null, role: "user", text: "hi", timestamp: Date.parse("2026-01-01T00:00:00.000Z"), active: true, label: "start" },
   ]);
+});
+
+test("running subagents from the delegate extension are published as tasks", async () => {
+  const h = setup();
+  await h.emit("session_start");
+  await until(() => h.state());
+  const row = {
+    id: "toolu_1", background: true, startedAt: 5, taskId: "01ab", title: "Audit", agent: "explore", status: "running",
+    sessionPath: "/s/child.jsonl", currentTool: "grep", model: "faux/m", turns: 2, tokens: 900, cost: 0.01,
+  };
+  h.busHandlers.get("delegate:tasks")!([row, { id: 3 }]);
+  assert.deepEqual((await until(() => h.state().tasks.length && h.state(), "tasks")).tasks, [row]);
+  h.busHandlers.get("delegate:tasks")!([]);
+  await until(() => h.state().tasks.length === 0, "tasks cleared");
+});
+
+test("parseTasks keeps known fields and fills the missing ones", () => {
+  assert.deepEqual(parseTasks("nope"), []);
+  assert.deepEqual(parseTasks([{ id: "a", title: "t", agent: "general", status: "queued", extra: 1 }]), [{
+    id: "a", background: false, startedAt: 0, taskId: null, title: "t", agent: "general", status: "queued",
+    sessionPath: null, currentTool: null, model: null, turns: 0, tokens: 0, cost: 0,
+  }]);
 });

@@ -419,3 +419,27 @@ test("a read that gave the model an image keeps the file's path", () => {
   assert.equal(turn.steps[0].image, "/work/shot.png");
   assert.equal(turn.steps[1].image, undefined);
 });
+
+test("delegate results and completion messages name their subagent", () => {
+  const s = session();
+  s.user("use a subagent");
+  s.assistant([call("c1", "delegate", { title: "Audit", subagent_type: "explore" })], "toolUse");
+  const details = { status: "running", taskId: "01ab", sessionPath: "/s/child.jsonl", agent: "explore", title: "Audit", background: true, activity: [] };
+  s.result("c1", "delegate", "<task …>", { details });
+  s.assistant([text("Started.")]);
+  s.entry({ type: "custom_message", customType: "delegate-completion", content: "done", display: true, details: { ...details, status: "completed", runId: "r1" } });
+  s.result("c9", "read", "x", { details: { sessionPath: "/s/not-a-task.jsonl" } }); // only delegate results count
+  const t = read(s.lines);
+
+  const task = { sessionPath: "/s/child.jsonl", title: "Audit", agent: "explore", status: "running", taskId: "01ab" };
+  assert.deepEqual(t.turns[0].steps[0].task, task);
+  assert.deepEqual(t.turns[1].notes[0].task, { ...task, status: "completed" });
+});
+
+test("a delegate result without a session names no subagent", () => {
+  const s = session();
+  s.user("x");
+  s.assistant([call("c1", "delegate", { title: "A" })], "toolUse");
+  s.result("c1", "delegate", "Unknown subagent", { isError: true, details: {} });
+  assert.equal(read(s.lines).turns[0].steps[0].task, undefined);
+});

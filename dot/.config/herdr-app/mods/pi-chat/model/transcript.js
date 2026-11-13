@@ -40,6 +40,14 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  *   a line of spaces and `...` where unchanged lines are left out.
  * @property {string} [image] A read that gave the model an image: the file's absolute path on Pi's machine.
  * @property {string} [readPath] A read call's file, absolute; becomes `image` when the result holds one.
+ * @property {TaskRef} [task] A delegate call's subagent, from its result.
+ *
+ * @typedef {object} TaskRef A subagent of the delegate extension, as its tool result or completion message names it.
+ * @property {string} sessionPath Its session file.
+ * @property {string} title
+ * @property {string} agent
+ * @property {string} status "running" (a background start), "completed", "failed", "aborted" or "interrupted".
+ * @property {string|null} taskId
  *
  * @typedef {object} Narration Assistant text written before the turn's last tool call, or its thinking.
  * @property {string} key
@@ -53,6 +61,7 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} title The extension's `customType`, or the command; else "".
  * @property {string} text At most 2000 characters.
  * @property {number} beforeStep Index in `steps` of the step it precedes.
+ * @property {TaskRef} [task] A delegate completion's subagent.
  *
  * @typedef {object} Turn From one user message to the next.
  * @property {string} key Stable for the life of the turn; use it as the list key.
@@ -110,6 +119,7 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} [text] Result and note.
  * @property {string} [diff] Result: an edit's diff.
  * @property {boolean} [image] Result: it holds an image.
+ * @property {TaskRef} [task] Result of a delegate call, or its completion note.
  */
 
 const TEXT_MAX = 2000;
@@ -264,6 +274,7 @@ function reduce(raw, cwd) {
   else if (raw.type === "custom_message") {
     note(entry, "custom", String(raw.customType || ""), blocksText(raw.content));
     entry.hidden = raw.display !== true;
+    if (raw.customType === "delegate-completion") taskRef(entry, raw.details);
   }
   // The rest (model and thinking changes, labels, usage, extension state, context
   // edits, session info) shows nowhere in the conversation, but stays a tree node.
@@ -338,10 +349,28 @@ function reduceMessage(entry, message, cwd) {
     const diff = message.details && message.details.diff;
     if (typeof diff === "string" && diff) entry.diff = clip(diff, DETAIL_MAX);
     entry.image = content.some((/** @type {any} */ block) => block && block.type === "image");
+    if (message.toolName === "delegate") taskRef(entry, message.details);
   } else if (message.role === "bashExecution") {
     note(entry, "bash", String(message.command || ""), message.output);
   }
   // System messages carry the prompt and the tools: not conversation.
+}
+
+/**
+ * Puts the subagent that delegate details name on `entry`, when they name its session.
+ * @param {Entry} entry
+ * @param {any} details
+ */
+function taskRef(entry, details) {
+  if (!details || typeof details.sessionPath !== "string" || !details.sessionPath) return;
+  const text = (/** @type {unknown} */ value) => (typeof value === "string" ? clip(value, 200) : "");
+  entry.task = {
+    sessionPath: details.sessionPath,
+    title: text(details.title),
+    agent: text(details.agent),
+    status: text(details.status),
+    taskId: typeof details.taskId === "string" && details.taskId ? details.taskId : null,
+  };
 }
 
 /**
@@ -446,7 +475,7 @@ function fold(transcript, entry) {
     if (turn && turn.done) turn = transcript.current = null;
     if (entry.hidden) return;
     if (!turn) turn = open(transcript, entry, null);
-    turn.notes.push({ key: entry.id, kind: entry.note, title: entry.title, text: entry.text, beforeStep: turn.steps.length });
+    turn.notes.push({ key: entry.id, kind: entry.note, title: entry.title, text: entry.text, beforeStep: turn.steps.length, ...(entry.task && { task: entry.task }) });
   } else {
     if (!turn) turn = open(transcript, entry, null);
     foldAssistant(transcript, turn, entry);
@@ -502,6 +531,7 @@ function foldResult(transcript, entry) {
   step.result = entry.text;
   if (entry.diff) step.diff = entry.diff;
   if (entry.image && step.readPath) step.image = step.readPath;
+  if (entry.task) step.task = entry.task;
   if (entry.durationMs !== undefined) step.durationMs = entry.durationMs;
   if (step.change && entry.ok && !counted) {
     let file = turn.files.find((known) => known.path === step.change.path);

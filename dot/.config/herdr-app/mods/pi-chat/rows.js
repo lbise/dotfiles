@@ -26,7 +26,7 @@ export function conversationRows(chat, sent) {
     if (turn.files.length && !turn.live) rows.push({ key: `${turn.key}:files`, kind: "files", estimate: 48 + 34 * turn.files.length, turn });
   }
   if (sent && !sentBefore) rows.push(sentRow(sent, chat));
-  if (chat.state && chat.state.status === "compacting") rows.push({ key: "compacting", kind: "compacting", estimate: 44 });
+  if (!chat.file && chat.state && chat.state.status === "compacting") rows.push({ key: "compacting", kind: "compacting", estimate: 44 });
   return rows;
 }
 

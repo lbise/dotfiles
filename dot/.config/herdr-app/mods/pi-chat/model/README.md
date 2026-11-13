@@ -31,12 +31,14 @@ for (const argv of inboxArgvs(id, { type: "prompt", text })) {
 
 | Module | Export | What it does |
 | --- | --- | --- |
-| `chat.js` | `createChat()` | A chat: cursor, transcript, last state, merged `turns`, `live`, `truncated`, and `epoch`, which goes up when it is another session or branch. |
+| `chat.js` | `createChat(file?)` | A chat: cursor, transcript, last state, merged `turns`, `live`, `truncated`, and `epoch`, which goes up when it is another session or branch. With `file`, it follows that subagent session instead of Pi's own: no live merge, and `live` while Pi's `state.tasks` lists it. |
+| | `childTask(chat)` | The running subagent a subagent chat follows, from `state.tasks`; else null. |
 | | `chatPollArgv(chat, terminalId)` | The argv of the chat's next poll. |
 | | `chatReceive(chat, stdout)` | Takes a poll's stdout, updates the chat in place, returns it. Follows `state.leaf` (a tree move adds no entry). |
 | `protocol.js` | `splitAddress(address)` | `"1-wsl/t7"` to `{ machine, id }`. |
 | | `createCursor()` | `{ sessionFile, offset, truncated }`: where the next poll resumes. |
-| | `pollArgv(terminalId, cursor)` | One `sh -c` that prints state.json, a separator, and the session file from the offset. |
+| | `pollArgv(terminalId, cursor, file?)` | One `sh -c` that prints state.json, a separator, and the session file (or `file`, a subagent's) from the offset. |
+| | `isChildSession(state, path)` | True when `path` is a `.jsonl` beside Pi's own session file: the only subagent files the chat reads. |
 | | `parsePoll(stdout)` | `{ state, problem, file, chunk, complete }`. Never throws. |
 | | `advance(cursor, poll)` | `{ cursor, lines, reset }`: the complete lines read and the new byte offset. |
 | | `inboxArgvs(terminalId, command)` | The commands that drop one file into `inbox/` (one, or several for a long prompt). |

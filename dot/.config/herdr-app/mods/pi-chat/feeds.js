@@ -16,16 +16,27 @@ const SILENT_AFTER = 2;
 const STUCK_AFTER = TIMEOUT + 4000;
 
 const feeds = new Map();
+const childFeeds = new Map();
 
 /** The feed of a Pi pane (see view.js), made on first use. */
 export function feedFor(pi) {
-  let feed = feeds.get(pi.address);
+  return kept(feeds, pi.address, pi, null);
+}
+
+/** The feed of one of a Pi pane's subagents: its session file, read only. Check the path with isChildSession first. */
+export function childFeedFor(pi, path) {
+  return kept(childFeeds, `${pi.address}|${path}`, pi, path);
+}
+
+function kept(store, address, pi, file) {
+  const feeds = store;
+  let feed = feeds.get(address);
   if (!feed || feed.key !== pi.key) {
     feed = {
       key: pi.key,
       machine: pi.machine,
       id: pi.id,
-      chat: createChat(),
+      chat: createChat(file),
       reads: 0, // reads that got an answer
       failures: 0, // failed reads in a row
       busy: false,
@@ -34,8 +45,8 @@ export function feedFor(pi) {
       changedAt: 0, // when a read last brought something new, on this machine's clock
       commands: [], // Pi's slash commands, from commands.json
     };
-    feeds.delete(pi.address);
-    feeds.set(pi.address, feed);
+    feeds.delete(address);
+    feeds.set(address, feed);
     for (const address of [...feeds.keys()].slice(0, Math.max(0, feeds.size - KEPT))) feeds.delete(address);
   }
   return feed;

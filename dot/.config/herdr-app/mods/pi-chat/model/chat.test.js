@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { chatPollArgv, chatReceive, createChat } from "./chat.js";
+import { chatPollArgv, chatReceive, childTask, createChat } from "./chat.js";
 import { call, session, text } from "./fixture.js";
 
 const RS = "\x1e";
@@ -13,13 +13,13 @@ function stdout(stateText, path, lines, from = 0) {
 
 test("a chat follows a session from poll to poll", () => {
   const chat = createChat();
-  assert.deepEqual(chatPollArgv(chat, "t7").slice(3), ["herdr-chat", "t7", "", "0"]);
+  assert.deepEqual(chatPollArgv(chat, "t7").slice(3), ["herdr-chat", "t7", "", "0", ""]);
 
   const s = session();
   const user = s.user("héllo");
   chatReceive(chat, stdout(state({ status: "working" }), "/s/one.jsonl", s.lines));
   assert.deepEqual([chat.turns.length, chat.live, chat.turns[0].live, chat.state.status], [1, true, true, "working"]);
-  assert.deepEqual(chatPollArgv(chat, "t7").slice(5), ["/s/one.jsonl", String(Buffer.byteLength(s.lines.join("\n")) + 1)]);
+  assert.deepEqual(chatPollArgv(chat, "t7").slice(5), ["/s/one.jsonl", String(Buffer.byteLength(s.lines.join("\n")) + 1), ""]);
 
   const read = s.lines.length;
   s.assistant([text("hello")]);
@@ -50,7 +50,7 @@ test("a session restarted from scratch replaces the conversation", () => {
   // /new: the state names a file that does not exist until the first message.
   chatReceive(chat, `${state({ sessionFile: "/s/two.jsonl" })}${RS}\n${RS}`);
   assert.deepEqual(chat.turns, []);
-  assert.deepEqual(chatPollArgv(chat, "t7").slice(5), ["/s/two.jsonl", "0"]);
+  assert.deepEqual(chatPollArgv(chat, "t7").slice(5), ["/s/two.jsonl", "0", ""]);
 
   const fresh = session();
   fresh.user("new question");
@@ -104,4 +104,31 @@ test("a tree move without an entry follows Pi's leaf, unless the file is newer t
   assert.equal(chat.turns.length, 1);
   chatReceive(chat, stdout(state({ leaf: null, updated: at + 7000 }), "/s/one.jsonl", s.lines, s.lines.length));
   assert.equal(chat.turns.length, 0);
+});
+
+test("a subagent's chat reads its own file and is live while Pi lists it as running", () => {
+  const child = "/s/child.jsonl";
+  const chat = createChat(child);
+  assert.deepEqual(chatPollArgv(chat, "t7").slice(4), ["t7", "", "0", child]);
+
+  const s = session();
+  s.user("CHILD: look around");
+  s.assistant([call("c1", "grep", { pattern: "x" })], "toolUse");
+  const running = { id: "toolu_1", sessionPath: child, title: "Look", agent: "explore", status: "running" };
+  // Pi's own state says it is working on its own turn; none of that leaks into the subagent's.
+  chatReceive(chat, stdout(state({ status: "working", tasks: [running], turn: { startedAt: 1, endedAt: null, steps: [{ id: "p1", name: "bash" }] } }), child, s.lines));
+  assert.equal(chat.live, true);
+  assert.deepEqual(childTask(chat), running);
+  assert.deepEqual([chat.turns.length, chat.turns[0].live, chat.turns[0].steps.map((step) => [step.id, step.ok])], [1, true, [["c1", undefined]]]);
+
+  // It ended (Pi no longer lists it) without the file seeing the step finish: cut off.
+  chatReceive(chat, stdout(state({ tasks: [] }), child, s.lines, s.lines.length));
+  assert.deepEqual([chat.live, chat.turns[0].live, chat.turns[0].steps[0].ok], [false, undefined, false]);
+
+  // Pi's own file in a poll (an older extension ignoring the path) is not read as the subagent's.
+  const other = session();
+  other.user("parent");
+  const before = chat.transcript;
+  chatReceive(chat, stdout(state({}), "/s/one.jsonl", other.lines));
+  assert.equal(chat.transcript, before);
 });
