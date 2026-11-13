@@ -36,6 +36,8 @@ AUTH_HELP = "Sign in with `/login` in pi (Anthropic) or `claude auth login` to s
 PI_AUTH_PATH = Path.home() / ".pi" / "agent" / "auth.json"
 USAGE_ENDPOINT = "https://api.anthropic.com/api/oauth/usage"
 PROBE_MIN_INTERVAL_SECONDS = 15
+# Wait this long after a 429 that names no Retry-After.
+PROBE_BACKOFF_SECONDS = 300
 
 
 def config_dir() -> Path:
@@ -755,8 +757,12 @@ def probe_limits(access_token: str) -> dict[str, Any]:
       help_text = "Anthropic's usage endpoint is rate limiting checks right now" + (
         f" (retry after {retry_after}s)" if retry_after else ""
       ) + ". Local Claude Code stats are still shown."
-    else:
-      help_text = f"Anthropic's usage endpoint returned status {error.code}. Local Claude Code stats are still shown."
+      try:
+        backoff = max(float(retry_after), 0)
+      except ValueError:
+        backoff = PROBE_BACKOFF_SECONDS
+      return {"ok": False, "helpText": help_text, "backoffSeconds": backoff}
+    help_text = f"Anthropic's usage endpoint returned status {error.code}. Local Claude Code stats are still shown."
     return {"ok": False, "helpText": help_text}
   except Exception:
     # A transport failure reached no server at all — no route, no DNS. Any
@@ -857,7 +863,18 @@ def collect_limits(access_token: str, expires_at_ms: int, force: bool) -> dict[s
     result["limits"] = fallback
     return result
 
+  # After a 429 even --force waits: hammering a rate limiter only extends it.
+  backoff_until = number(cached.get("backoffUntilMs")) / 1000
+  if time.time() < backoff_until:
+    result["limits"] = fallback
+    if not fallback:
+      result["usageStatusText"] = "Claude limits unavailable"
+      result["authHelpText"] = "Anthropic's usage endpoint is rate limiting checks right now. Local Claude Code stats are still shown."
+    return result
+
   probe = probe_limits(access_token)
+  if "backoffSeconds" in probe:
+    write_json(probe_cache, dict(cached, backoffUntilMs=round((time.time() + probe["backoffSeconds"]) * 1000)))
   if probe["ok"]:
     result["limits"] = probe["limits"]
     write_json(probe_cache, {"fetchedAtMs": round(time.time() * 1000), "limits": probe["limits"]})

@@ -65,7 +65,8 @@ export interface UsageProvider {
   cacheTtlMs: number;
   /** Name of what snapshot.extra shows, e.g. "Credits". */
   extraLabel?: string;
-  fetchUsage(auth: AuthSource): Promise<UsageSnapshot>;
+  /** fresh: a person asked for current numbers, so skip caches shared with other processes. */
+  fetchUsage(auth: AuthSource, options?: { fresh?: boolean }): Promise<UsageSnapshot>;
   /** Update usage from provider response headers without an extra request. */
   usageFromHeaders?(headers: Record<string, string>, previous: UsageSnapshot | null): UsageSnapshot | null;
   createPromptTracker?(): PromptTracker;

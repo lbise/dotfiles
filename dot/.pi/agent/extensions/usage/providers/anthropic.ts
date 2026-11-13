@@ -8,10 +8,75 @@
  * what pi actually consumes.
  */
 
-import { formatAmount, formatBar, numberValue, windowIcon, windowLabel } from "../format.ts";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+import { formatAmount, formatBar, formatRemaining, numberValue, windowIcon, windowLabel } from "../format.ts";
 import type { AuthSource, Segment, UsageProvider, UsageSnapshot, UsageWindow } from "../types.ts";
 
 const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
+
+/**
+ * The endpoint rate limits per account, and every running pi polls it. One file shared by all pi
+ * processes holds the last payload and any 429 backoff, so the machine makes at most one request
+ * per CACHE_TTL_MS however many sessions are open.
+ */
+const CACHE_TTL_MS = 2 * 60 * 1000;
+/** A lock older than this belongs to a process that died mid-request. */
+const LOCK_STALE_MS = 15 * 1000;
+const MIN_BACKOFF_MS = 60 * 1000;
+const MAX_BACKOFF_MS = 15 * 60 * 1000;
+
+type SharedCache = { fetchedAtMs?: number; payload?: UsagePayload; backoffUntilMs?: number; backoffMs?: number };
+
+function cacheFile(): string {
+  return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "leo", "ai-usage", "pi-anthropic-usage.json");
+}
+
+async function readCache(file: string): Promise<SharedCache> {
+  try {
+    return JSON.parse(await readFile(file, "utf8")) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Best effort: a cache that cannot be written only costs extra requests. */
+async function writeCache(file: string, cache: SharedCache): Promise<void> {
+  const tmp = `${file}.${process.pid}.tmp`;
+  try {
+    await writeFile(tmp, JSON.stringify(cache), { mode: 0o600 });
+    await rename(tmp, file);
+  } catch {
+    await rm(tmp, { force: true }).catch(() => undefined);
+  }
+}
+
+/** true: lock taken. false: another process is fetching. undefined: locking is impossible, fetch anyway. */
+async function takeLock(lock: string): Promise<boolean | undefined> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await writeFile(lock, String(process.pid), { flag: "wx", mode: 0o600 });
+      return true;
+    } catch (err: any) {
+      if (err?.code !== "EEXIST") return undefined;
+      const age = await stat(lock).then((s) => Date.now() - s.mtimeMs, () => 0);
+      if (age < LOCK_STALE_MS) return false;
+      await rm(lock, { force: true });
+    }
+  }
+  return false;
+}
+
+/** Retry-After in ms, from delay-seconds or an HTTP date. */
+export function retryAfterMs(header: string | null, now = Date.now()): number | undefined {
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? undefined : Math.max(0, at - now);
+}
 
 type WindowRaw = { utilization?: number | null; resets_at?: string | null } | null;
 
@@ -80,21 +145,48 @@ export const anthropicProvider: UsageProvider = {
   id: "anthropic",
   name: "Claude",
   extraLabel: "Extra",
-  cacheTtlMs: 60 * 1000,
+  cacheTtlMs: CACHE_TTL_MS,
 
-  async fetchUsage(auth: AuthSource): Promise<UsageSnapshot> {
+  async fetchUsage(auth: AuthSource, options = {}): Promise<UsageSnapshot> {
     const token = await auth.apiKey("anthropic");
     if (!token) throw new Error("no token");
     if (!token.startsWith("sk-ant-oat")) throw new Error("not a subscription login");
 
-    const response = await fetch(USAGE_URL, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "anthropic-beta": "oauth-2025-04-20",
-        Accept: "application/json",
-      },
-    });
-    if (!response.ok) throw new Error(`usage API returned ${response.status}`);
-    return snapshotFromPayload((await response.json()) as UsagePayload);
+    const file = cacheFile();
+    const cache = await readCache(file);
+    const cached = cache.payload ? snapshotFromPayload(cache.payload) : undefined;
+    // Even a manual refresh honours a backoff: Anthropic asked us to wait.
+    if (cache.backoffUntilMs && Date.now() < cache.backoffUntilMs) {
+      if (cached) return cached;
+      throw new Error(`rate limited, retry in ${formatRemaining(cache.backoffUntilMs)}`);
+    }
+    if (!options.fresh && cached && Date.now() - (cache.fetchedAtMs ?? 0) < CACHE_TTL_MS) return cached;
+
+    await mkdir(join(file, ".."), { recursive: true }).catch(() => undefined);
+    const lock = `${file}.lock`;
+    const locked = await takeLock(lock);
+    if (locked === false && cached) return cached;
+    try {
+      const response = await fetch(USAGE_URL, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "anthropic-beta": "oauth-2025-04-20",
+          Accept: "application/json",
+        },
+      });
+      if (response.status === 429) {
+        const backoffMs =
+          retryAfterMs(response.headers.get("retry-after")) ??
+          Math.min(MAX_BACKOFF_MS, Math.max(MIN_BACKOFF_MS, (cache.backoffMs ?? 0) * 2));
+        await writeCache(file, { ...cache, backoffUntilMs: Date.now() + backoffMs, backoffMs });
+        if (cached) return cached;
+      }
+      if (!response.ok) throw new Error(`usage API returned ${response.status}`);
+      const payload = (await response.json()) as UsagePayload;
+      await writeCache(file, { fetchedAtMs: Date.now(), payload });
+      return snapshotFromPayload(payload);
+    } finally {
+      if (locked) await rm(lock, { force: true }).catch(() => undefined);
+    }
   },
 };

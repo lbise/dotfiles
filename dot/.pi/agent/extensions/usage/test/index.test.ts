@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import test, { afterEach, mock } from "node:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test, { afterEach, beforeEach, mock } from "node:test";
 
 import { ICONS } from "../format.ts";
 import extension, { STATUS_KEYS, USAGE_EVENT, providerForModel } from "../index.ts";
@@ -7,6 +10,15 @@ import { setCopilotCreditCap } from "../providers/copilot.ts";
 
 const realFetch = globalThis.fetch;
 const realEnv = { HOME: process.env.HOME, GITHUB_TOKEN: process.env.GITHUB_TOKEN };
+// The Anthropic provider shares a cache file between processes; give each test its own.
+const realCacheHome = process.env.XDG_CACHE_HOME;
+beforeEach(() => {
+  process.env.XDG_CACHE_HOME = mkdtempSync(join(tmpdir(), "usage-cache-"));
+});
+afterEach(() => {
+  if (realCacheHome === undefined) delete process.env.XDG_CACHE_HOME;
+  else process.env.XDG_CACHE_HOME = realCacheHome;
+});
 afterEach(() => {
   globalThis.fetch = realFetch;
   mock.timers.reset();
@@ -103,12 +115,25 @@ test("statuses are also sent as plain text in footer order, and withdrawn when c
 });
 
 test("cached usage is reused within the TTL and refreshed on agent end", async () => {
+  mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
   const h = setup(payload);
   await h.emit("session_start");
   await h.emit("agent_start");
+  await h.emit("agent_end");
   assert.equal(h.fetches(), 1);
+  mock.timers.tick(121_000);
   await h.emit("agent_end");
   assert.equal(h.fetches(), 2);
+});
+
+test("pi sessions share one Anthropic fetch", async () => {
+  const a = setup(payload);
+  await a.emit("session_start");
+  const b = setup(payload);
+  await b.emit("session_start");
+  await b.emit("agent_end");
+  assert.equal(a.fetches() + b.fetches(), 1);
+  assert.equal(b.statuses.get(STATUS_KEYS.primary), `${ICONS.hours} ███░░░░░ 42%`);
 });
 
 test("switching to an untracked model clears the statuses", async () => {
@@ -145,7 +170,7 @@ test("turns refresh header-less providers once the cache TTL has passed", async 
   await settle();
   assert.equal(h.fetches(), 1);
 
-  mock.timers.tick(61_000);
+  mock.timers.tick(121_000);
   await h.emit("turn_end", { message: {} });
   await h.emit("turn_end", { message: {} });
   await settle();
@@ -274,7 +299,7 @@ test("copilot statuses carry the figures after the bar and the warning tones", a
   assert.equal(primary.note, undefined);
 });
 
-test("every provider is polled every minute, countdowns redrawn every 30 s", async () => {
+test("anthropic is polled when the shared cache expires, countdowns redrawn every 30 s", async () => {
   mock.timers.enable({ apis: ["Date", "setInterval"], now: Date.parse("2026-10-10T10:00:00Z") });
   const h = setup({ five_hour: { utilization: 42, resets_at: "2026-10-10T12:10:20Z" } });
   await h.emit("session_start");
@@ -288,6 +313,10 @@ test("every provider is polled every minute, countdowns redrawn every 30 s", asy
   assert.equal(resets(), "2h 10m");
 
   mock.timers.tick(30_000);
+  await settle();
+  assert.equal(h.fetches(), 1);
+
+  mock.timers.tick(60_000);
   await settle();
   assert.equal(h.fetches(), 2);
 

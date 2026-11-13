@@ -9,7 +9,10 @@
  * response headers, a TTL-throttled fetch after each turn for providers
  * without headers, and a poll every minute so spend from other sessions and
  * machines shows while idle. Reset countdowns
- * are redrawn every 30 s. /usage-refresh forces a fetch.
+ * are redrawn every 30 s. /usage-refresh forces a fetch. Providers may cache
+ * across processes (Anthropic does, to stay under its rate limit), so a
+ * "forced" refresh can still be answered from that cache; only
+ * /usage-refresh asks them to skip it.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -187,9 +190,9 @@ export default function (pi: ExtensionAPI) {
     );
   }
 
-  async function fetchInto(ctx: Ctx, provider: UsageProvider, state: ProviderState): Promise<UsageSnapshot | null> {
+  async function fetchInto(ctx: Ctx, provider: UsageProvider, state: ProviderState, fresh?: boolean): Promise<UsageSnapshot | null> {
     try {
-      state.snapshot = await provider.fetchUsage(authSource(ctx));
+      state.snapshot = await provider.fetchUsage(authSource(ctx), { fresh });
       state.fetchedAt = Date.now();
       publish(ctx, provider, state);
       return state.snapshot;
@@ -201,7 +204,7 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function refresh(ctx: Ctx, model: unknown, options: { force?: boolean } = {}): Promise<UsageSnapshot | null> {
+  async function refresh(ctx: Ctx, model: unknown, options: { force?: boolean; fresh?: boolean } = {}): Promise<UsageSnapshot | null> {
     const provider = providerForModel(model);
     if (!provider) {
       clear(ctx);
@@ -215,7 +218,7 @@ export default function (pi: ExtensionAPI) {
     }
 
     // Turn-end and poll refreshes run unawaited; share one request between them.
-    state.inflight ??= fetchInto(ctx, provider, state).finally(() => {
+    state.inflight ??= fetchInto(ctx, provider, state, options.fresh).finally(() => {
       state.inflight = undefined;
     });
     return state.inflight;
@@ -260,7 +263,7 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.notify(`Usage is only shown for ${PROVIDERS.map((p) => p.name).join(", ")} models`, "info");
         return;
       }
-      await refresh(ctx, ctx.model, { force: true });
+      await refresh(ctx, ctx.model, { force: true, fresh: true });
       ctx.ui.notify(`${provider.name} usage refreshed`, "info");
     },
   });

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
-import test, { afterEach } from "node:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test, { afterEach, beforeEach } from "node:test";
 
-import { anthropicProvider } from "../providers/anthropic.ts";
+import { anthropicProvider, retryAfterMs } from "../providers/anthropic.ts";
 import { codexProvider } from "../providers/codex.ts";
 import { capWindow, copilotProvider, createCopilotPromptTracker, setCopilotCreditCap } from "../providers/copilot.ts";
 import { ICONS } from "../format.ts";
@@ -9,6 +12,15 @@ import type { AuthSource, Segment } from "../types.ts";
 
 const text = (segments: Segment[] | undefined) => segments?.map((s) => s.text).join("");
 const realFetch = globalThis.fetch;
+// The Anthropic provider shares a cache file between processes; give each test its own.
+const realCacheHome = process.env.XDG_CACHE_HOME;
+beforeEach(() => {
+  process.env.XDG_CACHE_HOME = mkdtempSync(join(tmpdir(), "usage-cache-"));
+});
+afterEach(() => {
+  if (realCacheHome === undefined) delete process.env.XDG_CACHE_HOME;
+  else process.env.XDG_CACHE_HOME = realCacheHome;
+});
 afterEach(() => {
   globalThis.fetch = realFetch;
 });
@@ -83,6 +95,36 @@ test("anthropic rejects missing or non-subscription tokens", async () => {
 test("anthropic surfaces HTTP errors", async () => {
   stubFetch({}, 401);
   await assert.rejects(anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" })), /returned 401/);
+});
+
+test("anthropic backs off on 429 and keeps the last numbers", async () => {
+  stubFetch(anthropicPayload);
+  await anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" }));
+
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response("{}", { status: 429, headers: { "retry-after": "300" } });
+  }) as typeof fetch;
+  const first = await anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" }), { fresh: true });
+  assert.equal(first.primary?.usedPercent, 42);
+  // Within Retry-After even a manual refresh stays off the network.
+  const second = await anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" }), { fresh: true });
+  assert.equal(second.primary?.usedPercent, 42);
+  assert.equal(calls, 1);
+});
+
+test("anthropic 429 without cached numbers says when to retry", async () => {
+  stubFetch({}, 429);
+  await assert.rejects(anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" })), /returned 429/);
+  await assert.rejects(anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" })), /rate limited, retry in 1m/);
+});
+
+test("retry-after accepts seconds and HTTP dates", () => {
+  assert.equal(retryAfterMs("30"), 30_000);
+  assert.equal(retryAfterMs("Thu, 01 Jan 1970 00:01:00 GMT", 0), 60_000);
+  assert.equal(retryAfterMs("soon"), undefined);
+  assert.equal(retryAfterMs(null), undefined);
 });
 
 // Codex

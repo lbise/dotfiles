@@ -53,5 +53,32 @@ class ChooseLoginTest(unittest.TestCase):
         self.assertEqual(claude.choose_login(('', 0, ''), ('', 0, '')), ('', 0, ''))
 
 
+
+class LimitsBackoffTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.real = (claude.cache_root, claude.probe_limits)
+        claude.cache_root = lambda: Path(self.temporary_directory.name)
+        self.probes = 0
+
+    def tearDown(self) -> None:
+        claude.cache_root, claude.probe_limits = self.real
+        self.temporary_directory.cleanup()
+
+    def _probe(self, result: dict):
+        def probe(_token: str) -> dict:
+            self.probes += 1
+            return result
+        claude.probe_limits = probe
+
+    def test_rate_limit_pauses_even_forced_probes_and_keeps_last_limits(self) -> None:
+        limit = {'label': 'Session (5-hour)', 'percent': 0.4, 'resetsAt': ''}
+        self._probe({'ok': True, 'limits': [limit]})
+        claude.collect_limits('tok', 0, True)
+        self._probe({'ok': False, 'helpText': 'rate limited', 'backoffSeconds': 300})
+        self.assertEqual(claude.collect_limits('tok', 0, True)['limits'], [limit])
+        self.assertEqual(claude.collect_limits('tok', 0, True)['limits'], [limit])
+        self.assertEqual(self.probes, 2)
+
 if __name__ == '__main__':
     unittest.main()
