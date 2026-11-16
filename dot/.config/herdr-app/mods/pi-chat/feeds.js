@@ -39,6 +39,7 @@ function kept(store, address, pi, file) {
       chat: createChat(file),
       reads: 0, // reads that got an answer
       failures: 0, // failed reads in a row
+      error: "", // why the last read failed
       busy: false,
       read: null, // the read out now: one that ends after it was given up does nothing
       readAt: 0,
@@ -82,7 +83,10 @@ export function feedFree(feed) {
 /** Reads the feed once. Resolves true when what the chat shows changed. */
 export async function readFeed(feed) {
   if (!feedFree(feed)) return false;
-  if (feed.busy) feed.failures++; // the read given up
+  if (feed.busy) {
+    feed.failures++; // the read given up
+    feed.error = `no reply in ${STUCK_AFTER / 1000} s`;
+  }
   const read = (feed.read = {});
   feed.busy = true;
   feed.readAt = Date.now();
@@ -93,9 +97,10 @@ export async function readFeed(feed) {
     chatReceive(feed.chat, stdout);
     feed.reads++;
     feed.failures = 0;
-  } catch {
+  } catch (error) {
     if (feed.read !== read) return false;
     feed.failures++;
+    feed.error = String((error && error.message) || error);
   } finally {
     if (feed.read === read) feed.busy = false;
   }

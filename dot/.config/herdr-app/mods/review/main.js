@@ -717,6 +717,8 @@ export default class Review extends View {
   fileList(t, tall) {
     const current = this.current();
     const comments = this.store().comments;
+    // Draft comments on files no longer changed (e.g. committed): not drawn anywhere else.
+    const gone = [...new Set(comments.map((c) => c.path))].filter((p) => !this.files.some((f) => f.path === p));
     const list = v_flex()
       .id("review-files")
       .absolute()
@@ -769,6 +771,15 @@ export default class Review extends View {
             .when(f.del > 0, (el) => el.child(div().text_size(11).text_color(t.ansi1).child(`−${f.del}`)));
         }),
       )
+      .children(
+        gone.map((path) =>
+          h_flex().id(`review-gone-${path}`).h(26).flex_none().px(6).gap(6).items_center().text_color(t.dim)
+            .child(icon("comment", 11))
+            .child(div().flex_1().min_w(0).truncate().child(`${comments.filter((c) => c.path === path).length} · ${path} (no longer changed)`))
+            .child(this.button(t, `review-gone-x-${path}`, icon("close", 12), () =>
+              this.save({ comments: this.store().comments.filter((c) => c.path !== path) }))),
+        ),
+      )
       .when(!this.files.length, (el) =>
         el.child(div().p(8).text_color(t.dim).child(this.error || (this.loading ? "Loading changes…" : this.repo ? "No changes" : "No folder"))),
       )
@@ -776,7 +787,7 @@ export default class Review extends View {
     return div()
       .relative()
       .when(tall, (el) => el.flex_1().min_h(80))
-      .when(!tall, (el) => el.flex_none().h(Math.min(240, Math.max(40, this.files.length * 26 + 10))).border_b(1).border_color(t.border))
+      .when(!tall, (el) => el.flex_none().h(Math.min(240, Math.max(40, (this.files.length + gone.length) * 26 + 10))).border_b(1).border_color(t.border))
       .child(list)
       .child(Scrollbar.vertical("review-files").absolute().inset_0());
   }

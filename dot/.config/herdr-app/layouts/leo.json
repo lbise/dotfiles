@@ -94,25 +94,11 @@
           },
           "children": [
             {
-              "id": "usage-toggle",
-              "type": "block",
-              "size": {
-                "px": 84
-              },
-              "window_drag": true,
-              "content": {
-                "mod": "usage",
-                "props": {
-                  "role": "toggle"
-                }
-              }
-            },
-            {
               "id": "tabs",
               "type": "block",
               "window_drag": true,
               "content": {
-                "mod": "tabs"
+                "mod": "leo-tabs"
               },
               "size": {
                 "weight": 1

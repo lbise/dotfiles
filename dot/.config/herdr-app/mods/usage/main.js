@@ -4,11 +4,11 @@
 // them by model, provider, machine or project (History). The Subscriptions tab
 // shows each subscription's current limits (subs.mjs, through Pi's usage extension). "This computer" (Windows) is left
 // out: Pi runs only on the Linux machines. Opened with mod.open:usage, or from
-// the button this mod draws beside the tab bar (props.role "toggle", layouts/leo.json).
+// the Usage button in the tab bar (mods/leo-tabs).
 
-import { View, div, svg } from "gpui-kit";
+import { View, div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { appHome, exec, machines, props, readTextFile, run, theme } from "herdr";
+import { appHome, exec, machines, readTextFile, theme } from "herdr";
 import { usageChart, seriesColor } from "./chart.js";
 import {
   CREDIT_USD, GROUPS, OTHER, RANGES, billing, breakdownOf, formatBucket, formatCost, formatSpan, formatTokens, since, summarize,
@@ -29,25 +29,12 @@ const COLUMNS = [
 const COLUMN_WIDTH = 96;
 
 export default class Usage extends View {
-  init(given, cx) {
-    this.part = (given || props() || {}).role === "toggle" ? new Toggle() : new Report(cx);
+  init(_given, cx) {
+    this.part = new Report(cx);
   }
 
   render(cx) {
     return this.part.render(cx);
-  }
-}
-
-// The tab bar's button, styled as its Files and Changes buttons.
-class Toggle {
-  render() {
-    const t = theme();
-    return h_flex().size_full().px(6).items_center().bg(t.chrome).border_b(1).border_color(t.border)
-      .child(h_flex().id("usage-open").h(26).px(8).gap(5).flex_none().items_center().rounded(6)
-        .text_size(12).text_color(t.muted).hover((s) => s.bg(t.hover).text_color(t.foreground))
-        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .on_click(() => run("mod.open", { name: "usage" }))
-        .child(svg("mods/usage/usage.svg").size(14)).child("Usage"));
   }
 }
 

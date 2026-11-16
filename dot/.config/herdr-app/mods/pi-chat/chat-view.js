@@ -504,7 +504,7 @@ export class ChatView {
   dock(t, look, pi, feed) {
     const state = feed.chat.state;
     const notice = feedSilent(feed)
-      ? `${pi.machine || "This computer"} is not answering. This is the conversation as last read.`
+      ? `${pi.machine || "This computer"} is not answering (${feed.error}). This is the conversation as last read.`
       : this.notice || (state.error ? `Pi's chat extension reports: ${state.error}` : "");
     return h_flex()
       .w_full()
