@@ -87,6 +87,13 @@ test("parsePoll splits state, file and chunk", () => {
   assert.equal(cut.chunk, '{"id":"x"}\n{"id');
 });
 
+test("a chunk of whole lines moves the cursor to the size the poll printed", () => {
+  // The app's engine stalls counting the bytes of a string over 4 MiB, so they are not counted.
+  const read = advance(createCursor(), parsePoll(`{"v":1}${RS}0 99 /a.jsonl\n{"id":"a"}\n${RS}`));
+  assert.equal(read.cursor.offset, 99);
+  assert.deepEqual(read.lines, ['{"id":"a"}']);
+});
+
 test("no state file yet", (t) => {
   const m = machine(t);
   const read = m.poll();

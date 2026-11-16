@@ -73,7 +73,7 @@
  * @property {State|null} state The parsed state.json, or null.
  * @property {null|"missing"|"garbled"|"version"} problem Why `state` is null.
  * @property {PollFile|null} file Null when there is no readable session file.
- * @property {string} chunk The session file from `file.start`.
+ * @property {string} chunk The session file from `file.start` to `file.size`.
  * @property {boolean} complete False when the output was cut short.
  */
 
@@ -116,7 +116,7 @@ const POLL_SCRIPT = oneLine([
   `fi;`,
   `fi;`,
   `printf '%s %s %s\\n' "$o" "$n" "$f";`,
-  `tail -c +$((o + 1)) "$f";`,
+  `tail -c +$((o + 1)) "$f" | head -c $((n - o));`,
   `else`,
   `echo;`,
   `fi;`,
@@ -275,10 +275,13 @@ export function advance(cursor, poll) {
   }
   const reset = file.path !== cursor.sessionFile || file.start !== cursor.offset;
   const whole = poll.chunk.slice(0, poll.chunk.lastIndexOf("\n") + 1);
+  // The poll prints the file up to `size`, so a chunk of whole lines ends there.
+  // Counting the bytes by hand stalls the app's engine on a string over 4 MiB.
+  const ended = poll.complete && whole.length === poll.chunk.length;
   return {
     cursor: {
       sessionFile: file.path,
-      offset: file.start + utf8Length(whole),
+      offset: ended ? file.size : file.start + utf8Length(whole),
       truncated: reset ? file.start > 0 : cursor.truncated,
     },
     lines: whole ? whole.slice(0, -1).split("\n") : [],
