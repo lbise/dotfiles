@@ -10,7 +10,9 @@ import { formatDuration } from "./model/format.js";
 import { diffRows } from "./model/tools.js";
 import { trail } from "./model/transcript.js";
 import { cell, stepColor } from "./cells.js";
+import { syntax } from "./code.js";
 import { copyButton, hoverArea } from "./copy.js";
+import { languageOf } from "./diff/highlight.js";
 import { imageFor } from "./images.js";
 import { subagentRemark } from "./subagents.js";
 import { MONO, codeFont, icon, mix, monoLine } from "./ui.js";
@@ -18,10 +20,8 @@ import { MONO, codeFont, icon, mix, monoLine } from "./ui.js";
 const LINE = 24;
 const CODE_LINE = 20; // a line of a code view at 12.5 px, as markdown.js
 const SHOWN = 16; // a box shows this many lines, then scrolls
-const DIFF_MAX = 2000; // rows of a diff drawn at all
 const RESULT_PAD = 8;
 const RESULT_GAP = 6;
-const GUTTER = 44; // a diff's line numbers and sign
 const IMAGE = 240; // a picture's height in its step
 const THOUGHT_SHOWN = 20; // a thought shows this many lines, then scrolls
 const CHAR = 7.6; // a code view's character at 12.5 px, for guessing where prose wraps
@@ -35,22 +35,28 @@ export function stepVerb(step) {
   return step.kind === "run" ? "run" : step.name;
 }
 
-const FILE_LANGUAGES = { md: "markdown", rs: "rust", yml: "yaml", py: "python", sh: "bash", htm: "html" };
+/** A diff box: its rows are made when it is first drawn. */
+function diffOf(diffs, path) {
+  return {
+    kind: "diff",
+    key: diffs.join("\n...\n"),
+    rows: () => diffs.flatMap((diff, index) => (index ? [{ kind: "gap", number: "", text: "" }, ...diffRows(diff)] : diffRows(diff))),
+    lines: diffs.reduce((sum, diff) => sum + diff.split("\n").length, diffs.length - 1),
+    language: languageOf(path),
+  };
+}
 
 /** What a pressed step shows, in order: each a box of `lines` lines (a picture: its own height). */
 function boxes(step) {
   const all = [];
   // A command first, then what it gave.
   if (step.detail) all.push({ kind: "code", text: step.detail.text, language: step.detail.language });
-  if (step.diff) {
-    const extension = (/\.([\w+]+)$/.exec(step.label) || [])[1] || "";
-    all.push({ kind: "diff", rows: diffRows(step.diff).slice(0, DIFF_MAX), language: FILE_LANGUAGES[extension] || extension });
-  }
+  if (step.diff) all.push(diffOf([step.diff], step.change ? step.change.path : step.label));
   // An edit's output only says it worked: the diff is what it did.
   const output = step.result.replace(/\s+$/, "");
   if (output && !(step.diff && step.ok !== false)) all.push({ kind: "code", text: output, language: "text" });
   if (step.image) all.push({ kind: "image", path: step.image });
-  for (const box of all) box.lines = box.kind === "diff" ? box.rows.length : box.kind === "image" ? 0 : box.text.split("\n").length;
+  for (const box of all) if (box.lines === undefined) box.lines = box.kind === "image" ? 0 : box.text.split("\n").length;
   return all;
 }
 
@@ -132,52 +138,16 @@ function imageBox(t, id, box, ui) {
   return frame(t, id, box, body, null, ui);
 }
 
-// The diff: a tinted row per line under one coloured code view of the file's text.
+// The diff: its rows tinted, numbered and in syntax colours (diff/view.js).
+const copies = new WeakMap(); // a view's rows -> what its copy button copies
+
 function diffBox(t, id, box, ui) {
-  const text = box.rows.map((row) => row.text).join("\n");
-  const view = ui.views.view(id, text, box.language);
-  const height = box.rows.length * CODE_LINE;
-  const tint = { add: mix(t.background, t.ansi2, 0.16), del: mix(t.background, t.ansi1, 0.16) };
-  const sign = { add: "+", del: "−", same: "", gap: "" };
-  const rows = box.rows.map((row) =>
-    h_flex()
-      .h(CODE_LINE)
-      .flex_none()
-      .when(Boolean(tint[row.kind]), (el) => el.bg(tint[row.kind]))
-      .child(
-        h_flex()
-          .w(GUTTER)
-          .flex_none()
-          .pr(8)
-          .justify_end()
-          .font_family(MONO)
-          .text_size(11)
-          .text_color(row.kind === "add" ? t.ansi2 : row.kind === "del" ? t.ansi1 : t.dim)
-          .child(row.kind === "gap" ? "⋯" : `${sign[row.kind]}${row.number}`),
-      ),
-  );
-  const copy = box.rows.map((row) => (row.kind === "gap" ? "..." : `${row.kind === "add" ? "+" : row.kind === "del" ? "-" : " "}${row.text}`)).join("\n");
-  const body = div()
-    .id(`${id}-scroll`)
-    .size_full()
-    .py(RESULT_PAD)
-    .overflow_y_scroll()
-    .child(
-      div()
-        .relative()
-        .h(height)
-        .child(v_flex().children(rows))
-        .child(
-          div()
-            .absolute()
-            .top(0)
-            .left(GUTTER)
-            .right(0)
-            .h(height)
-            .child(view ? Editor.new(view).w_full().h(height) : plainLines(t, box.rows.map((row) => row.text))),
-        ),
-    );
-  return frame(t, id, box, body, copy, ui);
+  const view = ui.diffs.view(id, box.key, box.language, box.rows);
+  if (!copies.has(view.rows)) {
+    copies.set(view.rows, view.rows.map((row) => (row.kind === "gap" ? "..." : `${row.kind === "add" ? "+" : row.kind === "del" ? "-" : " "}${row.text}`)).join("\n"));
+  }
+  const body = ui.diffs.draw(t, { ...syntax(t), property: t.ansi4 }, view, { height: boxHeight(box) - RESULT_GAP, pad: RESULT_PAD });
+  return frame(t, id, box, body, copies.get(view.rows), ui);
 }
 
 // Markdown read as one line: the marks go, the words stay.
@@ -288,12 +258,27 @@ function stepLine(t, step, open, toggle, ui) {
 }
 
 /**
+ * A changed file's diff: those of the steps that changed it, in order, a gap between two.
+ * Each step's line numbers are the file's as that step left it.
+ * @param {Record<string, string>} t The theme.
+ * @param {string} id
+ * @param {string} path
+ * @param {object[]} steps
+ * @param {{ pointer: object, diffs: import("./diff/view.js").DiffViews }} ui
+ * @returns {object|null} Null when no step has a diff.
+ */
+export function fileDiff(t, id, path, steps, ui) {
+  const diffs = steps.filter((step) => step.diff).map((step) => step.diff);
+  return diffs.length ? diffBox(t, id, diffOf(diffs, path), ui) : null;
+}
+
+/**
  * @param {Record<string, string>} t The theme.
  * @param {object} turn
  * @param {boolean} open Closed keeps the lines, at no height, so it closes with motion too.
  * @param {Set<string>} openSteps Ids of the steps showing their result.
  * @param {(id: string, cx: object) => void} toggle
- * @param {{ views: import("./code.js").CodeViews, pointer: object, width: number, machine: string|null, now: number|null, taskFor?: (step: object) => object|null, openTask?: (task: object, cx: object) => void }} ui
+ * @param {{ views: import("./code.js").CodeViews, diffs: import("./diff/view.js").DiffViews, pointer: object, width: number, machine: string|null, now: number|null, taskFor?: (step: object) => object|null, openTask?: (task: object, cx: object) => void }} ui
  *   The code views, the pointer (copy buttons), the reading width, Pi's machine (pictures), the agent machine's time (running clocks),
  *   and a delegate step's subagent and how to open it.
  */

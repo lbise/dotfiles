@@ -112,8 +112,8 @@ test("a failed tool is a step that is not ok, and changes no file", () => {
   assert.equal(turn.steps[1].result, "Could not find the text");
   assert.deepEqual(turn.steps[1].change, { path: "b.c", added: 1, removed: 1 });
   assert.deepEqual(turn.files, [
-    { path: "a.c", added: 2, removed: 2 },
-    { path: "new.c", added: 3, removed: 0 },
+    { path: "a.c", added: 2, removed: 2, steps: ["c1", "c4"] },
+    { path: "new.c", added: 3, removed: 0, steps: ["c3"] },
   ]);
 });
 

@@ -7,7 +7,7 @@ import { errorText, formatDuration } from "./model/format.js";
 import { copyButton, hoverArea, typedText } from "./copy.js";
 import { STEP_CELL, stepCell } from "./cells.js";
 import { markdown } from "./markdown.js";
-import { liveTail, stepList, stepVerb } from "./steps.js";
+import { fileDiff, liveTail, stepList, stepVerb } from "./steps.js";
 import { subagentNote } from "./subagents.js";
 import { MONO, icon, monoLine } from "./ui.js";
 
@@ -155,10 +155,32 @@ function work(ui, turn) {
     .pt(10)
     .child(workLine(ui, turn, open === true))
     .when(tail !== null, (el) => el.child(tail))
-    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, pointer: chat.pointer, width: ui.width, machine: chat.shown ? chat.shown.machine : null, now: ui.now, taskFor: (step) => chat.taskFor(step), openTask: (task, cx) => chat.openChild(task, cx) })));
+    .when(open !== undefined, (el) => el.child(stepList(t, turn, open, chat.openSteps, (id, cx) => chat.toggleStep(id, cx), { views: chat.code, diffs: chat.diffs, pointer: chat.pointer, width: ui.width, machine: chat.shown ? chat.shown.machine : null, now: ui.now, taskFor: (step) => chat.taskFor(step), openTask: (task, cx) => chat.openChild(task, cx) })));
 }
 
-function files(t, turn) {
+// A file's row opens its diff under it.
+function fileRow(t, turn, file, counts, line, chat) {
+  const id = `pi-chat-file-${turn.key}-${file.path}`;
+  const open = chat.openSteps.has(id);
+  const steps = (file.steps || []).map((stepId) => turn.steps.find((step) => step.id === stepId)).filter(Boolean);
+  const diff = open ? fileDiff(t, `${id}-diff`, file.path, steps, { pointer: chat.pointer, diffs: chat.diffs }) : null;
+  const opens = steps.some((step) => step.diff);
+  return v_flex()
+    .border_t(1)
+    .border_color(t.border)
+    .child(
+      line()
+        .id(id)
+        .text_color(t.muted)
+        .when(opens, (el) => el.cursor_pointer().hover((s) => s.bg(t.surface)).on_click((_event, cx) => chat.toggleStep(id, cx)))
+        .child(icon(opens ? (open ? "chevron-down" : "chevron-right") : "file", 13))
+        .child(div().flex_1().min_w(0).truncate().font_family(MONO).text_size(12).child(monoLine(file.path)))
+        .child(counts(file.added, file.removed)),
+    )
+    .when(diff !== null, (el) => el.child(div().pr(12).child(diff)));
+}
+
+function files(t, turn, chat) {
   const added = turn.files.reduce((sum, file) => sum + file.added, 0);
   const removed = turn.files.reduce((sum, file) => sum + file.removed, 0);
   const counts = (plus, minus) =>
@@ -186,17 +208,7 @@ function files(t, turn) {
             .child(div().flex_1().font_medium().text_color(t.foreground).child(`${count} changed ${count === 1 ? "file" : "files"}`))
             .child(counts(added, removed)),
         )
-        .children(
-          turn.files.map((file) =>
-            line()
-              .border_t(1)
-              .border_color(t.border)
-              .text_color(t.muted)
-              .child(icon("file"))
-              .child(div().flex_1().min_w(0).truncate().font_family(MONO).text_size(12).child(monoLine(file.path)))
-              .child(counts(file.added, file.removed)),
-          ),
-        ),
+        .children(turn.files.map((file) => fileRow(t, turn, file, counts, line, chat))),
     );
 }
 
@@ -229,7 +241,7 @@ export function drawRow(item, ui) {
       .child(markdown(t, id, item.turn.answer, pointer, ui.chat.code))
       .when(!item.turn.live, (el) => el.child(div().absolute().top(gap).right(-34).child(copyButton(t, id, item.turn.answer, pointer, "Copy the answer"))));
   }
-  if (item.kind === "files") return files(t, item.turn);
+  if (item.kind === "files") return files(t, item.turn, ui.chat);
   if (item.kind === "end") {
     const error = item.turn.error;
     if (!error) return quiet(t, "Stopped.");

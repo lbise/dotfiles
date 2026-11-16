@@ -96,7 +96,7 @@ A turn starts at a user message and runs to the next one.
   narration: [{ key: "b2c3d4e5:0", text: "Looking.", beforeStep: 0 }],
   notes: [],                    // { key, kind: "compaction"|"branch"|"custom"|"bash", title, text, beforeStep }
   answer: "The check is in `afh.c`.",     // markdown; while live, the reply being written
-  files: [{ path: "src/afh.c", added: 3, removed: 1 }],
+  files: [{ path: "src/afh.c", added: 3, removed: 1, steps: ["toolu_2"] }],  // steps: ids of the steps that changed it
   startedAt: 1794489000000, endedAt: 1794489134000, durationMs: 134000,
   model: { provider: "anthropic", id: "claude-sonnet-4-5" },
   error: null, aborted: false,

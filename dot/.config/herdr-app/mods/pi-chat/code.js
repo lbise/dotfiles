@@ -11,7 +11,8 @@ import { asCode, codeFont } from "./ui.js";
 const KEPT = 160;
 const LANGUAGES = { ts: "js", tsx: "js", typescript: "js", javascript: "js", jsx: "js", mjs: "js", cjs: "js", sh: "bash", shell: "bash", zsh: "bash", console: "bash", py: "python", yml: "yaml", jsonc: "json", toml: "yaml", h: "c", hpp: "cpp", "c++": "cpp" };
 
-function syntax(t) {
+/** The theme's colours for code, by kind of token. */
+export function syntax(t) {
   return { keyword: t.ansi5, string: t.ansi2, "string.escape": t.ansi6, comment: t.muted, function: t.ansi4, type: t.ansi3, number: t.ansi1, constant: t.ansi6, boolean: t.ansi1 };
 }
 

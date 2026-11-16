@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
 # Drive the development copy of the Herdr app (its own home, so the daily window is untouched).
 #   herdr-app-dev sync            copy mods/pi-chat, layouts and themes from the repo into the dev home
+#   herdr-app-dev open            start the dev window (1280x820, at the screen's top left)
 #   herdr-app-dev shot [name]     save the dev window's frame, print its WSL path
+#   herdr-app-dev click X Y       press at client pixel X,Y (the shot's pixels)
+#   herdr-app-dev wheel X Y D     wheel at X,Y: D > 0 up, 120 a notch; hwheel X Y D: D > 0 right
+#   herdr-app-dev move X Y        move the pointer there (hover)
 #   herdr-app-dev <args...>       herdr-app <args...> against the dev window (status, do, check, ...)
 set -Eeuo pipefail
-repo="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)/dot/.config/herdr-app"
+here="$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")"
+repo="$(cd -- "$here/.." && pwd)/dot/.config/herdr-app"
 win_profile="$(cd /mnt/c && cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
 dev_win="$win_profile\\.config\\herdr-app-dev"
 dev="$(wslpath "$dev_win")"
 run() { (cd /mnt/c && HERDR_APP_HOME="$dev_win" WSLENV="HERDR_APP_HOME:${WSLENV:-}" herdr-app.exe "$@" | tr -d '\r'); }
+# Pointer input goes to the window `open` started, by its process id.
+input() {
+    local pid
+    pid="$(cat "$dev/window.pid" 2>/dev/null)" || { echo "ERROR: no dev window: run herdr-app-dev open" >&2; exit 1; }
+    (cd /mnt/c && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$here/herdr-app-dev-input.ps1")" \
+        -procId "$pid" -action "$@" | tr -d '\r')
+}
 case "${1:-}" in
 sync)
     mkdir -p "$dev/mods/pi-chat" "$dev/layouts" "$dev/themes"
@@ -16,6 +28,16 @@ sync)
     cp "$repo"/layouts/*.json "$dev/layouts/" 2>/dev/null || true
     cp "$repo"/themes/*.json "$dev/themes/"
     ;;
+open)
+    mkdir -p "$dev"
+    # Started from Windows so the window gets HERDR_APP_HOME; its process id is kept for input.
+    (cd /mnt/c && powershell.exe -NoProfile -Command "\$env:HERDR_APP_HOME='$dev_win'; (Start-Process -FilePath (Get-Command herdr-app.exe).Source -PassThru).Id" | tr -d '\r') >"$dev/window.pid"
+    for _ in $(seq 30); do run status >/dev/null 2>&1 && break; sleep 0.5; done
+    input place -x 0 -y 0
+    run status
+    ;;
+click | move) input "$1" -x "$2" -y "$3" ;;
+wheel | hwheel) input "$1" -x "$2" -y "$3" -delta "$4" ;;
 shot)
     out="$(wslpath "$(cd /mnt/c && cmd.exe /c 'echo %TEMP%' 2>/dev/null | tr -d '\r')")/herdr-shots"
     mkdir -p "$out"

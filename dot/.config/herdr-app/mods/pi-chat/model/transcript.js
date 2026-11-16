@@ -23,6 +23,7 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} path
  * @property {number} added Lines added.
  * @property {number} removed Lines removed.
+ * @property {string[]} [steps] In a turn's `files`: the ids of the steps that changed it, in order.
  *
  * @typedef {object} Step One tool call.
  * @property {string} id The tool call id: the same in state.json and in the session file.
@@ -535,7 +536,8 @@ function foldResult(transcript, entry) {
   if (entry.durationMs !== undefined) step.durationMs = entry.durationMs;
   if (step.change && entry.ok && !counted) {
     let file = turn.files.find((known) => known.path === step.change.path);
-    if (!file) turn.files.push((file = { path: step.change.path, added: 0, removed: 0 }));
+    if (!file) turn.files.push((file = { path: step.change.path, added: 0, removed: 0, steps: [] }));
+    file.steps.push(step.id);
     file.added += step.change.added;
     file.removed += step.change.removed;
   }

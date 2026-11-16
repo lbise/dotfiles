@@ -10,6 +10,7 @@ import { childTask } from "./model/chat.js";
 import { isChildSession } from "./model/protocol.js";
 import { AskCard } from "./ask.js";
 import { CodeViews } from "./code.js";
+import { DiffViews } from "./diff/view.js";
 import { editInNeovim } from "./editor.js";
 import { loadImages } from "./images.js";
 import { Composer } from "./composer.js";
@@ -47,6 +48,7 @@ export class ChatView {
   constructor(cx) {
     this.timeline = new Timeline();
     this.code = new CodeViews();
+    this.diffs = new DiffViews();
     this.composer = new Composer(this);
     this.draft = new SharedDraft(this.composer);
     this.picker = new Picker(this);

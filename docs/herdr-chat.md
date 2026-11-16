@@ -253,6 +253,12 @@ when idle, never when hidden.
 - Running subagents show in a strip over the reply box. The mod reads at the live pace while any
   subagent runs, also when Pi itself is idle. A finished background subagent shows as one line where
   its completion message stands, and a delegate step opens its subagent.
+- Diffs (an edit step's, a changed file's) are drawn by `diff/`: rows tinted and numbered, in syntax
+  colours from Prism (`diff/prism.js`, built by `scripts/herdr-app-build-prism`; add a language
+  there). Each side of a diff is tokenized whole, so comments and strings that span lines colour
+  right. A diff box scrolls itself and draws only the rows in view: GPUI scroll areas give the wheel
+  to the chat as well and cannot say when they are at their end. The wheel goes on to the chat
+  once the box is at its end.
 - Pressing a subagent shows its conversation in place of Pi's, read only. The header has a back button,
   Esc goes back, and nothing can be sent. Pi keeps running; unlike Pi's `/tasks`, nothing switches
   session. The poll is the same command, given the subagent's file as a fourth argument. It still
@@ -264,9 +270,16 @@ when idle, never when hidden.
 (`%USERPROFILE%\.config\herdr-app-dev`), so the daily window, its layout and its theme stay untouched:
 
     scripts/herdr-app-dev sync          # copy the mod, layouts and themes from the repo
+    scripts/herdr-app-dev open          # start the dev window, 1280x820 at the screen's top left
     scripts/herdr-app-dev check 'C:\Users\<you>\.config\herdr-app-dev\mods\pi-chat'
     scripts/herdr-app-dev do layout.switch '{"name":"leo"}'
     scripts/herdr-app-dev shot name     # prints the PNG's WSL path
+    scripts/herdr-app-dev click 700 840 # press at a pixel of the shot
+    scripts/herdr-app-dev wheel 800 300 -120   # a wheel notch down there (hwheel: sideways)
+
+Pointer input is posted to the dev window alone: the real cursor and the daily window stay put.
+A session to look at: `do space.new` with `"argv":["pi","--session","<copy of a session file>"]`
+on machine `1-wsl` shows that conversation without asking the model anything.
 
 Spaces, tabs and terminals belong to herdr-core, so a tab made from the dev window also appears in
 the daily window.
