@@ -4,7 +4,8 @@
 // unchanged lines take the new side's colours. A gap (lines left out) starts
 // over: a hunk that begins inside a comment is coloured as code.
 //
-// Plain JS, no Herdr imports: node runs its tests.
+// The source is mods/review/diff/; scripts/herdr-app-sync-diff copies it into
+// mods/pi-chat/diff/. Plain JS, no Herdr imports: node runs its tests.
 
 import Prism from "./prism.js";
 

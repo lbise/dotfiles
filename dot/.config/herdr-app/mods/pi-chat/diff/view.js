@@ -11,6 +11,7 @@ import { h_flex, v_flex } from "gpui-base";
 import { settings } from "herdr";
 import { MONO, codeFont, mix, monoLine } from "../ui.js";
 import { highlightRows } from "./highlight.js";
+import { markSpans, wordMarks } from "./words.js";
 
 /** A row's height. */
 export const DIFF_ROW = 20;
@@ -28,6 +29,7 @@ const SIGN = { add: "+", del: "−", same: "", gap: "" };
  * @property {string} key What its rows were made from.
  * @property {DiffRow[]} rows
  * @property {import("./highlight.js").Span[][]|null} spans Null: plain text.
+ * @property {Array<[number, number][]|null>} marks Changed words, per row (words.js).
  * @property {number} columns The longest line, in characters.
  * @property {number} y Scrolled down, design px.
  * @property {number} x Scrolled sideways, design px.
@@ -59,6 +61,7 @@ export class DiffViews {
         key,
         rows: made,
         spans: highlightRows(made, language),
+        marks: wordMarks(made),
         columns: made.reduce((most, row) => Math.max(most, row.text.replace(/\t/g, "    ").length), 0),
         y: view ? view.y : 0,
         x: view ? view.x : 0,
@@ -89,6 +92,7 @@ export class DiffViews {
     const first = Math.floor(view.y / DIFF_ROW);
     const last = Math.min(view.rows.length, Math.ceil((view.y + inner) / DIFF_ROW));
     const tint = { add: mix(t.background, t.ansi2, 0.16), del: mix(t.background, t.ansi1, 0.16) };
+    tint.mark = { add: mix(t.background, t.ansi2, 0.38), del: mix(t.background, t.ansi1, 0.38) };
     const rows = [];
     for (let i = first; i < last; i++) rows.push(this.row(t, colours, tint, view, i, i === first, zoom));
     return div()
@@ -133,14 +137,14 @@ export class DiffViews {
 
   row(t, colours, tint, view, index, first, zoom) {
     const row = view.rows[index];
-    const spans = view.spans ? view.spans[index] : [{ text: row.text, kind: null }];
+    const spans = markSpans(view.spans ? view.spans[index] : [{ text: row.text, kind: null }], view.marks[index]);
     const text = h_flex()
       .absolute()
       .top(0)
       .h(DIFF_ROW)
       .left(-view.x)
       .whitespace_nowrap()
-      .children(spans.map((span) => div().flex_none().when(Boolean(span.kind && colours[span.kind]), (el) => el.text_color(colours[span.kind])).child(monoLine(span.text))));
+      .children(spans.map((span) => div().flex_none().when(Boolean(span.kind && colours[span.kind]), (el) => el.text_color(colours[span.kind])).when(span.mark, (el) => el.bg(tint.mark[row.kind])).child(monoLine(span.text))));
     // The first row on screen measures a character, once: the font is the same in every view.
     const columns = row.text.replace(/\t/g, "    ").length;
     const measures = first && !this.char && columns >= 8;

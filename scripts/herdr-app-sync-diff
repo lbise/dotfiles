@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Copy the diff code the review mod owns into pi-chat: Herdr mods cannot import
+# outside their own folder. mods/review/diff/sync.test.js fails when they differ.
+set -Eeuo pipefail
+mods="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)/dot/.config/herdr-app/mods"
+for file in highlight.js words.js prism.js; do
+    cp "$mods/review/diff/$file" "$mods/pi-chat/diff/$file"
+done

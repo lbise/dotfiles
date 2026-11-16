@@ -255,8 +255,10 @@ when idle, never when hidden.
   its completion message stands, and a delegate step opens its subagent.
 - Diffs (an edit step's, a changed file's) are drawn by `diff/`: rows tinted and numbered, in syntax
   colours from Prism (`diff/prism.js`, built by `scripts/herdr-app-build-prism`; add a language
-  there). Each side of a diff is tokenized whole, so comments and strings that span lines colour
-  right. A diff box scrolls itself and draws only the rows in view: GPUI scroll areas give the wheel
+  there), changed words marked (`diff/words.js`). Each side of a diff is tokenized whole, so comments
+  and strings that span lines colour right. `highlight.js`, `words.js` and `prism.js` are copies of
+  the review mod's (`mods/review/diff/`, see docs/herdr-review.md): edit them there and run
+  `scripts/herdr-app-sync-diff`. A diff box scrolls itself and draws only the rows in view: GPUI scroll areas give the wheel
   to the chat as well and cannot say when they are at their end. The wheel goes on to the chat
   once the box is at its end.
 - Pressing a subagent shows its conversation in place of Pi's, read only. The header has a back button,
