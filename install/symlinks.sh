@@ -49,6 +49,7 @@ DESKTOP_LINKS=(
     ".config/herdr-app/settings.json"
     ".config/herdr-app/themes/tokyo-night.json"
     ".config/herdr-app/mods/prefix"
+    ".config/herdr-app/mods/tickets"
     ".config/walker"
     ".config/elephant/menus"
     # sdl-freerdp hotkeys default to Right Shift + key: Shift+D disconnects.

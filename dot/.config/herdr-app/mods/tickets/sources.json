@@ -1,0 +1,4 @@
+[
+  { "name": "Redmine", "kind": "redmine", "machine": "1-wsl" },
+  { "name": "GitHub", "kind": "github" }
+]
