@@ -9,12 +9,14 @@
 // files), relations and watchers. The tickets show as a list or as a board with a
 // column per status they are in ("tickets.view"); dragging a card to another column
 // changes its status when the tracker's workflow allows it. Unsent comments and descriptions survive switching
-// tickets and closing the dialog ("tickets.drafts"). Opened with mod.open:tickets,
-// or from the Tickets button in the tab bar (mods/leo-tabs).
+// tickets and closing the app ("tickets.drafts"). A side panel (layouts/leo.json's
+// `tickets` block), opened from the Tickets button in the tab bar or
+// leo-tabs.tickets, maximized with leo-tabs.max (mods/leo-tabs). Below WIDE it is
+// the list, or the picked ticket with a way back; the board needs the room.
 
-import { View, div } from "gpui-kit";
+import { View, div, svg } from "gpui-kit";
 import { Input, InputState, Popup, Textarea, TextareaState, TextView, h_flex, v_flex } from "gpui-base";
-import { appHome, checking, exec, machines, notify, readTextFile, setShared, shared, theme } from "herdr";
+import { appHome, checking, exec, layout, machines, notify, readTextFile, run as runCommand, setShared, settings, shared, theme } from "herdr";
 import { PROVIDERS, RELATIONS, ago, columns, dropped, parseSources, size, valueOf } from "./providers.js";
 
 const MONO = "Geist Mono";
@@ -30,9 +32,12 @@ const SHOWN = 200; // a dropdown draws at most this many; typing narrows the res
 const DOWNLOADS = "~/Downloads"; // where Save puts an attachment, on the source's machine
 // Trackers keep a single line break; markdown would join the lines. Two spaces keep it.
 const SOFT_BREAK = /([^\n])\n(?=[^\n])/g;
+const WIDE = 760; // design px from which the list and the ticket sit side by side
 
 export default class Tickets extends View {
   init(_props, cx) {
+    this.width = 0; // design px
+    this.narrow = true;
     this.sources = [];
     this.error = "";
     this.scripts = {}; // provider script file -> its text
@@ -459,6 +464,7 @@ export default class Tickets extends View {
     const tickets = all.filter((x) => !off.has(`st:${x.status}`));
     const picked = this.ticket();
     const loading = result?.state === "loading";
+    const narrow = (this.narrow = this.width < WIDE);
 
     const chip = (key, label, figure) => {
       const lit = !off.has(key);
@@ -480,7 +486,7 @@ export default class Tickets extends View {
     const state = loading ? div().text_color(t.muted).frames(SPINNER, 90)
       : result?.state === "error" ? div().min_w(0).truncate().text_color(t.ansi1).child(result.error)
       : result?.state === "ok" ? div().font_family(MONO).text_size(12).text_color(t.muted).child(String(all.length)) : null;
-    const label = (text) => div().w(64).flex_none().text_size(12).text_color(t.muted).child(text);
+    const label = (text) => div().when(narrow, (el) => el.w_full()).when(!narrow, (el) => el.w(64)).flex_none().text_size(12).text_color(t.muted).child(text);
     const card = () => v_flex().rounded(10).border(1).border_color(t.border);
     const note = (text, color = t.muted) => div().p(14).text_color(color).child(text);
 
@@ -496,7 +502,7 @@ export default class Tickets extends View {
         .child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(x.project))
         .child(div().flex_none().font_family(MONO).text_color(t.dim).child(ago(x.updated))));
 
-    const view = shared(VIEW) === "board" ? "board" : "list";
+    const view = !narrow && shared(VIEW) === "board" ? "board" : "list";
     const views = h_flex().gap(4).children([["list", "List"], ["board", "Board"]].map(([key, text]) =>
       h_flex().id(`view-${key}`).h(26).px(10).items_center().rounded(6).border(1).cursor_pointer().flex_none()
         .border_color(view === key ? t.accent : t.border).text_color(view === key ? t.foreground : t.muted)
@@ -507,25 +513,42 @@ export default class Tickets extends View {
       : note(loading ? "Loading…" : !source ? "No source for this computer in sources.json" : "No open tickets");
     const detail = picked && this.detail(t, picked, this.details[picked.key]);
 
-    return v_flex().id("tickets").size_full().bg(t.background).text_color(t.foreground).text_size(13).p(18).gap(12)
+    return v_flex().id("tickets").size_full().bg(t.background).text_color(t.foreground).text_size(13).p(narrow ? 12 : 18).gap(12)
+      .rounded(10).border_1().border_color(t.border).overflow_hidden()
+      .on_size_change((size, cx) => {
+        const width = size.width / (settings().zoom || 1);
+        if (Math.abs(width - this.width) < 1) return;
+        this.width = width;
+        cx.notify();
+      })
       .on_mouse_up("left", (_e, cx) => { if (this.drag) { this.drag = null; cx.notify(); } })
       .child(h_flex().items_center().gap(8)
-        .child(div().font_semibold().pr(6).child(sources.length > 1 || !source ? "Tickets" : source.name))
+        // Narrow: the panel's tab already says Tickets.
+        .when(!narrow || (sources.length <= 1 && !!source), (el) => el.child(div().min_w(0).truncate().font_semibold().pr(6).child(sources.length > 1 || !source ? "Tickets" : source.name)))
         .when(sources.length > 1, (el) => el.child(switcher))
         .when(!!state, (el) => el.child(state))
         .child(div().flex_1())
-        .child(views)
-        .child(button(t, "refresh", "Refresh", !loading, (cx) => this.refresh(cx))))
-      .when(statuses.length > 0, (el) => el.child(h_flex().items_center().gap(6).flex_wrap()
+        .when(!narrow, (el) => el.child(views))
+        .child(button(t, "refresh", narrow ? svg("mods/review/icons/refresh.svg").size(14) : "Refresh", !loading, (cx) => this.refresh(cx)))
+        .child(maxButton(t)))
+      .when(statuses.length > 0 && !(narrow && picked), (el) => el.child(h_flex().items_center().gap(6).flex_wrap()
         .child(label("Status"))
         .children(statuses.map((st) => chip(`st:${st}`, st, String(all.filter((x) => x.status === st).length))))))
-      .when(view === "list", (el) => el.child(h_flex().flex_1().min_h(0).gap(14)
+      // Narrow: the list, or the picked ticket in its place.
+      .when(narrow, (el) => el.child(picked
+        ? card().id("detail").flex_1().min_h(0).overflow_y_scrollbar()
+          .child(h_flex().px(12).pt(10).child(button(t, "back", "← Tickets", true, (cx) => this.unpick(cx))))
+          .child(detail)
+        : card().id("list").flex_1().min_h(0).overflow_y_scrollbar()
+          .children(tickets.map(row))
+          .when(!tickets.length, (el) => el.child(empty))))
+      .when(!narrow && view === "list", (el) => el.child(h_flex().flex_1().min_h(0).gap(14)
         .child(card().id("list").w(480).flex_none().overflow_y_scrollbar()
           .children(tickets.map(row))
           .when(!tickets.length, (el) => el.child(empty)))
         .child(card().id("detail").flex_1().min_w(0).overflow_y_scrollbar()
           .child(detail || note("Pick a ticket")))))
-      .when(view === "board", (el) => el
+      .when(!narrow && view === "board", (el) => el
         // Without a ticket open, a refused move has no detail to show in.
         .when(!!this.failed && !picked, (el) => el.child(div().text_color(t.ansi1).child(this.failed)))
         .child(h_flex().flex_1().min_h(0).gap(14)
@@ -593,7 +616,7 @@ export default class Tickets extends View {
         .child(div().w(14).flex_none().child(on ? "✓" : ""))
         .child(div().flex_1().min_w(0).truncate().child(o.name));
     };
-    const list = v_flex().id(`list-${entry.attr}`).w(wide ? 420 : 260).mt(6).p(4).gap(1).rounded(10).bg(t.popover)
+    const list = v_flex().id(`list-${entry.attr}`).w(wide && !this.narrow ? 420 : 260).mt(6).p(4).gap(1).rounded(10).bg(t.popover)
       .border_1().border_color(t.border).shadow_lg().text_size(13)
       .on_mouse_down_out((_e, cx) => this.closeMenu(cx))
       .when(total >= FILTER_FROM, (el) => el.child(div().mb(4).rounded(6).border(1).border_color(t.input).bg(t.surface).px(6)
@@ -625,6 +648,7 @@ export default class Tickets extends View {
   }
 
   detail(t, x, d) {
+    const narrow = this.narrow;
     const value = d?.value;
     const markdown = (id, text) => TextView.markdown(id, text.replace(/\r\n/g, "\n").replace(SOFT_BREAK, "$1  \n")).selectable(true);
     const section = (title, extra) => h_flex().gap(8).items_center().text_size(12).text_color(t.muted)
@@ -633,31 +657,33 @@ export default class Tickets extends View {
     const titleEntry = value?.form.find((f) => f.place === "title");
     const statusEntry = value?.form.find((f) => f.place === "status");
 
+    const watching = !!value?.me && !!value?.watchers && value.watchers.some((w) => w.id === value.me);
+    const actions = [
+      !!value?.me && !!value?.watchers && button(t, "watch-me", this.saving === (watching ? "unwatch" : "watch") ? "Saving…" : watching ? "Unwatch" : "Watch", !this.saving,
+        (cx) => this.apply(watching ? { unwatch: value.me } : { watch: value.me }, cx)),
+      button(t, "copy", this.copied === x.key ? "Copied" : "Copy link", true, (cx) => this.copy(x, cx)),
+      button(t, "open", narrow ? "Open" : "Open in browser", true, (cx) => cx.open_url(x.url)),
+    ].filter(Boolean);
+    const title = v_flex().flex_1().min_w(0).text_size(15).font_weight(500)
+      .child(div().font_family(MONO).text_size(13).text_color(t.muted).child(x.id))
+      .child(titleEntry ? this.typed(t, titleEntry, "title") : div().child(x.title));
+    // Narrow: the buttons go under the title.
     const head = v_flex().gap(8)
-      .child(h_flex().gap(10).items_start()
-        .child(v_flex().flex_1().min_w(0).text_size(15).font_weight(500)
-          .child(div().font_family(MONO).text_size(13).text_color(t.muted).child(x.id))
-          .child(titleEntry ? this.typed(t, titleEntry, "title") : div().child(x.title)))
-        .when(!!value?.me && !!value?.watchers, (el) => {
-          const watching = value.watchers.some((w) => w.id === value.me);
-          return el.child(button(t, "watch-me", this.saving === (watching ? "unwatch" : "watch") ? "Saving…" : watching ? "Unwatch" : "Watch", !this.saving,
-            (cx) => this.apply(watching ? { unwatch: value.me } : { watch: value.me }, cx)));
-        })
-        .child(button(t, "copy", this.copied === x.key ? "Copied" : "Copy link", true, (cx) => this.copy(x, cx)))
-        .child(button(t, "open", "Open in browser", true, (cx) => cx.open_url(x.url))))
-      .child(h_flex().gap(8).items_center().text_size(12).text_color(t.muted)
+      .child(narrow ? title : h_flex().gap(10).items_start().child(title).children(actions))
+      .when(narrow, (el) => el.child(h_flex().gap(6).flex_wrap().children(actions)))
+      .child(h_flex().gap(8).flex_wrap().items_center().text_size(12).text_color(t.muted)
         .child(statusEntry ? this.dropdown(t, statusEntry, false) : div().text_color(t.foreground).child(x.status))
         .when(!!x.priority, (el) => el.child(x.priority))
         .child(div().text_color(t.dim).child(x.project))
         .child(div().font_family(MONO).text_color(t.dim).child(`updated ${ago(x.updated)} ago`)));
 
-    const body = v_flex().p(16).gap(16).child(head)
+    const body = v_flex().p(narrow ? 12 : 16).gap(16).child(head)
       .when(!!this.failed, (el) => el.child(div().text_color(t.ansi1).child(this.failed)))
       .when(!!d?.error, (el) => el.child(div().text_color(t.ansi1).child(d.error)));
     if (!value) return body.child(d?.state === "error" ? div().text_color(t.ansi1).child(d.error) : div().text_color(t.muted).child("Loading…"));
 
     const rowOf = (name, control) => h_flex().gap(12).items_start().text_size(12)
-      .child(div().w(140).flex_none().py(5).truncate().text_color(t.muted).child(name))
+      .child(div().w(narrow ? 96 : 140).flex_none().py(5).truncate().text_color(t.muted).child(name))
       .child(control);
     const form = value.form.filter((f) => !f.place).map((f) =>
       rowOf(f.label, f.type === "select" ? h_flex().flex_1().min_w(0).py(1).child(this.dropdown(t, f, true)) : this.typed(t, f)));
@@ -680,40 +706,53 @@ export default class Tickets extends View {
         !this.attaching && button(t, "att-add", this.saving === "attach" ? "Uploading…" : "Add file", !this.saving, (cx) => { this.attaching = true; this.attachPath.focus(); cx.notify(); })))
       .children(value.attachments.map((a) => {
         const saved = this.downloads[a.id];
+        const name = div().id(`att-${a.id}`).flex_1().min_w(0).truncate().cursor_pointer().hover((s) => s.text_color(t.accent))
+          .on_click((_e, cx) => cx.open_url(a.url)).child(a.name);
+        const meta = [dim(size(a.size)), div().flex_none().text_color(t.muted).child(a.author), dim(when(a.at))];
+        const buttons = [
+          button(t, `save-${a.id}`, saved?.state === "loading" ? "Saving…" : "Save", saved?.state !== "loading", (cx) => this.save(a, cx)),
+          remove(`att:${a.id}`, (cx) => this.apply({ unattach: a.id }, cx)),
+        ];
+        // Narrow: the name and its buttons, then who and when.
         return v_flex().gap(2).text_size(12)
-          .child(h_flex().gap(8).items_center()
-            .child(div().id(`att-${a.id}`).flex_1().min_w(0).truncate().cursor_pointer().hover((s) => s.text_color(t.accent))
-              .on_click((_e, cx) => cx.open_url(a.url)).child(a.name))
-            .child(dim(size(a.size)))
-            .child(div().flex_none().text_color(t.muted).child(a.author))
-            .child(dim(when(a.at)))
-            .child(button(t, `save-${a.id}`, saved?.state === "loading" ? "Saving…" : "Save", saved?.state !== "loading", (cx) => this.save(a, cx)))
-            .child(remove(`att:${a.id}`, (cx) => this.apply({ unattach: a.id }, cx))))
+          .child(narrow
+            ? h_flex().gap(8).items_center().child(name).children(buttons)
+            : h_flex().gap(8).items_center().child(name).children(meta).children(buttons))
+          .when(narrow, (el) => el.child(h_flex().gap(8).flex_wrap().items_center().children(meta)))
           .when(!!a.description, (el) => el.child(div().text_color(t.muted).child(a.description)))
           .when(saved?.state === "ok", (el) => el.child(div().font_family(MONO).text_color(t.dim).child(`saved to ${saved.value}`)))
           .when(saved?.state === "error", (el) => el.child(div().text_color(t.ansi1).child(saved.error)));
       }))
-      .when(this.attaching, (el) => el.child(h_flex().gap(6).items_center()
-        .child(field(this.attachPath))
-        .child(field(this.attachNote, 200))
+      .when(this.attaching, (el) => el.child(h_flex().gap(6).items_center().when(narrow, (el) => el.flex_wrap())
+        .child(narrow ? field(this.attachPath).w_full() : field(this.attachPath))
+        .child(narrow ? field(this.attachNote).w_full() : field(this.attachNote, 200))
         .child(button(t, "att-cancel", "Cancel", true, (cx) => { this.attaching = false; cx.notify(); }))
         .child(button(t, "att-upload", this.saving === "attach" ? "Uploading…" : "Upload", !this.saving, (cx) => this.attachTyped(cx), true))));
 
     const timed = this.relType === "precedes" || this.relType === "follows";
     const relations = value.relations && v_flex().gap(6)
       .child(section(value.relations.length ? `${value.relations.length} related ticket${value.relations.length > 1 ? "s" : ""}` : "No related tickets"))
-      .children(value.relations.map((r) => h_flex().gap(8).items_center().text_size(12)
-        .child(div().w(140).flex_none().truncate().text_color(t.muted).child(r.label))
-        .child(div().id(`rel-${r.id}`).flex_none().font_family(MONO).cursor_pointer().hover((s) => s.text_color(t.accent))
-          .on_click((_e, cx) => cx.open_url(r.url)).child(`#${r.to}`))
-        .child(div().flex_1().min_w(0).truncate().child(r.title))
-        .child(div().flex_none().text_color(t.muted).child(r.status))
-        .child(remove(`rel:${r.id}`, (cx) => this.apply({ unrelate: r.id }, cx)))))
-      .child(h_flex().gap(6).items_center()
+      .children(value.relations.map((r) => {
+        const id = div().id(`rel-${r.id}`).flex_none().font_family(MONO).cursor_pointer().hover((s) => s.text_color(t.accent))
+          .on_click((_e, cx) => cx.open_url(r.url)).child(`#${r.to}`);
+        const title = div().flex_1().min_w(0).truncate().child(r.title);
+        const unrelate = remove(`rel:${r.id}`, (cx) => this.apply({ unrelate: r.id }, cx));
+        // Narrow: the ticket on the first line, how it relates under it.
+        return narrow
+          ? v_flex().gap(2).text_size(12)
+            .child(h_flex().gap(8).items_center().child(id).child(title).child(unrelate))
+            .child(div().text_color(t.muted).child(`${r.label} · ${r.status}`))
+          : h_flex().gap(8).items_center().text_size(12)
+            .child(div().w(140).flex_none().truncate().text_color(t.muted).child(r.label))
+            .child(id).child(title)
+            .child(div().flex_none().text_color(t.muted).child(r.status))
+            .child(unrelate);
+      }))
+      .child(h_flex().gap(6).items_center().when(narrow, (el) => el.flex_wrap())
         .child(div().w(200).flex_none().child(this.dropdown(t, this.entry("relation_type"), true)))
         .child(field(this.relTo, 110))
         .when(timed, (el) => el.child(field(this.relDelay, 80)))
-        .child(div().flex_1())
+        .when(!narrow, (el) => el.child(div().flex_1()))
         .child(button(t, "rel-add", this.saving === "relate" ? "Saving…" : "Add relation", !this.saving, (cx) => this.relate(cx), true)));
 
     const watchers = value.watchers && v_flex().gap(6)
@@ -754,6 +793,25 @@ export default class Tickets extends View {
           .child(button(t, "comment", this.saving === "comment" ? "Saving…" : "Comment", ready,
             (cx) => this.apply({ comment: this.comment.value().trim() }, cx), true))));
   }
+}
+
+/** The maximize button every side panel has (leo-tabs does the work). */
+function maxButton(t) {
+  const max = findNode(layout(), "chat-view")?.hidden === true;
+  return h_flex().id("panel-max").size(26).flex_none().items_center().justify_center().rounded(6).border(1).border_color(t.border)
+    .text_color(t.muted).cursor_pointer().hover((s) => s.bg(t.raised).text_color(t.foreground))
+    .on_click(() => runCommand("leo-tabs.max"))
+    .child(svg(`mods/review/icons/${max ? "unzoom" : "zoom"}.svg`).size(14));
+}
+
+function findNode(node, id) {
+  if (!node) return null;
+  if (node.id === id) return node;
+  for (const child of node.children || []) {
+    const found = findNode(child, id);
+    if (found) return found;
+  }
+  return null;
 }
 
 /** A small button; `primary` is the solid one (the action a form exists for). */

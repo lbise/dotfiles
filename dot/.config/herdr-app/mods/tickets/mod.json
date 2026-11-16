@@ -1,5 +1,1 @@
-{
-  "place": "none",
-  "title": "Tickets",
-  "overlay": { "kind": "dialog", "width": 1240, "height": 860 }
-}
+{ "place": "none", "title": "Tickets" }

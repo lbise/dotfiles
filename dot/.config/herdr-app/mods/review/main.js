@@ -1,7 +1,7 @@
 // Review: the changes of the focused pane's repo, to read and comment on.
-// It replaces Herdr's Changes panel (layouts/leo.json's `changes` block). Expand
-// hides the chat (`chat-view`) so the panel fills the work area; the sidebar
-// stays, so spaces still switch. What is shown is kept per repo in
+// It replaces Herdr's Changes panel (layouts/leo.json's `changes` block). Maximize
+// (m, or leo-tabs.max) hides the chat so the panel fills the work area; the
+// sidebar stays, so spaces still switch. What is shown is kept per repo in
 // shared(`review:<machine>:<repo>`): the mode, base, open file, split, viewed
 // marks and draft comments. Comments sit inline under their lines; Submit review
 // and Ask open the send dialog (dialog.js), this mod opened as a dialog of itself.
@@ -23,7 +23,6 @@ const STEP = 60; // design px an h or l moves the text sideways
 const COMPOSER = 164; // design px of the inline comment box
 const STATUS = { A: "ansi2", D: "ansi1", U: "ansi1", R: "ansi4", M: "blocked" };
 const DEFAULTS = { mode: "changes", base: null, open: null, split: false, viewed: {}, comments: [] };
-const EXPANDED = "review:expanded"; // { px }: the panel's width before it was expanded
 const SIGN = { add: "+", del: "-", same: " " };
 
 const icon = (name, size = 14) => svg(`mods/review/icons/${name}.svg`).size(size).flex_none();
@@ -93,7 +92,6 @@ export default class Review extends View {
     if (checking()) return;
     this.refresh(cx);
     cx.timer.every(POLL, (cx) => this.refresh(cx));
-    cx.timer.every(500, () => this.guard());
   }
 
   // ---- state shared by the side panel and the dialog
@@ -316,7 +314,7 @@ export default class Review extends View {
     return this.store().split && (this.width === 0 || this.width >= SPLIT_MIN);
   }
 
-  // ---- expanded: the chat hidden, the panel across the work area
+  // ---- maximized: the chat hidden, the panel across the work area (leo-tabs does it)
 
   expandable() {
     return Boolean(findNode(layout(), "chat-view") && findNode(layout(), "panel"));
@@ -327,23 +325,7 @@ export default class Review extends View {
   }
 
   toggleExpand() {
-    if (!this.expandable()) return;
-    if (this.expanded()) return this.collapse();
-    setShared(EXPANDED, { px: findNode(layout(), "panel").size?.px || 368 });
-    run("layout.hide", { id: "chat-view" });
-    run("layout.resize", { id: "panel", weight: 1 });
-  }
-
-  collapse() {
-    run("layout.show", { id: "chat-view" });
-    run("layout.resize", { id: "panel", px: shared(EXPANDED)?.px || 368 });
-  }
-
-  /** The chat comes back once the review leaves the panel (another space's panel, Files): never an empty work area. */
-  guard() {
-    if (!this.expanded() || !shared(EXPANDED)) return;
-    const root = layout();
-    if (findNode(root, "panel")?.hidden || findNode(root, "panel-body")?.active !== "changes") this.collapse();
+    if (this.expandable()) run("leo-tabs.max");
   }
 
   // ---- comments and questions

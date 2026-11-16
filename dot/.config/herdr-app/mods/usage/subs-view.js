@@ -56,30 +56,39 @@ function segments(t, list, fallback) {
 
 // A limit window: its share used as a bar (amber from 70 %, rose from 90 %, as the
 // chat's status bar), a pace mark where an even spend would be, used/limit, reset.
-function windowRow(t, w) {
+// Narrow: the bar on one line, the figures under it.
+function windowRow(t, w, narrow) {
   const percent = Math.max(0, Math.min(100, w.usedPercent));
   const fill = toneColor(t, w.tone) || (percent >= 90 ? t.ansi1 : percent >= 70 ? t.ansi3 : t.foreground);
-  return h_flex().h(28).gap(12).items_center()
+  const bar = h_flex().h(28).gap(12).items_center()
     .child(div().w(64).flex_none().text_size(12).text_color(t.muted).child(w.label || ""))
-    .child(div().flex_1().min_w(80).h(8).rounded(4).bg(t.raised).relative()
+    .child(div().flex_1().min_w(narrow ? 40 : 80).h(8).rounded(4).bg(t.raised).relative()
       .child(div().h_full().rounded(4).w(`${percent}%`).bg(fill))
       .when(w.markerPercent !== undefined, (el) => el.child(div().absolute().top(-3).h(14).w(2).rounded(1)
         .left(`${Math.max(0, Math.min(100, w.markerPercent))}%`).bg(t.muted))))
     .child(h_flex().w(52).flex_none().justify_end().font_family(MONO).text_size(12).text_color(fill === t.foreground ? t.foreground : fill)
-      .child(`${Math.round(w.usedPercent)}%`))
-    .child(div().w(110).flex_none().font_family(MONO).text_size(12).text_color(t.muted)
-      .child(w.used !== undefined && w.limit !== undefined ? `${formatTokens(w.used)}/${formatTokens(w.limit)}` : ""))
+      .child(`${Math.round(w.usedPercent)}%`));
+  const used = div().font_family(MONO).text_size(12).text_color(t.muted)
+    .child(w.used !== undefined && w.limit !== undefined ? `${formatTokens(w.used)}/${formatTokens(w.limit)}` : "");
+  const resets = div().font_family(MONO).text_size(12).text_color(t.dim).child(w.resetsAt ? `resets ${formatReset(w.resetsAt)}` : "");
+  if (narrow) {
+    return v_flex()
+      .child(bar)
+      .child(h_flex().pl(76).gap(10).flex_wrap().items_center().child(used).child(segments(t, w.note, t.muted)).child(resets));
+  }
+  return bar
+    .child(used.w(110).flex_none())
     .child(div().w(70).flex_none().child(segments(t, w.note, t.muted)))
-    .child(div().w(110).flex_none().font_family(MONO).text_size(12).text_color(t.dim)
-      .child(w.resetsAt ? `resets ${formatReset(w.resetsAt)}` : ""));
+    .child(resets.w(110).flex_none());
 }
 
 /**
  * @param {object} t theme
  * @param {{state: "idle" | "loading" | "ok", providers: object[], errors: string[], at: number}} subs
  * @param {Record<string, string>} notes a line per provider id under its limits
+ * @param {boolean} narrow laid out for the side panel
  */
-export function subsView(t, subs, notes) {
+export function subsView(t, subs, notes, narrow) {
   if (subs.state !== "ok") {
     return div().p(14).text_color(t.muted).child(div().frames(["Reading limits ⠋", "Reading limits ⠙", "Reading limits ⠹", "Reading limits ⠸", "Reading limits ⠼", "Reading limits ⠴", "Reading limits ⠦", "Reading limits ⠧", "Reading limits ⠇", "Reading limits ⠏"], 90));
   }
@@ -87,14 +96,14 @@ export function subsView(t, subs, notes) {
   const card = (p) => {
     const snap = p.snapshot || {};
     const windows = [snap.primary, snap.secondary].filter(Boolean);
-    return v_flex().gap(6).p(14).rounded(10).border(1).border_color(t.border)
+    return v_flex().gap(6).p(narrow ? 10 : 14).rounded(10).border(1).border_color(t.border)
       .child(h_flex().items_center().gap(8)
-        .child(div().font_semibold().child(p.name))
-        .child(div().text_size(12).text_color(t.dim).child(p.id))
+        .child(div().flex_none().font_semibold().child(p.name))
+        .child(div().min_w(0).truncate().text_size(12).text_color(t.dim).child(p.id))
         .child(div().flex_1())
-        .child(div().text_size(12).text_color(t.dim).child(p.machine ? `via ${p.machine}` : "")))
+        .child(div().flex_none().text_size(12).text_color(t.dim).child(p.machine ? `via ${p.machine}` : "")))
       .when(!!p.error, (el) => el.child(div().text_color(t.ansi1).child(p.error)))
-      .children(windows.map((w) => windowRow(t, w)))
+      .children(windows.map((w) => windowRow(t, w, narrow)))
       .when(!windows.length && !!snap.summary, (el) => el.child(h_flex().h(28).gap(12).items_center()
         .child(div().w(64).flex_none().text_size(12).text_color(t.muted).child(snap.summaryLabel || ""))
         .child(segments(t, snap.summary, t.foreground))))

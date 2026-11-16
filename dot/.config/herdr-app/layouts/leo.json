@@ -185,6 +185,20 @@
                       "content": {
                         "mod": "review"
                       }
+                    },
+                    {
+                      "id": "usage",
+                      "type": "block",
+                      "content": {
+                        "mod": "usage"
+                      }
+                    },
+                    {
+                      "id": "tickets",
+                      "type": "block",
+                      "content": {
+                        "mod": "tickets"
+                      }
                     }
                   ]
                 }
