@@ -54,21 +54,22 @@ function filledCells(fraction, cells) {
 }
 
 /**
- * The context window as 40 cells, each 1/40 of it.
+ * The context window as `count` cells (40 by default), each 1/count of it.
  * state.json gives only a total, so every filled cell is "used"; when a
  * breakdown is passed as `parts`, the cells take its categories in order.
  * @param {{ tokens: number, window: number|null, parts?: Array<{ category: string, tokens: number }> }|null} context
- * @returns {Array<string|null>} 40 entries: a category for a filled cell, null for an empty one. All null when the window is unknown.
+ * @param {number} [count]
+ * @returns {Array<string|null>} `count` entries: a category for a filled cell, null for an empty one. All null when the window is unknown.
  */
-export function contextCells(context) {
-  const cells = new Array(CONTEXT_CELLS).fill(null);
+export function contextCells(context, count = CONTEXT_CELLS) {
+  const cells = new Array(count).fill(null);
   if (!context || !(context.window > 0)) return cells;
-  const filled = filledCells(context.tokens / context.window, CONTEXT_CELLS);
+  const filled = filledCells(context.tokens / context.window, count);
   let at = 0;
   let tokens = 0;
   for (const part of Array.isArray(context.parts) ? context.parts : []) {
     tokens += part.tokens;
-    const upTo = Math.min(filled, filledCells(tokens / context.window, CONTEXT_CELLS));
+    const upTo = Math.min(filled, filledCells(tokens / context.window, count));
     while (at < upTo) cells[at++] = part.category;
   }
   while (at < filled) cells[at++] = "used";
@@ -147,7 +148,9 @@ export function usageGroups(entries) {
     const label = typeof entry.label === "string" ? entry.label : null;
     const resets = typeof entry.resets === "string" ? entry.resets : "";
     if (Number.isFinite(entry.percent)) {
-      const words = typeof entry.detail === "string" && entry.detail ? [entry.detail] : [];
+      let words = typeof entry.detail === "string" && entry.detail ? [entry.detail] : [];
+      // The cap counts the same credits as the month: only its limit is new.
+      if (label === "Cap") words = words.map((detail) => detail.replace(/^.*\//, "of "));
       const note = typeof entry.note === "string" ? entry.note : "";
       last = { label: label || "", percent: entry.percent, cells: usageCells(`${entry.percent}%`).cells, value: "", resets, words, tone: alarm(entry.tone), note, noteTone: alarm(entry.noteTone) };
       groups.push(last);

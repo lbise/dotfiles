@@ -39,6 +39,7 @@ test("context map is always 40 cells", () => {
   assert.equal(filled(contextCells({ tokens: 0, window: 1000 })), 0);
   assert.equal(filled(contextCells({ tokens: 1, window: 1000000 })), 1); // anything used shows
   assert.equal(filled(contextCells({ tokens: 2000, window: 1000 })), 40); // over the window
+  assert.equal(filled(contextCells({ tokens: 500, window: 1000 }, 20)), 10); // the shrunk bar
   for (const unknown of [null, { tokens: 5, window: null }, { tokens: 5, window: 0 }]) {
     assert.deepEqual(contextCells(unknown), new Array(40).fill(null));
   }
@@ -99,7 +100,7 @@ test("usage groups take the extension's figures, else the text's", () => {
       { label: "5h", percent: 38.4, value: "", resets: "2h 10m", words: [] },
       { label: "wk", percent: 53.9, value: "", resets: "", words: ["14.8k/27.5k", "3d"] },
       { label: "Prompt", percent: null, value: "~0.5cr $0.01", resets: "", words: [] },
-      { label: "Cap", percent: 76.9, value: "", resets: "", words: ["30.8k/40k"] },
+      { label: "Cap", percent: 76.9, value: "", resets: "", words: ["of 40k"] },
     ],
   );
   assert.equal(groups[0].cells.filter(Boolean).length, 4);

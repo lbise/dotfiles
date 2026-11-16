@@ -1,9 +1,10 @@
 // The line along the chat's bottom: the context window as 40 cells, the
-// repository and branch, the session's cost, the model's provider, and each
-// usage limit (the provider's) as 10 cells.
-// When the line is too narrow the least needed words go first, never the
-// figures. Each version of the line (all words, then fewer) is drawn once out of
-// sight and measured, so words go only when they truly do not fit.
+// repository and branch, the session's cost, and each usage limit (the
+// provider's) as 10 cells.
+// When the line is too narrow the context bar first shrinks to half, then the
+// least needed words go, never the figures. Each version of the line (all
+// words, then fewer) is drawn once out of sight and measured, so words go only
+// when they truly do not fit.
 
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
@@ -19,7 +20,8 @@ const KEPT = 64;
 const OUT_OF_SIGHT = 4000; // room for a version measured unconstrained
 
 // A part: the text its width depends on, how soon it goes when room runs out
-// (0: never; the highest goes first), and how to draw it.
+// (0: never; the highest goes first), and how to draw it. A part with `small`
+// is replaced by that part instead of going.
 function words(t, text, strong, drop = 0, color = null) {
   const draw = () =>
     div()
@@ -48,8 +50,9 @@ function usageParts(t, usage) {
     const color = alarmColor(t, usage.tone);
     parts.push(bar(t, usage.cells, color), words(t, `${Math.round(usage.percent)}%`, true, 0, color));
   }
-  usage.words.forEach((text, index) => parts.push(words(t, text, false, index ? 4 : 3)));
-  if (usage.note) parts.push(words(t, usage.note, true, 3, alarmColor(t, usage.noteTone)));
+  // used/limit and Copilot's projection are figures: they never go.
+  usage.words.forEach((text, index) => parts.push(words(t, text, false, index ? 4 : 0)));
+  if (usage.note) parts.push(words(t, usage.note, true, 0, alarmColor(t, usage.noteTone)));
   if (usage.resets) parts.push(words(t, `resets ${usage.resets}`, false, 5));
   return parts;
 }
@@ -59,7 +62,7 @@ function groupsOf(t, state) {
   const context = state.context;
   if (context && Number.isFinite(context.tokens)) {
     const group = [words(t, "Context", false, 1)];
-    if (context.window) group.push(bar(t, contextCells(context).map(Boolean)));
+    if (context.window) group.push({ ...bar(t, contextCells(context).map(Boolean)), drop: 6, small: bar(t, contextCells(context, 20).map(Boolean)) });
     group.push(words(t, formatTokens(context.tokens), true));
     if (context.window) group.push(words(t, `of ${formatTokens(context.window)}`, false, 2));
     groups.push(group);
@@ -71,7 +74,6 @@ function groupsOf(t, state) {
   }
   const cost = formatCost(state.cost);
   if (cost) groups.push([words(t, cost, true)]);
-  if (state.model && state.model.provider) groups.push([words(t, state.model.provider, false)]);
   for (const usage of usageGroups(state.usage)) groups.push(usageParts(t, usage));
   return groups;
 }
@@ -79,7 +81,8 @@ function groupsOf(t, state) {
 // The versions of the line, from all words to only what never goes.
 function versions(groups) {
   const drops = [...new Set(groups.flat().map((part) => part.drop).filter(Boolean))].sort((a, b) => b - a);
-  return [groups, ...drops.map((drop) => groups.map((group) => group.filter((part) => !part.drop || part.drop < drop)))];
+  const kept = (drop) => (part) => (!part.drop || part.drop < drop ? [part] : part.small ? [part.small] : []);
+  return [groups, ...drops.map((drop) => groups.map((group) => group.flatMap(kept(drop))))];
 }
 
 // Geist Mono: a word's width is its length.
