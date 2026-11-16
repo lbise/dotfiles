@@ -252,6 +252,11 @@ when idle, never when hidden.
 - Prose in the UI font, figures in Geist Mono, code in the terminal font (`settings().font_family`).
 - Chat settings (accent, ground, tool activity, reading width) live in `shared()` state; accent and
   ground are written to `settings.json` as `colors` overrides.
+- Files pasted into the reply box (a picture, or files copied in Explorer), dropped on it, or picked
+  with its + button show as chips over the text (`attach.js`; Windows app only). They are copied into
+  `data/pi-chat-uploads/` for the thumbnails, and on send uploaded to Pi's machine
+  (`${TMPDIR:-/tmp}/herdr-chat-uploads-<uid>/`, mode 700). Pictures (png, jpg, gif, webp) go in the
+  `prompt`'s `images`; other files are listed by path at the end of its text.
 - Running subagents show in a strip over the reply box. The mod reads at the live pace while any
   subagent runs, also when Pi itself is idle. A finished background subagent shows as one line where
   its completion message stands, and a delegate step opens its subagent.

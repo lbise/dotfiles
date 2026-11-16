@@ -1,9 +1,11 @@
 // The reply box: the text (one to eight lines), the model and thinking pickers
 // under it, and the round button that sends, or stops a working Pi. Over it opens
-// the slash menu, or a picker the view hands in.
+// the slash menu, or a picker the view hands in. Files pasted, dropped on it or
+// picked with + wait over the text as chips (attach.js) and go with the message.
 
-import { div } from "gpui-kit";
+import { div, image } from "gpui-kit";
 import { Popup, Textarea, TextareaState, h_flex, v_flex } from "gpui-base";
+import { stageFiles } from "./attach.js";
 import { completePath, pathWord, sessionCommand } from "./model/lists.js";
 import { selectAll, takeKeys } from "./keys.js";
 import { menu } from "./menu.js";
@@ -14,7 +16,7 @@ const TWICE = 250; // a press that closes a menu also lands on its chip
 
 export class Composer {
   /**
-   * @param {object} chat The view: `send(text, cx)`, `stop(cx)`, `command(command, cx)`,
+   * @param {object} chat The view: `send(text, files, cx)`, `say(notice, cx)`, `stop(cx)`, `command(command, cx)`,
    *   `runSession(action, instructions, cx)`, `listPaths(prefix)`, `slashCommands()`, `loadCommands(cx)`, `busy()`, `openModels(cx)`, `editDraft(cx)`.
    */
   constructor(chat) {
@@ -27,6 +29,9 @@ export class Composer {
     this.open = null; // the open menu: "model" or "thinking"
     this.closedAt = 0;
     this.hint = ""; // the paths a Tab could not choose between
+    this.files = []; // attached, staged on this computer: { rel, name, image }
+    // A paste with no text: a picture or files copied in Explorer.
+    this.input.on("paste_other", (_event, cx) => this.attach("paste", [], cx));
     // The button's look and the slash menu depend on the text: redraw when either changes.
     this.input.on("change", (_event, cx) => {
       const text = this.input.value();
@@ -64,14 +69,92 @@ export class Composer {
     const items = this.slash.items(this.chat.slashCommands());
     if (items.length) return this.accept(items[Math.min(this.slash.index, items.length - 1)], cx);
     const text = this.input.value().trim();
-    if (!text) return;
-    const session = sessionCommand(text);
+    const files = this.files;
+    if (!text && !files.length) return;
+    const session = files.length ? null : sessionCommand(text);
     if (session) {
       if (this.chat.runSession(session.action, session.instructions, cx)) this.set("");
       return;
     }
     this.set("");
-    this.chat.send(text, cx);
+    this.files = [];
+    this.chat.send(text, files, cx);
+  }
+
+  /** Adds files to the message: from the clipboard, a file dialog, or dropped paths. */
+  attach(how, paths, cx) {
+    cx.spawn(async (cx) => {
+      try {
+        this.files = [...this.files, ...(await stageFiles(how, paths))];
+      } catch (err) {
+        this.chat.say(`Could not attach: ${err instanceof Error ? err.message : err}`, cx);
+      }
+      cx.notify();
+    });
+  }
+
+  detach(rel, cx) {
+    this.files = this.files.filter((file) => file.rel !== rel);
+    cx.notify();
+  }
+
+  chips(t) {
+    return h_flex()
+      .pb(8)
+      .gap(6)
+      .flex_wrap()
+      .children(
+        this.files.map((file, index) =>
+          h_flex()
+            .id(`pi-chat-file-${index}`)
+            .h(40)
+            .max_w(220)
+            .pl(file.image ? 4 : 10)
+            .pr(4)
+            .gap(6)
+            .items_center()
+            .rounded(8)
+            .bg(t.raised)
+            .text_size(12.5)
+            .text_color(t.muted)
+            .tooltip(file.name)
+            .child(file.image ? image(file.rel).size(32).rounded(5).flex_none() : icon("file", 14))
+            .child(div().truncate().child(file.name))
+            .child(
+              div()
+                .id(`pi-chat-file-${index}-remove`)
+                .size(20)
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(5)
+                .cursor_pointer()
+                .hover((s) => s.bg(t.surface).text_color(t.foreground))
+                .accessibility_label(`Remove ${file.name}`)
+                .on_click((_event, cx) => this.detach(file.rel, cx))
+                .child(icon("close", 12)),
+            ),
+        ),
+      );
+  }
+
+  plus(t) {
+    return div()
+      .id("pi-chat-attach")
+      .size(24)
+      .flex_none()
+      .flex()
+      .items_center()
+      .justify_center()
+      .rounded(7)
+      .cursor_pointer()
+      .text_color(t.muted)
+      .hover((s) => s.bg(t.raised).text_color(t.foreground))
+      .tooltip("Attach files (or paste, or drop them here)")
+      .accessibility_label("Attach files")
+      .on_click((_event, cx) => this.attach("pick", [], cx))
+      .child(icon("plus", 15));
   }
 
   // Tab: the path at the end of the text, completed from the files on Pi's machine.
@@ -200,16 +283,21 @@ export class Composer {
     return parts;
   }
 
+  // Nothing to send: no text, no file.
+  empty() {
+    return this.blank && !this.files.length;
+  }
+
   // Send, or Stop while Pi works. Text typed while it works is a steer: Pi reads
   // it once its running step ends, so both buttons show.
   buttons(t, working) {
-    if (!working || this.blank) return [this.button(t, working ? "stop" : "send")];
+    if (!working || this.empty()) return [this.button(t, working ? "stop" : "send")];
     return [this.button(t, "steer"), this.button(t, "stop")];
   }
 
   button(t, kind) {
     const working = kind === "stop";
-    const ready = working || !this.blank;
+    const ready = working || !this.empty();
     const label = { send: "Send", steer: "Steer", stop: "Stop" }[kind];
     const tip = { send: "Send (Enter)", steer: "Steer: Pi reads it once its running step ends (Enter)", stop: "Stop (Esc)" }[kind];
     return div()
@@ -221,8 +309,8 @@ export class Composer {
       .justify_center()
       .rounded(14)
       // Beside Steer, Stop steps back.
-      .bg(ready && !(working && !this.blank) ? t.accent : t.raised)
-      .text_color(!ready ? t.dim : working && !this.blank ? t.foreground : t.accent_foreground)
+      .bg(ready && !(working && !this.empty()) ? t.accent : t.raised)
+      .text_color(!ready ? t.dim : working && !this.empty() ? t.foreground : t.accent_foreground)
       .tooltip(tip)
       .accessibility_label(label)
       .when(ready, (el) =>
@@ -269,9 +357,11 @@ export class Composer {
         cx.stop_propagation();
         this.chat.stop(cx);
       })
+      .on_drop((event, cx) => this.attach("drop", event.paths, cx))
+      .when(this.files.length, (el) => el.child(this.chips(t)))
       .when(this.hint, (el) => el.child(div().pb(6).truncate().font_family("Geist Mono").text_size(12).text_color(t.muted).child(this.hint)))
       .child(takeKeys(div().w_full(), slash !== null, (key, cx) => (slash ? this.slashKey(key, cx) : this.fieldKey(key, cx))).child(Textarea.new(this.input).w_full().text_size(15).text_color(t.foreground)))
-      .child(h_flex().mt(8).gap(2).items_center().children(this.pickers(t, state)).child(div().flex_1()).child(h_flex().gap(6).children(this.buttons(t, working))));
+      .child(h_flex().mt(8).gap(2).items_center().child(this.plus(t)).children(this.pickers(t, state)).child(div().flex_1()).child(h_flex().gap(6).children(this.buttons(t, working))));
     // The popovers hang from a line along the box's top edge.
     const anchor = Popup.new("pi-chat-over-reply", div().w_full().h(0)).anchor("bottom_left").when(over, (el) => el.content(div().pb(8).child(over)));
     return v_flex().w_full().mt(14).mb(12).child(anchor).child(box);

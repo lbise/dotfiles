@@ -16,7 +16,7 @@ const LINE_REST = 250;
 
 // Your message, selectable, with its copy button beside it. One sent while Pi
 // works waits until Pi takes it (a steer): it says so until it reaches the conversation.
-function bubble(t, key, text, queued, pointer) {
+function bubble(t, key, text, images, queued, pointer) {
   const id = `pi-chat-user-${key}`;
   // The copy button hangs in the right margin, level with the card's top, as an answer's does.
   return hoverArea(v_flex(), id, pointer)
@@ -38,6 +38,18 @@ function bubble(t, key, text, queued, pointer) {
         .child(typedText(`${id}-text`, text)),
     )
     .child(div().absolute().top(18).right(-34).child(copyButton(t, id, text, pointer, "Copy your message")))
+    .when(images > 0, (el) =>
+      el.child(
+        h_flex()
+          .pt(6)
+          .gap(6)
+          .items_center()
+          .text_size(12.5)
+          .text_color(t.muted)
+          .child(icon("file", 13))
+          .child(images === 1 ? "1 image" : `${images} images`),
+      ),
+    )
     .when(queued, (el) =>
       el.child(
         h_flex()
@@ -268,7 +280,7 @@ const NOTES = { compaction: "Context compacted.", branch: "Came back from anothe
 export function drawRow(item, ui) {
   const { t } = ui;
   const pointer = ui.chat.pointer;
-  if (item.kind === "user") return bubble(t, item.key, item.text || "Image", item.queued === true, pointer);
+  if (item.kind === "user") return bubble(t, item.key, item.text || "Image", item.images || 0, item.queued === true, pointer);
   if (item.kind === "work") return work(ui, item.turn);
   // An answer follows its turn's work line; one given without any work comes right after the message.
   if (item.kind === "answer") {

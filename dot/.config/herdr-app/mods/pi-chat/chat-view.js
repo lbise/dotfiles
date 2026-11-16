@@ -7,10 +7,12 @@ import { Popup, h_flex, v_flex } from "gpui-base";
 import { exec, nextCommand, setShared, settings, shared, theme } from "herdr";
 import { chatSettings } from "./model/settings.js";
 import { childTask } from "./model/chat.js";
+import { promptWith } from "./model/attach.js";
 import { isChildSession } from "./model/protocol.js";
 import { AskCard } from "./ask.js";
 import { CodeViews } from "./code.js";
 import { DiffViews } from "./diff/view.js";
+import { uploadFile } from "./attach.js";
 import { editInNeovim } from "./editor.js";
 import { loadImages } from "./images.js";
 import { Composer } from "./composer.js";
@@ -67,7 +69,7 @@ export class ChatView {
     this.hoveredCell = null;
     this.knownCells = null; // step ids of the running turn seen so far; null before the first read
     this.growing = new Set(); // cells drawn small now, to scale in on the next draw
-    this.sent = null; // { text, at, after }: sent from here at `at`, not in the conversation yet; `after` is when the last turn began
+    this.sent = null; // { text, images, at, after }: sent from here at `at`, not in the conversation yet; `after` is when the last turn began
     this.notice = "";
     this.hurryUntil = 0;
     this.second = -1;
@@ -385,12 +387,18 @@ export class ChatView {
     });
   }
 
-  send(text, cx) {
+  say(notice, cx) {
+    this.notice = notice;
+    cx.notify();
+  }
+
+  // Attached files go to Pi's machine first; the message names them as they are there.
+  send(text, files, cx) {
     const pi = target();
     if (!pi) return;
     const feed = feedFor(pi);
     const last = feed.chat.turns[feed.chat.turns.length - 1];
-    const sent = { text, at: Date.now(), after: last ? last.startedAt || 0 : 0 };
+    const sent = { text, images: files.filter((file) => file.image).length, at: Date.now(), after: last ? last.startedAt || 0 : 0 };
     this.sent = sent;
     this.notice = "";
     this.hurryUntil = Date.now() + HURRY;
@@ -398,10 +406,15 @@ export class ChatView {
     cx.notify();
     cx.spawn(async (cx) => {
       try {
-        await sendCommand(feed, { type: "prompt", text });
+        const command = promptWith(text, await Promise.all(files.map((file) => uploadFile(pi.machine, file.rel))));
+        sent.text = command.text; // what the conversation will hold
+        await sendCommand(feed, command);
       } catch {
         if (this.sent === sent) this.sent = null;
-        if (this.shown && this.shown.key === pi.key && !this.composer.text()) this.composer.set(text);
+        if (this.shown && this.shown.key === pi.key && !this.composer.text()) {
+          this.composer.set(text);
+          this.composer.files = [...files, ...this.composer.files];
+        }
         this.notice = `Not sent: ${pi.machine || "this computer"} did not take the message. It is back in the box.`;
         cx.notify();
       }
