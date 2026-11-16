@@ -37,7 +37,8 @@ first boot. Your user also needs sudo rights.
 
 ## Install
 
-Log in as your user (not root) and run:
+Log in as your user (not root), copy your GitHub SSH key to `~/.ssh` (the
+repo is cloned over SSH), then run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lbise/dotfiles/master/bootstrap.sh | bash
@@ -56,8 +57,7 @@ sudo systemctl disable --now systemd-networkd.service
 
 These need you:
 
-- Copy your SSH and GPG keys, then switch the repo remote to SSH:
-  `git -C ~/gitrepo/dotfiles remote set-url origin git@github.com:lbise/dotfiles.git`
+- Copy your GPG keys.
 - Sign in to Dropbox, the browser and other accounts.
 - Add a `monitor =` line to `dot/.config/hypr/hyprland.conf` if the
   `preferred,auto` fallback is wrong for the screen.

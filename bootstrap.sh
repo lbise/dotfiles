@@ -3,6 +3,9 @@
 # Bootstrap a brand new Arch Linux installation: install git and yay, clone the
 # dotfiles, then run the complete installer (dotfiles bootstrap).
 #
+# Needs a GitHub SSH key first (in ~/.ssh or a forwarded agent): the repo is
+# cloned over SSH.
+#
 # Usage on a new Arch Linux machine, logged in as your user (not root):
 #   curl -fsSL https://raw.githubusercontent.com/lbise/dotfiles/master/bootstrap.sh | bash
 #
@@ -31,7 +34,7 @@ main() {
     fi
 
     echo ">> Upgrading the system and installing git and base-devel..."
-    sudo pacman -Syu --noconfirm --needed git base-devel
+    sudo pacman -Syu --noconfirm --needed git base-devel openssh
 
     if ! command -v yay &> /dev/null; then
         echo ">> Installing yay (AUR helper)..."
@@ -57,9 +60,13 @@ main() {
     fi
 
     echo ">> Cloning dotfiles repository..."
-    # HTTPS because SSH keys are not set up yet. Switch the remote afterwards.
     mkdir -p "$(dirname "$DOTFILES_DIR")"
-    git clone https://github.com/lbise/dotfiles.git "$DOTFILES_DIR"
+    # accept-new: trust github.com's host key on first contact instead of prompting.
+    if ! GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new" \
+        git clone git@github.com:lbise/dotfiles.git "$DOTFILES_DIR"; then
+        echo "ERROR: SSH clone failed. Copy your GitHub SSH key to ~/.ssh first." >&2
+        exit 1
+    fi
 
     echo "********************************************************************************"
     echo "Bootstrap completed! Running the dotfiles bootstrap command..."
