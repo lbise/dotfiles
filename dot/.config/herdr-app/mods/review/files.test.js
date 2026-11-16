@@ -20,13 +20,17 @@ test("no changes, no files", () => {
   assert.deepEqual(parseFiles("", "", ""), { files: [], limited: false });
 });
 
-test("comments make one message: where, the lines, what to do", () => {
-  const text = commentMessage([
-    { path: "a.c", side: "new", from: 3, to: 4, excerpt: ["+x", "+y"], text: "rename x " },
-    { path: "b.c", side: "old", from: 9, to: 9, excerpt: ["-z"], text: "why removed?" },
-  ]);
+test("comments make one message: by file and line, where, the lines, what to do", () => {
+  const text = commentMessage(
+    [
+      { id: "1", path: "b.c", side: "old", from: 9, to: 9, excerpt: ["-z"], text: "why removed?" },
+      { id: "2", path: "a.c", side: "new", from: 3, to: 4, excerpt: ["+x", "+y"], text: "rename x " },
+      { id: "3", path: "a.c", whole: true, text: "split this file" },
+    ],
+    "the uncommitted changes in /r",
+  );
   assert.equal(
     text,
-    "Review comments on the current changes. Address each one:\n\n1. a.c:3-4\n```diff\n+x\n+y\n```\nrename x\n\n2. b.c:9 (removed lines)\n```diff\n-z\n```\nwhy removed?",
+    "Review comments on the uncommitted changes in /r. Address each one:\n\n1. a.c (the whole file)\nsplit this file\n\n2. a.c:3-4\n```diff\n+x\n+y\n```\nrename x\n\n3. b.c:9 (removed lines)\n```diff\n-z\n```\nwhy removed?",
   );
 });

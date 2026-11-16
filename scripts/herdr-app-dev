@@ -3,7 +3,7 @@
 #   herdr-app-dev sync            copy mods/pi-chat and mods/review, layouts and themes from the repo into the dev home
 #   herdr-app-dev open            start the dev window (1280x820, at the screen's top left)
 #   herdr-app-dev shot [name]     save the dev window's frame, print its WSL path
-#   herdr-app-dev click X Y       press at client pixel X,Y (the shot's pixels)
+#   herdr-app-dev click X Y       press at client pixel X,Y (the shot's pixels); rightclick X Y: the right button
 #   herdr-app-dev wheel X Y D     wheel at X,Y: D > 0 up, 120 a notch; hwheel X Y D: D > 0 right
 #   herdr-app-dev move X Y        move the pointer there (hover)
 #   herdr-app-dev type TEXT       type into the focused element; {esc} and {enter} press those keys
@@ -40,7 +40,7 @@ open)
     input place -x 0 -y 0
     run status
     ;;
-click | move) input "$1" -x "$2" -y "$3" ;;
+click | rightclick | move) input "$1" -x "$2" -y "$3" ;;
 type) input type -text "$2" ;;
 wheel | hwheel) input "$1" -x "$2" -y "$3" -delta "$4" ;;
 shot)

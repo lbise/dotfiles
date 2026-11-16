@@ -150,3 +150,62 @@ export function linesOf(text) {
   if (lines[lines.length - 1] === "") lines.pop();
   return lines;
 }
+
+/**
+ * The rows a comment is about: [first, last] row indices, or null when its lines are not in the diff.
+ * A new-side comment covers the removed lines between its own; an old-side one, removed lines only.
+ * @param {Row[]} rows
+ * @param {{ side: "old"|"new", from: number, to: number }} comment
+ */
+export function commentSpan(rows, comment) {
+  let first = -1, last = -1;
+  rows.forEach((row, index) => {
+    const n = comment.side === "old" ? (row.kind === "del" ? row.old : null) : row.kind === "del" ? null : row.new;
+    if (n === null || n < comment.from || n > comment.to) return;
+    if (first < 0) first = index;
+    last = index;
+  });
+  return first < 0 ? null : [first, last];
+}
+
+/** A hunk's lines: [first, last] row indices after its header at `index`, up to the next header or fold. */
+export function hunkSpan(rows, index) {
+  let last = index;
+  while (last + 1 < rows.length && rows[last + 1].kind !== "hunk" && rows[last + 1].kind !== "gap") last++;
+  return last > index ? [index + 1, last] : null;
+}
+
+/**
+ * What the diff stacks, top to bottom: `top` first, then each of `count` lines with what goes after it.
+ * @template T
+ * @param {number} count Lines (rows, or side-by-side pairs), each `line` px tall.
+ * @param {number} line
+ * @param {Array<T & { h: number }>} top
+ * @param {Map<number, Array<T & { h: number }>>} after Items under a line, by its index.
+ * @returns {{ items: Array<{ line?: number, extra?: T & { h: number }, h: number }>, tops: number[], total: number }}
+ */
+export function stackItems(count, line, top, after) {
+  const items = top.map((extra) => ({ extra, h: extra.h }));
+  for (let i = 0; i < count; i++) {
+    items.push({ line: i, h: line });
+    for (const extra of after.get(i) || []) items.push({ extra, h: extra.h });
+  }
+  const tops = [];
+  let total = 0;
+  for (const item of items) {
+    tops.push(total);
+    total += item.h;
+  }
+  return { items, tops, total };
+}
+
+/** The first item still on screen at scroll `y`: the last whose top is at or above it. */
+export function firstShown(tops, y) {
+  let lo = 0, hi = tops.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (tops[mid] <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.max(0, lo);
+}

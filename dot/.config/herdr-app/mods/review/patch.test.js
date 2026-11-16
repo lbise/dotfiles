@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildRows, gapsOf, hashText, linesOf, parsePatch, splitRows } from "./patch.js";
+import { buildRows, commentSpan, firstShown, gapsOf, hashText, hunkSpan, linesOf, parsePatch, splitRows, stackItems } from "./patch.js";
 
 const DIFF = [
   "diff --git a/x.c b/x.c",
@@ -73,4 +73,27 @@ test("helpers", () => {
   assert.notEqual(hashText("abc"), hashText("abd"));
   assert.deepEqual(linesOf("a\nb\n"), ["a", "b"]);
   assert.deepEqual(linesOf(""), []);
+});
+
+test("a comment's rows: new side spans removed lines between, old side only removed ones", () => {
+  const rows = buildRows(parsePatch(DIFF), null, {});
+  // ~, @, s3:3, d4, a:4, s5:5, ~, @, s10:10, d11, a:11, a:12
+  assert.deepEqual(commentSpan(rows, { side: "new", from: 3, to: 4 }), [2, 4]);
+  assert.deepEqual(commentSpan(rows, { side: "old", from: 4, to: 4 }), [3, 3]);
+  assert.equal(commentSpan(rows, { side: "new", from: 40, to: 41 }), null);
+  assert.deepEqual(hunkSpan(rows, 1), [2, 5]);
+  assert.deepEqual(hunkSpan(rows, 7), [8, 11]);
+});
+
+test("stacked items: extras on top and under their line; the first shown at a scroll", () => {
+  const card = { h: 50 };
+  const { items, tops, total } = stackItems(3, 20, [{ h: 30 }], new Map([[1, [card]]]));
+  assert.deepEqual(items.map((item) => item.line ?? "x"), ["x", 0, 1, "x", 2]);
+  assert.deepEqual(tops, [0, 30, 50, 70, 120]);
+  assert.equal(total, 140);
+  assert.equal(firstShown(tops, 0), 0);
+  assert.equal(firstShown(tops, 69), 2);
+  assert.equal(firstShown(tops, 70), 3);
+  assert.equal(firstShown(tops, 500), 4);
+  assert.equal(firstShown([], 10), 0);
 });

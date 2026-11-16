@@ -38,17 +38,24 @@ export function parseFiles(nameStatus, numstat, untracked) {
 }
 
 /**
- * @typedef {{ path: string, side: "old"|"new", from: number, to: number, excerpt: string[], text: string }} Comment
- *   Lines from..to of one side; `excerpt`: the diff lines, signed.
+ * @typedef {{ id: string, path: string, whole?: boolean, side?: "old"|"new", from?: number, to?: number, excerpt?: string[], text: string }} Comment
+ *   On the whole file (`whole`), or on lines from..to of one side; `excerpt`: the diff lines, signed.
  */
 
 /**
- * The comments as one message to an agent.
+ * The comments as one message to an agent, by file, then line; a file's whole-file comments first.
  * @param {Comment[]} comments
+ * @param {string} about What was reviewed, e.g. "the uncommitted changes in /src/app".
  */
-export function commentMessage(comments) {
-  const parts = ["Review comments on the current changes. Address each one:"];
-  comments.forEach((comment, index) => {
+export function commentMessage(comments, about) {
+  const order = (c) => (c.whole ? -1 : c.from);
+  const sorted = [...comments].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : order(a) - order(b)));
+  const parts = [`Review comments on ${about}. Address each one:`];
+  sorted.forEach((comment, index) => {
+    if (comment.whole) {
+      parts.push(`${index + 1}. ${comment.path} (the whole file)\n${comment.text.trim()}`);
+      return;
+    }
     const lines = comment.from === comment.to ? `${comment.from}` : `${comment.from}-${comment.to}`;
     const where = `${comment.path}:${lines}${comment.side === "old" ? " (removed lines)" : ""}`;
     parts.push(`${index + 1}. ${where}\n\`\`\`diff\n${comment.excerpt.join("\n")}\n\`\`\`\n${comment.text.trim()}`);

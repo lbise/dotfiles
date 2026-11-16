@@ -27,6 +27,9 @@ switch ($action) {
   "click"  { & $move
              [void][HerdrDevInput]::PostMessage($h, 0x0201, [IntPtr]1, (Pack $x $y)); Start-Sleep -Milliseconds 30
              [void][HerdrDevInput]::PostMessage($h, 0x0202, [IntPtr]0, (Pack $x $y)) }
+  "rightclick" { & $move
+             [void][HerdrDevInput]::PostMessage($h, 0x0204, [IntPtr]2, (Pack $x $y)); Start-Sleep -Milliseconds 30
+             [void][HerdrDevInput]::PostMessage($h, 0x0205, [IntPtr]0, (Pack $x $y)) }
   "wheel"  { & $wheel 0x020A }
   "hwheel" { & $wheel 0x020E }
   # The window's place (screen pixels) and size, without taking focus.

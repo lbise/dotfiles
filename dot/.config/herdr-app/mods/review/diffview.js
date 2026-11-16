@@ -15,7 +15,7 @@ export const ROW = 20;
 const NUMBER = 40; // a line number's column
 const MARKER = 12; // the comment dot's column
 const SIGN = 14;
-const CHAR = 7.3; // a code character's width at the diff's size, about
+export const CHAR = 7.3; // a code character's width at the diff's size, about
 const SIGNS = { add: "+", del: "−", same: " " };
 
 /** The theme's colours for code, by kind of token (as pi-chat's). */
@@ -71,6 +71,12 @@ export function layoutView(view) {
     return spans || [{ text: row.text, kind: null }];
   });
   view.pairs = splitRows(rows);
+  // A row's side-by-side pair.
+  view.pairOf = [];
+  view.pairs.forEach((pair, index) => {
+    if (pair.left !== null) view.pairOf[pair.left] = index;
+    if (pair.right !== null) view.pairOf[pair.right] = index;
+  });
   view.columns = rows.reduce((most, row) => Math.max(most, row.text.replace(/\t/g, "    ").length), 0);
 }
 

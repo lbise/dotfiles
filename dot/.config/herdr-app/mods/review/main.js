@@ -1,31 +1,67 @@
 // Review: the changes of the focused pane's repo, to read and comment on.
-// It replaces Herdr's Changes panel (layouts/leo.json's `changes` block) and
-// opens maximized as a dialog (props.max). The two copies share what is shown
-// through shared(`review:<machine>:<repo>`): the mode, base, open file, split,
-// viewed marks and comments. See .scratch/herdr-code-review/spec.md.
+// It replaces Herdr's Changes panel (layouts/leo.json's `changes` block). Expand
+// hides the chat (`chat-view`) so the panel fills the work area; the sidebar
+// stays, so spaces still switch. What is shown is kept per repo in
+// shared(`review:<machine>:<repo>`): the mode, base, open file, split, viewed
+// marks and draft comments. Comments sit inline under their lines; Submit review
+// and Ask open the send dialog (dialog.js), this mod opened as a dialog of itself.
+// See .scratch/herdr-code-review/spec.md.
 
 import { View, div, svg } from "gpui-kit";
 import { Input, InputState, Scrollbar, Textarea, TextareaState, h_flex, v_flex } from "gpui-base";
-import { checking, closeOverlay, nextCommand, openOverlay, props, setShared, settings, shared, theme, watchFolder } from "herdr";
-import { giveAgent, sendLabel, tabAgent } from "./agent.js";
-import { ROW, layoutView, makeView, palette, sideways, splitRow, unifiedRow } from "./diffview.js";
+import { checking, layout, nextCommand, openOverlay, props, run, setShared, settings, shared, theme, watchFolder } from "herdr";
+import { Dialog } from "./dialog.js";
+import { CHAR, ROW, layoutView, makeView, palette, sideways, splitRow, unifiedRow } from "./diffview.js";
 import { commentMessage } from "./files.js";
-import { EXPAND } from "./patch.js";
+import { EXPAND, commentSpan, firstShown, hunkSpan, stackItems } from "./patch.js";
 import { branches, changedFiles, commitAll, compareFrom, defaultBase, fileDiff, findRepo, location } from "./git.js";
 
 const POLL = 10000;
 const SPLIT_MIN = 600; // design px of diff below which side by side is unified
+const WIDE = 760; // design px of panel from which the file list sits beside the diff
 const STEP = 60; // design px an h or l moves the text sideways
+const COMPOSER = 164; // design px of the inline comment box
 const STATUS = { A: "ansi2", D: "ansi1", U: "ansi1", R: "ansi4", M: "blocked" };
 const DEFAULTS = { mode: "changes", base: null, open: null, split: false, viewed: {}, comments: [] };
+const EXPANDED = "review:expanded"; // { px }: the panel's width before it was expanded
+const SIGN = { add: "+", del: "-", same: " " };
 
 const icon = (name, size = 14) => svg(`mods/review/icons/${name}.svg`).size(size).flex_none();
 const stop = (_event, cx) => cx.stop_propagation();
 
+function findNode(node, id) {
+  if (!node) return null;
+  if (node.id === id) return node;
+  for (const child of node.children || []) {
+    const found = findNode(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** What a run of rows is about: { side, from, to }, or null when it has no lines. */
+function linesOf(rows) {
+  const body = rows.filter((row) => SIGN[row.kind]);
+  if (!body.length) return null;
+  const side = body.every((row) => row.kind === "del") ? "old" : "new";
+  const numbers = body.map((row) => (side === "old" ? row.old : row.new)).filter((n) => n !== null);
+  return { side, from: Math.min(...numbers), to: Math.max(...numbers) };
+}
+
+const excerptOf = (rows) => rows.filter((row) => SIGN[row.kind]).map((row) => SIGN[row.kind] + row.text);
+const spanText = (at) => `${at.from === at.to ? `line ${at.from}` : `lines ${at.from}–${at.to}`}${at.side === "old" ? " (removed)" : ""}`;
+
 export default class Review extends View {
   init(_props, cx) {
-    this.max = Boolean(props()?.max);
+    // Opened as the send dialog: this copy is the dialog, nothing else.
+    if (props()?.dialog) {
+      this.dialog = new Dialog();
+      this.dialog.init(_props, cx);
+      return;
+    }
     this.handle = cx.focus_handle();
+    this.panelWidth = 0; // design px
+    this.compose = null; // the open comment box: { path, whole, editing: a comment's id or null }
     this.repo = null; // { root, on, branch }
     this.files = [];
     this.view = null; // the open file's diff (diffview.js makeView)
@@ -39,7 +75,9 @@ export default class Review extends View {
     this.hunk = -1; // the hunk last jumped to
     this.commitInput = InputState.new({ placeholder: "Commit message" });
     this.commitInput.on("submit", (_e, cx) => this.commit(cx));
-    this.note = TextareaState.new({ placeholder: "Comment on the selected lines…", rows: 3 });
+    this.note = TextareaState.new({ placeholder: "Leave a comment…", rows: 4 });
+    // Enter adds; shift-enter is the textarea's own new line.
+    this.note.on("submit", (e, cx) => { if (!e?.shift) this.addComment(cx); });
     // Which box has the keyboard: "note", "commit" or null.
     for (const [name, state] of [["commit", this.commitInput], ["note", this.note]]) {
       state.on("focus", (_e, cx) => { this.typing = name; cx.notify(); });
@@ -55,6 +93,7 @@ export default class Review extends View {
     if (checking()) return;
     this.refresh(cx);
     cx.timer.every(POLL, (cx) => this.refresh(cx));
+    cx.timer.every(500, () => this.guard());
   }
 
   // ---- state shared by the side panel and the dialog
@@ -65,7 +104,10 @@ export default class Review extends View {
 
   store() {
     const key = this.key();
-    return { ...DEFAULTS, ...((key && shared(key)) || {}) };
+    const st = { ...DEFAULTS, ...((key && shared(key)) || {}) };
+    // Comments saved before they had ids.
+    st.comments = st.comments.map((c, i) => (c.id ? c : { ...c, id: `old${i}` }));
+    return st;
   }
 
   save(change) {
@@ -97,7 +139,7 @@ export default class Review extends View {
     const context = JSON.stringify(where);
     if (context !== this.context) {
       this.context = context;
-      Object.assign(this, { repo: null, files: [], view: null, sel: null, error: null, problem: null, watched: null, limited: false });
+      Object.assign(this, { repo: null, files: [], view: null, sel: null, compose: null, error: null, problem: null, watched: null, limited: false });
     }
     if (!where.cwd) return;
     this.loading = true;
@@ -179,6 +221,10 @@ export default class Review extends View {
 
   show(path, cx) {
     this.wanted = path;
+    if (this.compose && this.compose.path !== path) {
+      this.compose = null;
+      this.note.set_value("");
+    }
     this.sel = null;
     this.problem = null;
     this.notice = null;
@@ -244,100 +290,214 @@ export default class Review extends View {
     const heads = view.rows.flatMap((row, index) => (row.kind === "hunk" ? [index] : []));
     if (!heads.length) return;
     this.hunk = Math.max(0, Math.min(heads.length - 1, this.hunk + by));
-    const row = heads[this.hunk];
-    this.y = (this.splitShown() ? view.pairs.findIndex((pair) => pair.left === row) : row) * ROW; // clamped when drawn
+    const line = this.splitShown() ? view.pairOf[heads[this.hunk]] : heads[this.hunk];
+    // Where it was last drawn: comments above push it down. Clamped when drawn.
+    const at = this.stack ? this.stack.items.findIndex((item) => item.line === line) : -1;
+    this.y = at >= 0 ? this.stack.tops[at] : line * ROW;
   }
 
   toggleFull() {
     const view = this.view;
     if (!view) return;
-    view.folds = view.folds === "all" ? {} : "all";
+    this.refold(view.folds === "all" ? {} : "all");
+  }
+
+  /** New folds: the rows move, and a selection follows its lines. */
+  refold(folds) {
+    const view = this.view;
+    const at = linesOf(this.selectedRows());
+    view.folds = folds;
     layoutView(view);
-    this.sel = null;
+    const span = at && commentSpan(view.rows, at);
+    this.sel = span ? { anchor: span[0], head: span[1] } : null;
   }
 
   splitShown() {
     return this.store().split && (this.width === 0 || this.width >= SPLIT_MIN);
   }
 
-  maximize() {
-    if (this.max) closeOverlay(props().overlay);
-    else openOverlay({ mod: "review", kind: "dialog", width: 0.96, height: 0.94, props: { max: true } });
+  // ---- expanded: the chat hidden, the panel across the work area
+
+  expandable() {
+    return Boolean(findNode(layout(), "chat-view") && findNode(layout(), "panel"));
   }
 
-  /** A click on a row (a row's index, or a side-by-side pair's). */
-  clickRow(key, shift, cx) {
+  expanded() {
+    return findNode(layout(), "chat-view")?.hidden === true;
+  }
+
+  toggleExpand() {
+    if (!this.expandable()) return;
+    if (this.expanded()) return this.collapse();
+    setShared(EXPANDED, { px: findNode(layout(), "panel").size?.px || 368 });
+    run("layout.hide", { id: "chat-view" });
+    run("layout.resize", { id: "panel", weight: 1 });
+  }
+
+  collapse() {
+    run("layout.show", { id: "chat-view" });
+    run("layout.resize", { id: "panel", px: shared(EXPANDED)?.px || 368 });
+  }
+
+  /** The chat comes back once the review leaves the panel (another space's panel, Files): never an empty work area. */
+  guard() {
+    if (!this.expanded() || !shared(EXPANDED)) return;
+    const root = layout();
+    if (findNode(root, "panel")?.hidden || findNode(root, "panel-body")?.active !== "changes") this.collapse();
+  }
+
+  // ---- comments and questions
+
+  /** The row a click on line `key` means (a row's index, or a side-by-side pair's), or -1. */
+  rowAt(key) {
     const view = this.view;
-    if (!view) return;
-    let index = key;
-    if (this.splitShown()) {
-      const pair = view.pairs[index];
-      if (!pair) return;
-      index = pair.right ?? pair.left;
-    }
+    if (!view) return -1;
+    if (!this.splitShown()) return view.rows[key] ? key : -1;
+    const pair = view.pairs[key];
+    return pair ? pair.right ?? pair.left : -1;
+  }
+
+  /** The rows a click on row `index` targets: itself, or a header's hunk. Null for a fold. */
+  targetOf(index) {
+    const row = this.view.rows[index];
+    if (row.kind === "gap") return null;
+    return row.kind === "hunk" ? hunkSpan(this.view.rows, index) : [index, index];
+  }
+
+  selRange() {
+    return this.sel ? [Math.min(this.sel.anchor, this.sel.head), Math.max(this.sel.anchor, this.sel.head)] : null;
+  }
+
+  /** A click on a line: opens a fold, or opens the comment box there, or widens it to the line. */
+  clickRow(key, cx) {
+    const view = this.view;
+    const index = this.rowAt(key);
+    if (index < 0) return;
     const row = view.rows[index];
-    if (!row) return;
     if (row.kind === "gap") {
       if (!view.newLines || view.folds === "all") return;
-      view.folds = { ...view.folds, [row.gap]: (view.folds[row.gap] || 0) + EXPAND };
-      layoutView(view);
-      this.sel = null;
-    } else if (row.kind !== "hunk") {
-      const anchor = shift && this.sel ? this.sel.anchor : index;
-      const [a, b] = [Math.min(anchor, index), Math.max(anchor, index)];
-      // A selection stays inside one hunk.
-      const crosses = view.rows.slice(a, b + 1).some((r) => r.kind === "hunk" || r.kind === "gap");
-      this.sel = crosses ? { anchor: index, head: index } : { anchor, head: index };
+      this.refold({ ...view.folds, [row.gap]: (view.folds[row.gap] || 0) + EXPAND });
+      cx.notify();
+      return;
     }
+    let span = this.targetOf(index);
+    if (!span) return;
+    const c = this.compose;
+    const open = c && !c.whole && c.path === view.path ? this.selRange() : null;
+    if (open) {
+      const inside = span[0] >= open[0] && span[1] <= open[1];
+      // A click inside the lines clears them, while there is nothing to lose; outside, it widens them.
+      if (inside && !c.editing && !this.note.value().trim()) return this.closeComposer(cx);
+      span = inside ? open : [Math.min(span[0], open[0]), Math.max(span[1], open[1])];
+    }
+    this.sel = { anchor: span[0], head: span[1] };
+    this.compose = { path: view.path, whole: false, editing: open ? c.editing : null };
+    this.focusNote(cx);
+  }
+
+  /** The speech bubble on a file: the comment box for the file as a whole. */
+  commentFile(path, cx) {
+    const c = this.compose;
+    if (c?.whole && c.path === path && !c.editing && !this.note.value().trim()) return this.closeComposer(cx);
+    if (this.current() !== path) this.open(path, cx);
+    this.sel = null;
+    this.compose = { path, whole: true, editing: null };
+    this.y = 0;
+    this.focusNote(cx);
+  }
+
+  editComment(comment, cx) {
+    const span = comment.whole || !this.view ? null : commentSpan(this.view.rows, comment);
+    this.sel = span ? { anchor: span[0], head: span[1] } : null;
+    this.compose = { path: comment.path, whole: Boolean(comment.whole), editing: comment.id };
+    this.note.set_value(comment.text);
+    this.focusNote(cx);
+  }
+
+  focusNote(cx) {
+    this.reveal = true; // the box scrolls into view when drawn
+    this.note.focus();
+    // Again once the box is drawn.
+    cx.timer.after(300, () => this.note.focus());
+    cx.notify();
+  }
+
+  closeComposer(cx) {
+    this.compose = null;
+    this.sel = null;
+    this.note.set_value("");
     this.handle.focus();
     cx.notify();
   }
 
   selectedRows() {
-    if (!this.sel || !this.view) return [];
-    const [a, b] = [Math.min(this.sel.anchor, this.sel.head), Math.max(this.sel.anchor, this.sel.head)];
-    return this.view.rows.slice(a, b + 1);
+    const range = this.selRange();
+    return range && this.view ? this.view.rows.slice(range[0], range[1] + 1) : [];
   }
 
   addComment(cx) {
-    const rows = this.selectedRows();
+    const c = this.compose;
     const text = this.note.value().trim();
-    if (!rows.length || !text) return;
-    const side = rows.every((row) => row.kind === "del") ? "old" : "new";
-    const numbers = rows.map((row) => (side === "old" ? row.old : row.new)).filter((n) => n !== null);
-    const sign = { add: "+", del: "-", same: " " };
-    const comment = { path: this.view.path, side, from: Math.min(...numbers), to: Math.max(...numbers), excerpt: rows.map((row) => sign[row.kind] + row.text), text };
-    this.save({ comments: [...this.store().comments, comment] });
-    this.note.set_value("");
-    this.sel = null;
-    this.handle.focus();
-    cx.notify();
-  }
-
-  removeComment(index) {
-    this.save({ comments: this.store().comments.filter((_c, i) => i !== index) });
-  }
-
-  sendComments(cx) {
-    const agent = tabAgent();
+    if (!c || !text) return;
     const comments = this.store().comments;
-    if (!agent || !comments.length || this.sending) return;
-    this.sending = true;
-    this.problem = null;
-    cx.spawn(async (cx) => {
-      try {
-        await giveAgent(agent, commentMessage(comments));
-        const sent = new Set(comments.map((c) => JSON.stringify(c)));
-        this.save({ comments: this.store().comments.filter((c) => !sent.has(JSON.stringify(c))) });
-        this.notice = agent.app === "pi" ? "In Pi's input: read it there and send it." : `Sent to ${agent.app || "the agent"}.`;
-      } catch (e) {
-        this.problem = `Could not send: ${e.message || e}`;
-      } finally {
-        this.sending = false;
-        cx.notify();
-      }
-    });
-    cx.notify();
+    const old = comments.find((x) => x.id === c.editing);
+    const rows = !c.whole && this.view?.path === c.path ? this.selectedRows() : [];
+    const at = linesOf(rows);
+    let comment;
+    if (c.whole) comment = { path: c.path, whole: true, text };
+    else if (at) comment = { path: c.path, ...at, excerpt: excerptOf(rows), text };
+    // Its lines left the diff: only the text changes.
+    else if (old) comment = { ...old, text };
+    else return;
+    comment.id = old ? old.id : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    this.save({ comments: old ? comments.map((x) => (x.id === old.id ? comment : x)) : [...comments, comment] });
+    this.closeComposer(cx);
+  }
+
+  deleteComment(id, cx) {
+    this.save({ comments: this.store().comments.filter((c) => c.id !== id) });
+    if (this.compose?.editing === id) this.closeComposer(cx);
+    else cx.notify();
+  }
+
+  /** What is reviewed, in words: "the uncommitted changes in /src/app". */
+  about() {
+    const st = this.store();
+    const what = st.mode === "branch" ? `the changes since ${st.base}` : "the uncommitted changes";
+    return `${what} in ${this.repo.root}${this.repo.on ? ` (on ${this.repo.on})` : ""}`;
+  }
+
+  openDialog(kind, title, context, clear) {
+    openOverlay({ mod: "review", kind: "dialog", width: 760, height: 0.8, props: { dialog: kind, title, context, clear } });
+  }
+
+  submitReview() {
+    const comments = this.store().comments;
+    if (!comments.length || !this.repo) return;
+    const n = comments.length;
+    this.openDialog("review", `${n} comment${n === 1 ? "" : "s"}`, commentMessage(comments, this.about()), { key: this.key(), ids: comments.map((c) => c.id) });
+  }
+
+  /** Ask about rows [a, b] of the open diff, or the whole diff without `span`. */
+  askAbout(span) {
+    const view = this.view;
+    if (!view || !this.repo) return;
+    if (!span) {
+      this.openDialog("ask", view.path, `The diff of ${view.path}, ${this.about()}:\n\`\`\`diff\n${view.text.trim()}\n\`\`\``);
+      return;
+    }
+    const rows = view.rows.slice(span[0], span[1] + 1);
+    const at = linesOf(rows);
+    if (!at) return;
+    const where = `${view.path}, ${spanText(at)}`;
+    this.openDialog("ask", where, `In ${where}, of ${this.about()}:\n\`\`\`diff\n${excerptOf(rows).join("\n")}\n\`\`\``);
+  }
+
+  /** A right-click on a line: ask about it (a header: its hunk). */
+  askRow(key) {
+    const index = this.rowAt(key);
+    const span = index < 0 ? null : this.targetOf(index);
+    if (span) this.askAbout(span);
   }
 
   commit(cx) {
@@ -363,8 +523,9 @@ export default class Review extends View {
 
   key_down(e, cx) {
     if (e.key === "escape") {
+      if (this.compose) { this.closeComposer(cx); cx.stop_propagation(); return; }
       if (this.typing) { this.typing = null; this.handle.focus(); cx.stop_propagation(); cx.notify(); return; }
-      if (this.sel || this.picking) { this.sel = null; this.picking = null; cx.stop_propagation(); cx.notify(); }
+      if (this.picking) { this.picking = null; cx.stop_propagation(); cx.notify(); }
       return;
     }
     if (this.typing || e.modifiers.control || e.modifiers.alt || e.modifiers.platform) return;
@@ -377,11 +538,12 @@ export default class Review extends View {
       v: () => { const file = this.files.find((f) => f.path === this.current()); if (file) this.toggleViewed(file); },
       s: () => this.save({ split: !this.store().split }),
       f: () => this.toggleFull(),
-      m: () => this.maximize(),
+      m: () => this.toggleExpand(),
       r: () => this.refresh(cx, true),
       h: () => { this.x = Math.max(0, this.x - STEP); },
       l: () => { this.x += STEP; }, // clamped when drawn
-      c: () => { if (this.sel) this.note.focus(); },
+      c: () => { if (this.compose) this.note.focus(); },
+      a: () => this.askAbout(null),
     };
     const action = actions[e.key];
     if (!action) return;
@@ -393,34 +555,43 @@ export default class Review extends View {
   // ---- drawing
 
   render(cx) {
+    if (this.dialog) return this.dialog.render(cx);
     if (JSON.stringify(location()) !== this.context) this.refresh(cx);
     const t = theme();
     const st = this.store();
     // Another copy (the dialog, the panel) picked another file or mode.
     if (this.repo && !this.loading && this.compared !== undefined && this.compared !== `${st.mode}|${st.base}`) this.refresh(cx);
     else if (this.view && this.current() && this.view.path !== this.current() && this.wanted !== this.current() && !this.loading) this.show(this.current(), cx);
-    const body = this.max
+    this.wide = this.panelWidth >= WIDE;
+    const body = this.wide
       ? h_flex()
           .flex_1()
           .min_h(0)
           .items_start()
-          .child(v_flex().w(320).h_full().flex_none().border_r(1).border_color(t.border).child(this.fileList(t, true)).child(this.commentsPanel(t)).when(st.mode === "changes", (el) => el.child(this.commitBox(t))))
-          .child(v_flex().flex_1().min_w(0).h_full().child(this.fileHeader(t)).child(this.diff(t)).child(this.composer(t)))
+          .child(v_flex().w(320).h_full().flex_none().border_r(1).border_color(t.border).child(this.fileList(t, true)).child(this.submitBar(t)).when(st.mode === "changes", (el) => el.child(this.commitBox(t))))
+          .child(v_flex().flex_1().min_w(0).h_full().child(this.fileHeader(t)).child(this.diff(t)))
       : v_flex()
           .flex_1()
           .min_h(0)
           .child(this.fileList(t, false))
           .child(this.fileHeader(t))
           .child(this.diff(t))
-          .child(this.composer(t))
-          .child(this.commentsPanel(t))
+          .child(this.submitBar(t))
           .when(st.mode === "changes", (el) => el.child(this.commitBox(t)));
     return v_flex()
       .id("review")
       .size_full()
       .min_h(0)
-      .when(!this.max, (el) => el.rounded(10).border_1().border_color(t.border))
+      .rounded(10)
+      .border_1()
+      .border_color(t.border)
       .overflow_hidden()
+      .on_size_change((size, cx) => {
+        const width = size.width / (settings().zoom || 1);
+        if (Math.abs(width - this.panelWidth) < 1) return;
+        this.panelWidth = width;
+        cx.notify();
+      })
       .bg(t.background)
       .text_color(t.foreground)
       .text_size(13)
@@ -494,7 +665,7 @@ export default class Review extends View {
       .child(div().flex_1())
       .child(this.button(t, "review-split", icon("split-right"), () => this.save({ split: !st.split }), { on: st.split }))
       .child(this.button(t, "review-refresh", icon("refresh"), (cx) => this.refresh(cx, true)))
-      .child(this.button(t, "review-max", icon(this.max ? "unzoom" : "zoom"), () => this.maximize()));
+      .when(this.expandable(), (el) => el.child(this.button(t, "review-max", icon(this.expanded() ? "unzoom" : "zoom"), () => this.toggleExpand())));
     const info = h_flex()
       .h(24)
       .px(12)
@@ -558,6 +729,7 @@ export default class Review extends View {
           const name = parts.pop();
           const seen = this.viewed(f);
           const notes = comments.filter((c) => c.path === f.path).length;
+          const whole = this.compose?.whole && this.compose.path === f.path;
           return h_flex()
             .id(`review-file-${f.path}`)
             .h(26)
@@ -582,7 +754,16 @@ export default class Review extends View {
                 .child(div().text_color(t.dim).truncate().child(parts.length ? `${parts.join("/")}/` : ""))
                 .child(div().flex_none().max_w(260).truncate().child(name)),
             )
-            .when(notes > 0, (el) => el.child(div().text_size(11).text_color(t.accent).child(`●${notes}`)))
+            // A speech bubble: the file's comment count, and a click comments on the whole file.
+            .child(
+              h_flex().id(`review-file-note-${f.path}`).h(18).min_w(18).px(notes ? 4 : 0).gap(3).flex_none().items_center().justify_center().rounded(4).text_size(11)
+                .text_color(notes || whole ? t.foreground : t.dim)
+                .when(notes > 0 || whole, (el) => el.bg(t.raised))
+                .hover((s) => s.bg(t.hover).text_color(t.foreground))
+                .on_click((_e, cx) => { cx.stop_propagation(); this.commentFile(f.path, cx); })
+                .when(notes > 0, (el) => el.child(String(notes)))
+                .child(icon("comment", notes ? 11 : 12)),
+            )
             .when(f.binary, (el) => el.child(div().text_size(11).text_color(t.dim).child("bin")))
             .when(f.add > 0, (el) => el.child(div().text_size(11).text_color(t.ansi2).child(`+${f.add}`)))
             .when(f.del > 0, (el) => el.child(div().text_size(11).text_color(t.ansi1).child(`−${f.del}`)));
@@ -619,6 +800,7 @@ export default class Review extends View {
       .child(this.button(t, "review-prev-hunk", icon("arrow-up", 12), () => this.jumpHunk(-1)))
       .child(this.button(t, "review-next-hunk", icon("arrow-down", 12), () => this.jumpHunk(1)))
       .when(Boolean(view.newLines), (el) => el.child(this.button(t, "review-full", "Full file", () => this.toggleFull(), { on: view.folds === "all" })))
+      .when(view.rows.length > 0, (el) => el.child(this.button(t, "review-ask", "Ask", () => this.askAbout(null))))
       .child(this.button(t, "review-viewed", seen ? icon("check", 12) : "", () => this.toggleViewed(file), { on: seen, title: "Viewed" }))
       .when(st.split && !this.splitShown(), (el) => el.child(div().text_size(11).text_color(t.dim).child("too narrow to split")));
   }
@@ -633,43 +815,77 @@ export default class Review extends View {
       this.height = height;
       cx.notify();
     });
+    this.stack = null;
     if (!view) {
       const text = this.problem ? "" : this.loading ? "Loading…" : this.files.length ? "Loading the diff…" : "";
       return area.child(div().p(12).text_color(t.dim).child(text));
     }
     const file = view.file;
+    const split = this.splitShown();
+    // What sits between the lines: the comments under their last line, the comment box under
+    // the selected lines; whole-file comments, and those whose lines left the diff, on top.
+    const notes = this.store().comments.filter((c) => c.path === view.path);
+    const spans = new Map(notes.map((c) => [c.id, c.whole ? null : commentSpan(view.rows, c)]));
+    const compose = this.compose?.path === view.path ? this.compose : null;
+    const top = [];
+    const after = new Map();
+    const put = (row, extra) => {
+      const line = split ? view.pairOf[row] : row;
+      after.set(line, [...(after.get(line) || []), extra]);
+    };
+    for (const c of notes.filter((c) => c.whole).concat(notes.filter((c) => !c.whole))) {
+      if (compose?.editing === c.id) continue; // the box takes its place
+      const extra = { card: c, h: this.cardHeight(c.text) };
+      if (spans.get(c.id)) put(spans.get(c.id)[1], extra);
+      else top.push(extra);
+    }
+    const range = compose && !compose.whole ? this.selRange() : null;
+    if (compose) {
+      if (range) put(range[1], { composer: true, h: COMPOSER });
+      else top.push({ composer: true, h: COMPOSER });
+    }
     if (!view.rows.length) {
       const text = view.patch.binary || file.binary ? "Binary file: no text diff" : file.status === "R" ? "Renamed, no other change" : "No text diff";
-      return area.child(div().p(12).text_color(t.dim).child(text));
+      return area.child(v_flex().size_full().font_family(palette(t).font).text_size(12).children(top.map((extra) => this.extra(t, extra))).child(div().p(12).text_color(t.dim).child(text)));
     }
-    const split = this.splitShown();
     const p = palette(t);
     const zoom = settings().zoom || 1;
-    const across = sideways(view, this.width, split, !this.max);
+    const across = sideways(view, this.width, split, !this.wide);
     this.x = Math.max(0, Math.min(this.x, across.max));
-    const [a, b] = this.sel ? [Math.min(this.sel.anchor, this.sel.head), Math.max(this.sel.anchor, this.sel.head)] : [-1, -2];
-    const store = this.store();
-    const notes = store.comments.filter((c) => c.path === view.path);
+    const [a, b] = range || [-1, -2];
     const marks = {
       selected: (index) => index >= a && index <= b,
-      commented: (index) => {
-        const row = view.rows[index];
-        return notes.some((c) => (c.side === "old" ? row.kind === "del" && row.old >= c.from && row.old <= c.to : row.new !== null && row.new >= c.from && row.new <= c.to));
-      },
+      commented: (index) => notes.some((c) => spans.get(c.id) && index >= spans.get(c.id)[0] && index <= spans.get(c.id)[1]),
       foldable: Boolean(view.newLines),
       x: this.x,
-      compact: !this.max,
+      compact: !this.wide,
     };
     const count = split ? view.pairs.length : view.rows.length;
-    const maxY = Math.max(0, count * ROW - this.height);
+    const stack = (this.stack = stackItems(count, ROW, top, after));
+    const maxY = Math.max(0, stack.total - this.height);
+    if (this.reveal) {
+      this.reveal = false;
+      const at = stack.items.findIndex((item) => item.extra?.composer);
+      if (at >= 0) this.y = Math.min(stack.tops[at], Math.max(this.y, stack.tops[at] + COMPOSER - this.height));
+    }
     this.y = Math.max(0, Math.min(this.y, maxY));
     const draw = split ? (i) => splitRow(p, view, view.pairs[i], marks) : (i) => unifiedRow(p, view, i, marks);
-    // Only the rows in view are built.
-    const first = Math.floor(this.y / ROW);
-    const last = Math.min(count, Math.ceil((this.y + this.height) / ROW) + 1);
-    const rows = [];
-    for (let i = first; i < last; i++)
-      rows.push(draw(i).id(`review-row-${i}`).on_click((e, cx) => this.clickRow(i, e.modifiers.shift, cx)));
+    // Only the items in view are built.
+    const first = firstShown(stack.tops, this.y);
+    const shown = [];
+    for (let i = first; i < stack.items.length && stack.tops[i] < this.y + this.height; i++) {
+      const item = stack.items[i];
+      if (item.extra) {
+        shown.push(this.extra(t, item.extra));
+        continue;
+      }
+      const line = item.line;
+      shown.push(
+        draw(line).id(`review-row-${line}`).cursor_pointer()
+          .on_click((_e, cx) => this.clickRow(line, cx))
+          .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.askRow(line); }),
+      );
+    }
     // A bar: `along` the axis, its track from `start` and `room` long, for `max` px of scrolling.
     const bar = (axis, start, room, max) => {
       const size = Math.max(24, (room * room) / (room + max));
@@ -706,79 +922,80 @@ export default class Review extends View {
         cx.stop_propagation();
         cx.notify();
       })
-      .child(v_flex().absolute().left(0).right(0).top(first * ROW - this.y).children(rows))
+      .child(v_flex().absolute().left(0).right(0).top(stack.tops[first] - this.y).children(shown))
       .when(maxY > 0, (el) => el.child(bar("y", 0, this.height, maxY)));
     return v_flex().flex_1().min_h(0).child(box).child(strip);
   }
 
-  composer(t) {
-    const rows = this.selectedRows();
-    if (!rows.length) return div();
-    const side = rows.every((row) => row.kind === "del") ? "old" : "new";
-    const numbers = rows.map((row) => (side === "old" ? row.old : row.new)).filter((n) => n !== null);
-    const lines = numbers.length ? (Math.min(...numbers) === Math.max(...numbers) ? `line ${numbers[0]}` : `lines ${Math.min(...numbers)}–${Math.max(...numbers)}`) : "";
-    const ready = Boolean(this.note.value().trim());
-    return v_flex()
-      .flex_none()
-      .p(8)
-      .gap(6)
-      .border_t(1)
-      .border_color(t.border)
-      .bg(t.chrome)
-      .child(div().text_size(11).text_color(t.dim).child(`Comment on ${this.view.path}, ${lines}${side === "old" ? " (removed)" : ""} · shift-click to extend`))
-      .child(
-        div().id("review-note").rounded(6).border_1().border_color(this.typing === "note" ? t.accent : t.border).p(4).cursor_text()
-          .on_mouse_down("left", stop)
-          .child(Textarea.new(this.note).w_full().text_size(12)),
-      )
-      .child(
-        h_flex().gap(6).justify_end()
-          .child(this.button(t, "review-note-cancel", "Cancel", (cx) => { this.sel = null; this.note.set_value(""); this.handle.focus(); cx.notify(); }))
-          .child(
-            div().id("review-note-add").h(24).px(10).flex().items_center().rounded(6).text_size(12)
-              .bg(ready ? t.solid : t.raised).text_color(ready ? t.solid_foreground : t.dim)
-              .when(ready, (el) => el.cursor_pointer())
-              .on_mouse_down("left", stop)
-              .on_click((_e, cx) => this.addComment(cx))
-              .child("Add comment"),
-          ),
-      );
+  // shortcut: a card's height is guessed from its text (wrapped at the diff's width in code
+  // characters) and the rest is cut off; measure the text if cards come out wrong.
+  cardHeight(text) {
+    const perLine = Math.max(20, Math.floor((this.width - 46) / CHAR));
+    const lines = text.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / perLine)), 0);
+    return 46 + lines * 17;
   }
 
-  commentsPanel(t) {
-    const comments = this.store().comments;
-    if (!comments.length) return div();
-    const agent = tabAgent();
-    const can = Boolean(agent) && !this.sending;
-    return v_flex()
-      .flex_none()
-      .max_h(200)
-      .border_t(1)
-      .border_color(t.border)
-      .child(
-        h_flex().h(30).px(10).gap(6).items_center()
-          .child(div().flex_1().text_size(12).font_semibold().child(`Comments · ${comments.length}`))
-          .child(
-            div().id("review-send").h(24).px(10).flex().items_center().rounded(6).text_size(12)
-              .bg(can ? t.solid : t.raised).text_color(can ? t.solid_foreground : t.dim)
-              .when(can, (el) => el.cursor_pointer())
-              .on_mouse_down("left", stop)
-              .on_click((_e, cx) => this.sendComments(cx))
-              .child(this.sending ? "Sending…" : sendLabel(agent)),
-          ),
-      )
-      .child(
-        v_flex().id("review-comments").flex_1().min_h(0).overflow_y_scroll().px(6).pb(6).children(
-          comments.map((c, index) =>
-            h_flex().id(`review-comment-${index}`).gap(6).px(4).py(3).items_start().rounded(5).cursor_pointer().hover((s) => s.bg(t.hover))
-              .on_click((_e, cx) => this.open(c.path, cx))
-              .child(div().flex_none().text_size(11).text_color(t.accent).child(`${c.path.split("/").pop()}:${c.from}${c.to !== c.from ? `-${c.to}` : ""}`))
-              .child(div().flex_1().min_w(0).text_size(12).truncate().child(c.text))
-              .child(div().id(`review-comment-x-${index}`).flex_none().text_color(t.dim).hover((s) => s.text_color(t.foreground))
-                .on_click((_e, cx) => { cx.stop_propagation(); this.removeComment(index); cx.notify(); })
-                .child(icon("close", 12))),
-          ),
+  extra(t, extra) {
+    return extra.composer ? this.composer(t, extra.h) : this.card(t, extra.card, extra.h);
+  }
+
+  card(t, c, h) {
+    const what = c.whole ? "the whole file" : spanText(c);
+    return div().id(`review-card-${c.id}`).w_full().h(h).flex_none().px(10).py(4).child(
+      v_flex().size_full().overflow_hidden().px(10).py(6).gap(4).rounded(8).border_1().border_color(t.border).bg(t.surface).cursor_pointer()
+        .hover((s) => s.border_color(t.accent))
+        .on_click((_e, cx) => this.editComment(c, cx))
+        .child(
+          h_flex().gap(6).items_center().text_size(11).text_color(t.dim)
+            .child(div().flex_1().min_w(0).truncate().child(`Comment · ${what} · click to edit`))
+            .child(div().id(`review-card-x-${c.id}`).text_color(t.dim).hover((s) => s.text_color(t.foreground))
+              .on_click((_e, cx) => { cx.stop_propagation(); this.deleteComment(c.id, cx); })
+              .child(icon("close", 12))),
+        )
+        .child(div().whitespace_normal().text_color(t.foreground).child(c.text)),
+    );
+  }
+
+  /** The comment box, inline under its lines (on top for the whole file). */
+  composer(t, h) {
+    const c = this.compose;
+    const at = c.whole ? null : linesOf(this.selectedRows());
+    const what = c.whole ? "the whole file" : at ? spanText(at) : "lines no longer in the diff";
+    const ready = Boolean(this.note.value().trim());
+    return div().id("review-composer").w_full().h(h).flex_none().px(10).py(4).on_mouse_down("left", stop).child(
+      v_flex().size_full().p(8).gap(6).rounded(8).border_1().border_color(t.accent).bg(t.surface)
+        .child(div().text_size(11).text_color(t.dim).truncate().child(`${c.editing ? "Edit comment" : "Comment"} · ${what}${c.whole ? "" : " · click lines to widen"}`))
+        .child(
+          div().id("review-note").flex_1().min_h(0).overflow_hidden().rounded(6).border_1().border_color(this.typing === "note" ? t.accent : t.border).bg(t.background).px(6).py(4).cursor_text()
+            .child(Textarea.new(this.note).w_full().text_size(12)),
+        )
+        .child(
+          h_flex().gap(6).items_center()
+            .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child("Enter adds · shift-enter: new line · Esc cancels"))
+            .when(Boolean(c.editing), (el) => el.child(this.button(t, "review-note-delete", "Delete", (cx) => this.deleteComment(c.editing, cx))))
+            .child(this.button(t, "review-note-cancel", "Cancel", (cx) => this.closeComposer(cx)))
+            .child(
+              div().id("review-note-add").h(24).px(10).flex().items_center().rounded(6).text_size(12)
+                .bg(ready ? t.solid : t.raised).text_color(ready ? t.solid_foreground : t.dim)
+                .when(ready, (el) => el.cursor_pointer())
+                .on_click((_e, cx) => this.addComment(cx))
+                .child(c.editing ? "Save" : "Add comment"),
+            ),
         ),
+    );
+  }
+
+  submitBar(t) {
+    const n = this.store().comments.length;
+    if (!n) return div();
+    return h_flex().flex_none().h(40).px(10).gap(6).items_center().border_t(1).border_color(t.border)
+      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(`${n} draft comment${n === 1 ? "" : "s"}`))
+      .child(
+        div().id("review-submit").h(26).px(10).flex().items_center().rounded(6).text_size(12).cursor_pointer()
+          .bg(t.solid).text_color(t.solid_foreground).hover((s) => s.opacity(0.88))
+          .on_mouse_down("left", stop)
+          .on_click(() => this.submitReview())
+          .child(`Submit review · ${n}`),
       );
   }
 
