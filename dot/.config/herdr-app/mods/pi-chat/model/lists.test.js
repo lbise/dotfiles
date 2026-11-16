@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matches, parseCommands, parseModels, parseSessions, parseTree, sessionCommand, slashItems } from "./lists.js";
+import { completePath, matches, pathWord, parseCommands, parseModels, parseSessions, parseTree, sessionCommand, slashItems } from "./lists.js";
 import { formatAge } from "./format.js";
 
 test("sessions are checked and their titles made one line", () => {
@@ -84,4 +84,14 @@ test("models.json: every model, the scoped and current ones marked", () => {
     { provider: "a", id: "b", name: "B", scoped: false, current: false },
   ]);
   assert.equal(parseModels("{"), null);
+});
+
+test("a path at the end of the reply completes as far as its matches agree", () => {
+  assert.deepEqual(pathWord("look at @src/a"), { start: 9, word: "src/a" });
+  assert.equal(pathWord("trailing "), null);
+  assert.equal(completePath("see src/a", ["src/afh.c", "src/afh.h"]), "see src/afh.");
+  assert.equal(completePath("see @src", ["src/"]), "see @src/");
+  assert.equal(completePath("see src/afh.c", ["src/afh.c"]), "see src/afh.c ");
+  assert.equal(completePath("see src/a", ["src/a.c", "src/b.c"]), "see src/a"); // nothing more in common
+  assert.equal(completePath("see x", []), "see x");
 });

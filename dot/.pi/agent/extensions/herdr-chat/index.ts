@@ -103,6 +103,10 @@ type ModelRef = { provider: string; id: string };
 const SCOPE_KEY = Symbol.for("herdr-chat.scope");
 const scopeStore = globalThis as { [SCOPE_KEY]?: ModelRef[] };
 
+/** The model and thinking level last chosen in this process, which a new session (/new) starts with instead of Pi's defaults. */
+const LAST_KEY = Symbol.for("herdr-chat.last");
+const lastStore = globalThis as { [LAST_KEY]?: { model?: ModelRef; thinking?: string } };
+
 /** Saves the scope as Pi's /scoped-models does: `enabledModels` in the global settings, none for all. */
 async function saveEnabledModels(cwd: string, patterns: string[] | undefined) {
   const { SettingsManager } = await import("@earendil-works/pi-coding-agent");
@@ -358,11 +362,11 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
           });
           return;
         }
-        if (!["new", "resume", "tree", "reload"].includes(command.action as string)) throw new Error(`session: unknown action ${command.action}`);
+        if (!["new", "resume", "tree", "fork", "reload"].includes(command.action as string)) throw new Error(`session: unknown action ${command.action}`);
         if (command.action === "resume" && !(typeof command.path === "string" && command.path.endsWith(".jsonl") && existsSync(command.path))) {
           throw new Error(`session: no session file ${command.path}`);
         }
-        if (command.action === "tree" && !(typeof command.entryId === "string" && c.sessionManager.getEntry(command.entryId))) {
+        if ((command.action === "tree" || command.action === "fork") && !(typeof command.entryId === "string" && c.sessionManager.getEntry(command.entryId))) {
           throw new Error(`session: no entry ${command.entryId}`);
         }
         await new Promise<void>((resolve, reject) => {
@@ -411,6 +415,9 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
         return cancelled(await c.newSession());
       case "resume":
         return cancelled(await c.switchSession(command.path as string));
+      case "fork":
+        // As /fork, but keeping the entry itself: the new session ends with that reply.
+        return cancelled(await c.fork(command.entryId as string, { position: "at" }));
       case "tree": {
         const id = command.entryId as string;
         if (id === c.sessionManager.getLeafId()) return; // already there, as in /tree
@@ -565,8 +572,14 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
     if (ctx) publisher.schedule();
   });
 
-  on("session_start", (_event, c) => {
+  on("session_start", async (event, c) => {
     stop();
+    const last = lastStore[LAST_KEY];
+    if (event?.reason === "new" && last) {
+      const model = last.model && c.modelRegistry.find(last.model.provider, last.model.id);
+      if (model && !(c.model && same(c.model, model))) await pi.setModel(model);
+      if (last.thinking) pi.setThinkingLevel(last.thinking as any);
+    }
     mkdirSync(inboxDir, { recursive: true, mode: 0o700 });
     working = !c.isIdle(); // a reload can land in the middle of a run
     turn = working ? { startedAt: Date.now(), endedAt: null, steps: [] } : null;
@@ -675,7 +688,14 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
   });
 
   // Nothing to track, but the state they change should go out at once.
-  for (const event of ["turn_end", "model_select", "thinking_level_select", "session_info_changed"]) {
+  on("model_select", (event) => {
+    if (event.model) lastStore[LAST_KEY] = { ...lastStore[LAST_KEY], model: { provider: event.model.provider, id: event.model.id } };
+  });
+  on("thinking_level_select", (event) => {
+    if (event.level) lastStore[LAST_KEY] = { ...lastStore[LAST_KEY], thinking: event.level };
+  });
+
+  for (const event of ["turn_end", "session_info_changed"]) {
     on(event);
   }
 }

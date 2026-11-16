@@ -3,7 +3,7 @@
 
 import { div } from "gpui-kit";
 import { Popup, h_flex, v_flex } from "gpui-base";
-import { errorText, formatDuration } from "./model/format.js";
+import { errorText, formatCost, formatDuration } from "./model/format.js";
 import { copyButton, hoverArea, typedText } from "./copy.js";
 import { STEP_CELL, stepCell } from "./cells.js";
 import { markdown } from "./markdown.js";
@@ -159,7 +159,7 @@ function work(ui, turn) {
 }
 
 // A file's row opens its diff under it.
-function fileRow(t, turn, file, counts, line, chat) {
+function fileRow(t, turn, file, counts, line, chat, rowKey) {
   const id = `pi-chat-file-${turn.key}-${file.path}`;
   const open = chat.openSteps.has(id);
   const steps = (file.steps || []).map((stepId) => turn.steps.find((step) => step.id === stepId)).filter(Boolean);
@@ -172,7 +172,7 @@ function fileRow(t, turn, file, counts, line, chat) {
       line()
         .id(id)
         .text_color(t.muted)
-        .when(opens, (el) => el.cursor_pointer().hover((s) => s.bg(t.surface)).on_click((_event, cx) => chat.toggleStep(id, cx)))
+        .when(opens, (el) => el.cursor_pointer().hover((s) => s.bg(t.surface)).on_click((_event, cx) => chat.toggleStep(id, cx, rowKey)))
         .child(icon(opens ? (open ? "chevron-down" : "chevron-right") : "file", 13))
         .child(div().flex_1().min_w(0).truncate().font_family(MONO).text_size(12).child(monoLine(file.path)))
         .child(counts(file.added, file.removed)),
@@ -180,7 +180,7 @@ function fileRow(t, turn, file, counts, line, chat) {
     .when(diff !== null, (el) => el.child(div().pr(12).child(diff)));
 }
 
-function files(t, turn, chat) {
+function files(t, turn, chat, rowKey) {
   const added = turn.files.reduce((sum, file) => sum + file.added, 0);
   const removed = turn.files.reduce((sum, file) => sum + file.removed, 0);
   const counts = (plus, minus) =>
@@ -208,12 +208,53 @@ function files(t, turn, chat) {
             .child(div().flex_1().font_medium().text_color(t.foreground).child(`${count} changed ${count === 1 ? "file" : "files"}`))
             .child(counts(added, removed)),
         )
-        .children(turn.files.map((file) => fileRow(t, turn, file, counts, line, chat))),
+        .children(turn.files.map((file) => fileRow(t, turn, file, counts, line, chat, rowKey))),
     );
 }
 
 function quiet(t, text) {
   return div().w_full().pt(10).text_size(13).text_color(t.muted).child(text);
+}
+
+const pad = (n) => String(n).padStart(2, "0");
+const stamp = (ms) => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+// Under a finished answer: copy, fork from it, and when, by which model, at what cost.
+function answerFooter(ui, id, turn) {
+  const { t, chat } = ui;
+  const pointer = chat.pointer;
+  const copied = pointer.copied === id;
+  const button = (key, glyph, label, onClick) =>
+    div()
+      .id(`${id}-${key}`)
+      .size(24)
+      .flex_none()
+      .flex()
+      .items_center()
+      .justify_center()
+      .rounded(6)
+      .cursor_pointer()
+      .hover((s) => s.bg(t.surface).text_color(t.foreground))
+      .tooltip(label)
+      .accessibility_label(label)
+      .on_click((_event, cx) => onClick(cx))
+      .child(icon(glyph, 13));
+  const meta = [
+    turn.endedAt ? stamp(turn.endedAt) : "",
+    turn.model ? [turn.model.provider, turn.model.id].filter(Boolean).join("/") : "",
+    turn.cost ? formatCost(turn.cost) : "",
+  ].filter(Boolean);
+  return h_flex()
+    .pt(6)
+    .gap(2)
+    .items_center()
+    .text_color(t.muted)
+    .child(button("copy", copied ? "check" : "copy", copied ? "Copied" : "Copy the answer", (cx) => pointer.copy(id, turn.answer, cx)))
+    .when(!ui.readOnly && Boolean(turn.lastId), (el) => el.child(button("fork", "branch", "Fork a new session from here", (cx) => chat.forkAt(turn.lastId, cx))))
+    .when(meta.length > 0, (el) => el.child(div().pl(6).min_w(0).truncate().font_family(MONO).text_size(11.5).child(monoLine(meta.join(" · ")))));
 }
 
 const NOTES = { compaction: "Context compacted.", branch: "Came back from another branch." };
@@ -233,15 +274,13 @@ export function drawRow(item, ui) {
   if (item.kind === "answer") {
     const gap = item.turn.steps.length || item.turn.live || item.turn.narration.length ? 4 : 12;
     const id = `pi-chat-md-${item.key}`;
-    // The copy button hangs in the margin beside the answer's first line, so the answer keeps its place.
-    return hoverArea(div(), id, pointer)
-      .relative()
+    return v_flex()
       .w_full()
       .pt(gap)
       .child(markdown(t, id, item.turn.answer, pointer, ui.chat.code))
-      .when(!item.turn.live, (el) => el.child(div().absolute().top(gap).right(-34).child(copyButton(t, id, item.turn.answer, pointer, "Copy the answer"))));
+      .when(!item.turn.live, (el) => el.child(answerFooter(ui, id, item.turn)));
   }
-  if (item.kind === "files") return files(t, item.turn, ui.chat);
+  if (item.kind === "files") return files(t, item.turn, ui.chat, item.key);
   if (item.kind === "end") {
     const error = item.turn.error;
     if (!error) return quiet(t, "Stopped.");

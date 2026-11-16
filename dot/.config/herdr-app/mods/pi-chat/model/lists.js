@@ -183,3 +183,28 @@ export function sessionCommand(text) {
   if (instructions && match[1] !== "compact") return null;
   return { action: /** @type {"new"|"compact"|"resume"|"tree"|"reload"} */ (match[1]), instructions };
 }
+
+/**
+ * The path being typed at the end of a reply (after a space, an optional `@` dropped), or null.
+ * shortcut: completes only at the end of the text and paths without spaces; follow the caret if that gets in the way.
+ * @param {string} text
+ */
+export function pathWord(text) {
+  const match = /(?:^|\s)@?([^\s@]+)$/.exec(text);
+  return match ? { start: text.length - match[1].length, word: match[1] } : null;
+}
+
+/**
+ * The reply with its last path completed from `found` (what starts with it, folders ending in `/`):
+ * as far as all of them agree, plus a space after a single file. Unchanged when they agree on nothing more.
+ * @param {string} text
+ * @param {string[]} found
+ */
+export function completePath(text, found) {
+  const at = pathWord(text);
+  if (!at || !found.length) return text;
+  let common = found[0];
+  for (const one of found) while (!one.startsWith(common)) common = common.slice(0, -1);
+  if (found.length === 1 && !common.endsWith("/")) common += " ";
+  return common.length > at.word.length ? text.slice(0, at.start) + common : text;
+}

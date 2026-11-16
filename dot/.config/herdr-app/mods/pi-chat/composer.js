@@ -4,7 +4,7 @@
 
 import { div } from "gpui-kit";
 import { Popup, Textarea, TextareaState, h_flex, v_flex } from "gpui-base";
-import { sessionCommand } from "./model/lists.js";
+import { completePath, pathWord, sessionCommand } from "./model/lists.js";
 import { selectAll, takeKeys } from "./keys.js";
 import { menu } from "./menu.js";
 import { SlashMenu } from "./slash.js";
@@ -15,7 +15,7 @@ const TWICE = 250; // a press that closes a menu also lands on its chip
 export class Composer {
   /**
    * @param {object} chat The view: `send(text, cx)`, `stop(cx)`, `command(command, cx)`,
-   *   `runSession(action, instructions, cx)`, `slashCommands()`, `loadCommands(cx)`, `busy()`, `openModels(cx)`, `editDraft(cx)`.
+   *   `runSession(action, instructions, cx)`, `listPaths(prefix)`, `slashCommands()`, `loadCommands(cx)`, `busy()`, `openModels(cx)`, `editDraft(cx)`.
    */
   constructor(chat) {
     this.chat = chat;
@@ -26,10 +26,15 @@ export class Composer {
     this.blank = true;
     this.open = null; // the open menu: "model" or "thinking"
     this.closedAt = 0;
+    this.hint = ""; // the paths a Tab could not choose between
     // The button's look and the slash menu depend on the text: redraw when either changes.
     this.input.on("change", (_event, cx) => {
       const text = this.input.value();
       const query = this.slash.query;
+      if (this.hint) {
+        this.hint = "";
+        cx.notify();
+      }
       if (this.slash.follow(text)) this.chat.loadCommands(cx);
       const blank = !text.trim();
       if (blank === this.blank && query === this.slash.query) return;
@@ -69,6 +74,20 @@ export class Composer {
     this.chat.send(text, cx);
   }
 
+  // Tab: the path at the end of the text, completed from the files on Pi's machine.
+  complete(cx) {
+    const text = this.input.value();
+    if (!pathWord(text)) return;
+    cx.spawn(async (cx) => {
+      const found = await this.chat.listPaths(pathWord(text).word);
+      if (this.input.value() !== text) return;
+      const next = completePath(text, found);
+      if (next !== text) this.set(next);
+      this.hint = next === text && found.length > 1 ? found.slice(0, 20).map((path) => path.replace(/.*\/(?=.)/, "")).join("   ") : "";
+      cx.notify();
+    });
+  }
+
   // A slash menu entry: a session command runs (or opens its picker), anything else goes in the box.
   accept(item, cx) {
     if (item.kind !== "session") this.set(`/${item.name} `);
@@ -81,6 +100,7 @@ export class Composer {
     if (key === "ctrl-a") selectAll(this.input, cx);
     else if (key === "ctrl-g") this.chat.editDraft(cx);
     else if (key === "enter") this.enter(cx);
+    else if (key === "tab") this.complete(cx);
     else if (key === "shift-tab") this.chat.command({ type: "cycle", what: "thinking" }, cx);
     else this.chat.command({ type: "cycle", what: "model", direction: key === "alt-p" ? "backward" : "forward" }, cx);
   }
@@ -249,6 +269,7 @@ export class Composer {
         cx.stop_propagation();
         this.chat.stop(cx);
       })
+      .when(this.hint, (el) => el.child(div().pb(6).truncate().font_family("Geist Mono").text_size(12).text_color(t.muted).child(this.hint)))
       .child(takeKeys(div().w_full(), slash !== null, (key, cx) => (slash ? this.slashKey(key, cx) : this.fieldKey(key, cx))).child(Textarea.new(this.input).w_full().text_size(15).text_color(t.foreground)))
       .child(h_flex().mt(8).gap(2).items_center().children(this.pickers(t, state)).child(div().flex_1()).child(h_flex().gap(6).children(this.buttons(t, working))));
     // The popovers hang from a line along the box's top edge.

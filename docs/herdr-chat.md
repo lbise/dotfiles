@@ -144,6 +144,7 @@ made the name does not matter. A command that cannot run sets `state.error`.
 { "type": "session", "action": "compact", "instructions": "…" }  // like /compact [instructions]; instructions optional
 { "type": "session", "action": "resume", "path": "/abs/….jsonl" } // like /resume, picking that session
 { "type": "session", "action": "tree", "entryId": "…", "summarize": false }  // like /tree, jumping to that entry
+{ "type": "session", "action": "fork", "entryId": "…" }          // like /fork, but the new session keeps that entry (Pi's fork position "at")
 { "type": "list", "what": "sessions" }                           // write sessions.json
 { "type": "list", "what": "tree" }                               // write tree.json
 { "type": "list", "what": "models" }                             // write models.json
@@ -163,7 +164,8 @@ moves to its parent and puts its text in Pi's input box (`draft`). After `new`, 
 Pi's own `/fork`, `/clone`, `/reload`) Pi restarts the extension: `state.json` and
 `commands.json` are rewritten for the new session at once, `turn` is `null`, and `usage` follows
 when the usage extension reports again. Commands still in the same inbox scan after a `new` or
-`resume` are dropped.
+`resume` are dropped. After `new`, the new session takes the model and thinking level last selected in this
+Pi process (by the chat or Pi's own keys) instead of Pi's defaults.
 
 ### `sessions.json` (extension writes on a `list` request)
 

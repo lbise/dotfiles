@@ -4,7 +4,7 @@
 
 import { div } from "gpui-kit";
 import { Popup, h_flex, v_flex } from "gpui-base";
-import { nextCommand, setShared, settings, shared, theme } from "herdr";
+import { exec, nextCommand, setShared, settings, shared, theme } from "herdr";
 import { chatSettings } from "./model/settings.js";
 import { childTask } from "./model/chat.js";
 import { isChildSession } from "./model/protocol.js";
@@ -262,6 +262,20 @@ export class ChatView {
     return !state || state.status !== "idle";
   }
 
+  /** The paths on Pi's machine that start with `prefix` (relative to Pi's folder), folders ending in `/`. */
+  async listPaths(prefix) {
+    const pi = target();
+    const state = pi ? feedFor(pi).chat.state : null;
+    if (!state) return [];
+    const script = 'cd "$1" 2>/dev/null; p=$2; t=; case $p in "~/"*) t=1; p="$HOME/${p#"~/"}";; esac; for f in "$p"*; do [ -e "$f" ] || continue; [ -d "$f" ] && f="$f/"; [ -n "$t" ] && f="~/${f#"$HOME/"}"; printf "%s\\n" "$f"; done | head -200';
+    try {
+      const result = await exec("sh", ["-c", script, "pi-chat", state.cwd || ".", prefix], { on: pi.machine, timeout: 3000 });
+      return result.code === 0 ? result.stdout.split("\n").filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
   slashCommands() {
     const pi = target();
     return pi ? feedFor(pi).commands : [];
@@ -292,6 +306,15 @@ export class ChatView {
     else if (action === "tree") this.picker.open("tree", feedFor(pi), cx);
     else this.sessionCommand(action === "compact" && instructions ? { type: "session", action, instructions } : { type: "session", action }, cx);
     return true;
+  }
+
+  /** A new session from the conversation up to the entry `entryId`, as Pi's /fork. */
+  forkAt(entryId, cx) {
+    if (this.busy()) {
+      this.notice = "Pi is busy. Session commands wait until it is idle.";
+      return cx.notify();
+    }
+    this.sessionCommand({ type: "session", action: "fork", entryId }, cx);
   }
 
   sessionCommand(command, cx) {
@@ -395,8 +418,10 @@ export class ChatView {
     cx.notify();
   }
 
-  toggleStep(id, cx) {
-    this.timeline.hold();
+  /** `rowKey`: the row to scroll into view as it opens (a changed file's diff, which opens at the bottom). */
+  toggleStep(id, cx, rowKey) {
+    if (rowKey && !this.openSteps.has(id)) this.timeline.reveal(rowKey);
+    else this.timeline.hold();
     if (this.openSteps.has(id)) this.openSteps.delete(id);
     else this.openSteps.add(id);
     cx.notify();
@@ -489,7 +514,7 @@ export class ChatView {
     const items = conversationRows(feed.chat, child ? null : this.sent);
     if (!items.length) return child ? div().flex_1() : emptyChat(t);
     const now = agentNow(feed);
-    const ui = { t, look, width: look.width, elapsed: this.elapsed(feed), now, asking: !child && feed.chat.state.status === "asking", chat: this };
+    const ui = { t, look, readOnly: child, width: look.width, elapsed: this.elapsed(feed), now, asking: !child && feed.chat.state.status === "asking", chat: this };
     const list = this.timeline.render({
       items,
       row: (item) => drawRow(item, ui),

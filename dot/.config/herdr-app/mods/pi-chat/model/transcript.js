@@ -76,6 +76,8 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {number|null} endedAt Null while the turn is live.
  * @property {number|null} durationMs
  * @property {{ provider: string, id: string }|null} model The model that wrote the last reply.
+ * @property {number} cost USD of the turn's replies, as their usage reports it.
+ * @property {string|null} lastId Entry id of the turn's last reply.
  * @property {string|null} error Set when the turn ended in an error.
  * @property {boolean} aborted
  * @property {boolean} done The assistant's last message ended its reply (it asked for no tool).
@@ -111,6 +113,7 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} [stop] Assistant: the stop reason.
  * @property {string|null} [error] Assistant.
  * @property {Turn["model"]} [model] Assistant.
+ * @property {number} [cost] Assistant: USD.
  * @property {string} [callId] Result.
  * @property {boolean} [ok] Result.
  * @property {number} [durationMs] Result.
@@ -248,6 +251,8 @@ export function newTurn(key, user) {
     endedAt: null,
     durationMs: null,
     model: null,
+    cost: 0,
+    lastId: null,
     error: null,
     aborted: false,
     done: false,
@@ -318,6 +323,7 @@ function reduceMessage(entry, message, cwd) {
     entry.stop = message.stopReason;
     entry.error = message.stopReason === "error" ? clip(String(message.errorMessage || "error"), TEXT_MAX) : null;
     entry.model = typeof message.model === "string" ? { provider: String(message.provider || ""), id: message.model } : null;
+    entry.cost = Number.isFinite(message.usage?.cost?.total) ? message.usage.cost.total : 0;
     entry.parts = [];
     content.forEach((/** @type {any} */ block, /** @type {number} */ index) => {
       if (!block) return;
@@ -514,6 +520,8 @@ function foldAssistant(transcript, turn, entry) {
   }
   turn.answer = transcript.pending.map((text) => text.text).join("\n\n");
   if (entry.model) turn.model = entry.model;
+  turn.cost += entry.cost || 0;
+  turn.lastId = entry.id;
   turn.error = entry.error;
   turn.aborted = entry.stop === "aborted";
   turn.done = entry.stop !== "toolUse";

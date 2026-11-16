@@ -58,6 +58,12 @@ export class Timeline {
     this.floor = Math.min(0, this.top); // a short conversation hangs from the bottom: its top stays there
   }
 
+  /** As hold(), and while row `key` grows in the next second, scroll so its end shows (its top kept in view). */
+  reveal(key) {
+    this.hold();
+    this.revealing = { key, until: Date.now() + 1000 };
+  }
+
   /** A row took another key (a sent message became part of the conversation): keep its place and skip its entrance. */
   rename(from, to) {
     if (this.heights.has(from)) this.heights.set(to, this.heights.get(from));
@@ -71,6 +77,7 @@ export class Timeline {
       this.top = this.total - this.view;
     }
     this.held = false;
+    this.revealing = null;
     this.top = this.clamp(this.top - dy);
     if (this.top >= this.total - this.view - 2) this.follow();
   }
@@ -142,7 +149,11 @@ export class Timeline {
           this.heights.set(item.key, height);
           // A row above the view changed size: what is on screen stays where it is.
           const offset = this.offsets.get(item.key);
-          if (!this.following && offset !== undefined && offset < this.top) this.top += height - (old ?? item.estimate);
+          const reveal = this.revealing;
+          if (reveal && reveal.key === item.key && Date.now() < reveal.until && offset !== undefined && !this.following) {
+            // The next render clamps it to the new total.
+            this.top = Math.max(this.top, Math.min(offset, offset + height - this.view));
+          } else if (!this.following && offset !== undefined && offset < this.top) this.top += height - (old ?? item.estimate);
           // A held row shrank back and the newest row is in view again: follow as before.
           if (this.held && old !== undefined && height < old && this.total - (old - height) - this.view - this.top <= 2) this.follow();
           // While following, a known row that grows is pinned to the bottom already.

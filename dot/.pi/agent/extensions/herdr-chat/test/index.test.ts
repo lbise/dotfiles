@@ -11,6 +11,7 @@ const cleanups: (() => unknown)[] = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
   delete (globalThis as any)[Symbol.for("herdr-chat.scope")];
+  delete (globalThis as any)[Symbol.for("herdr-chat.last")];
   if (realTerminalId === undefined) delete process.env.HC_TERMINAL_ID;
   else process.env.HC_TERMINAL_ID = realTerminalId;
 });
@@ -110,6 +111,7 @@ function setup({ hasUI = true } = {}) {
     newSession: async () => (calls.push(["newSession"]), { cancelled: false }),
     reload: async () => void calls.push(["reload"]),
     switchSession: async (path: string) => (calls.push(["switchSession", path]), { cancelled: path.includes("veto") }),
+    fork: async (id: string, options: any) => (calls.push(["fork", id, options]), { cancelled: false }),
     navigateTree: async (id: string, options: any) => (calls.push(["navigateTree", id, options]), { cancelled: false }),
   };
   const listed: string[][] = [];
@@ -392,6 +394,7 @@ test("session commands run through the internal command, which does nothing type
   h.send({ type: "session", action: "resume", path: session });
   h.send({ type: "session", action: "tree", entryId: "e1", summarize: true });
   h.send({ type: "session", action: "tree", entryId: "e2" }); // the leaf: nothing to do
+  h.send({ type: "session", action: "fork", entryId: "e2" });
   h.send({ type: "session", action: "reload" });
   h.send({ type: "session", action: "compact", instructions: " keep the plan " });
   await until(() => h.calls.some((c) => c[0] === "compact"), "compact");
@@ -404,6 +407,8 @@ test("session commands run through the internal command, which does nothing type
     internal,
     ["navigateTree", "e1", { summarize: true }],
     internal,
+    internal,
+    ["fork", "e2", { position: "at" }],
     internal,
     ["reload"],
   ]);
@@ -512,4 +517,15 @@ test("parseTasks keeps known fields and fills the missing ones", () => {
     id: "a", background: false, startedAt: 0, taskId: null, title: "t", agent: "general", status: "queued",
     sessionPath: null, currentTool: null, model: null, turns: 0, tokens: 0, cost: 0,
   }]);
+});
+
+test("a new session starts with the model and thinking level last chosen", async () => {
+  const h = setup();
+  await h.emit("session_start", { reason: "startup" });
+  await h.emit("model_select", { model: { provider: "openai", id: "gpt-6" } });
+  await h.emit("thinking_level_select", { level: "low" });
+  h.pi.setThinkingLevel("high");
+  await h.emit("session_start", { reason: "new" });
+  assert.deepEqual(h.calls.filter((c) => c[0] === "setModel"), [["setModel", "gpt-6"]]);
+  assert.equal(h.pi.getThinkingLevel(), "low");
 });

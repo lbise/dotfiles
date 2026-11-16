@@ -12,7 +12,7 @@ function read(lines) {
 test("a turn with no tools is a user message and an answer", () => {
   const s = session();
   const first = s.user("What is AFH?");
-  const reply = s.assistant([{ type: "thinking", thinking: "hm" }, text("Adaptive **frequency** hopping.")], "stop", {}, 18000);
+  const reply = s.assistant([{ type: "thinking", thinking: "hm" }, text("Adaptive **frequency** hopping.")], "stop", { usage: { cost: { total: 0.25 } } }, 18000);
   const t = read(s.lines);
 
   assert.deepEqual(t.header, { id: "session-1", cwd: "/work", parentSession: null });
@@ -29,6 +29,8 @@ test("a turn with no tools is a user message and an answer", () => {
     endedAt: Date.parse("2026-01-01T10:00:19.000Z"),
     durationMs: 18000,
     model: { provider: "anthropic", id: "claude-test" },
+    cost: 0.25,
+    lastId: reply,
     error: null,
     aborted: false,
     done: true,
