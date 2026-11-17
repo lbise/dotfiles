@@ -43,13 +43,7 @@ DESKTOP_LINKS=(
     ".config/systemd/user/leo-quickshell.service"
     ".config/systemd/user/leo-bt-agent.service"
     ".config/uwsm"
-    # Herdr desktop app. Link single files: the app writes its own state next to them.
-    # On WSL with the app on Windows, use scripts/herdr-app-link instead.
-    ".config/herdr-app/keys.json"
-    ".config/herdr-app/settings.json"
-    ".config/herdr-app/themes/tokyo-night.json"
-    ".config/herdr-app/mods/prefix"
-    ".config/herdr-app/mods/tickets"
+    # Herdr desktop app: linked by scripts/herdr-app-link below.
     ".config/walker"
     ".config/elephant/menus"
     # sdl-freerdp hotkeys default to Right Shift + key: Shift+D disconnects.
@@ -100,6 +94,12 @@ for REL in "${DOTFILES_LINKS[@]}"; do
     DST="$DOTFILES_DST/$DST_REL"
     create_symlink "$SRC" "$DST"
 done
+
+# Herdr desktop app config, every tracked file and mod. On WSL the app runs on
+# Windows: run scripts/herdr-app-link by hand there (it needs elevation).
+if ! is_work && ! is_wsl; then
+    "$DOTFILES_ROOT/scripts/herdr-app-link"
+fi
 
 # Select the tracked Pi profile for this machine.
 create_symlink "$PI_SETTINGS_SOURCE" "$DOTFILES_DST/.pi/agent/settings.json"

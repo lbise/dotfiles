@@ -2,8 +2,9 @@
 // collect.py runs on each machine (python3) and returns per-day totals; the view
 // filters them by range, provider and machine, charts them per day, and groups
 // them by model, provider, machine or project (History). The Subscriptions tab
-// shows each subscription's current limits (subs.mjs, through Pi's usage extension). "This computer" (Windows) is left
-// out: Pi runs only on the Linux machines. A side panel (layouts/leo.json's
+// shows each subscription's current limits (subs.mjs, through Pi's usage extension). "This computer"
+// counts on Linux; on Windows it is left out: Pi runs only on the Linux machines (WSL is one).
+// A side panel (layouts/leo.json's
 // `usage` block), opened from the Usage button in the tab bar or leo-tabs.usage,
 // maximized with leo-tabs.max (mods/leo-tabs). Below WIDE it lays itself out for
 // the narrow panel: fewer table columns, stacked controls.
@@ -13,8 +14,8 @@ import { h_flex, v_flex } from "gpui-base";
 import { appHome, exec, layout, machines, readTextFile, run, settings, theme } from "herdr";
 import { usageChart, seriesColor } from "./chart.js";
 import {
-  CREDIT_USD, GROUPS, OTHER, RANGES, billing, breakdownOf, formatBucket, formatCost, formatSpan, formatTokens, since, summarize,
-  toRecords, tokens,
+  CREDIT_USD, GROUPS, LOCAL, OTHER, RANGES, billing, breakdownOf, formatBucket, formatCost, formatSpan, formatTokens, since, summarize,
+  onOf, toRecords, tokens,
 } from "./model.js";
 import { loadSubs, subsView } from "./subs-view.js";
 
@@ -94,7 +95,7 @@ class Report {
   }
 
   refresh(cx) {
-    const names = machines().map((m) => m.name).filter(Boolean);
+    const names = piMachines();
     this.results = Object.fromEntries(names.map((name) => [name, { state: "loading", records: [] }]));
     cx.notify();
     cx.spawn(async (cx) => {
@@ -111,7 +112,7 @@ class Report {
     cx.notify();
     cx.spawn(async (cx) => {
       const script = await readTextFile(`${appHome()}/mods/usage/subs.mjs`);
-      const names = machines().map((m) => m.name).filter(Boolean).sort();
+      const names = piMachines().sort();
       this.subs = { state: "ok", ...(await loadSubs(names, script)), at: Date.now() };
       cx.notify();
     });
@@ -301,10 +302,16 @@ class Report {
   }
 }
 
+// The machines Pi may run on: every one, and this computer unless it is Windows.
+function piMachines() {
+  const local = !appHome().includes("\\");
+  return machines().filter((m) => m.name || local).map((m) => m.name || LOCAL);
+}
+
 async function collect(name, script) {
   if (!script) return { state: "error", records: [], error: "collect.py not found" };
   try {
-    const r = await exec("python3", ["-c", script], { on: name, timeout: TIMEOUT_MS });
+    const r = await exec("python3", ["-c", script], { on: onOf(name), timeout: TIMEOUT_MS });
     if (r.code === 127) return { state: "error", records: [], error: "no python3" };
     if (r.code !== 0) return { state: "error", records: [], error: (r.stderr || `exit ${r.code}`).trim().split("\n").pop() };
     return { state: "ok", records: toRecords(name, JSON.parse(r.stdout).rows) };

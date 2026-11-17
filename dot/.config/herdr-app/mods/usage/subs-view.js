@@ -5,7 +5,7 @@
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { exec } from "herdr";
-import { formatReset, formatTokens } from "./model.js";
+import { formatReset, formatTokens, onOf } from "./model.js";
 
 const MONO = "Geist Mono";
 
@@ -28,7 +28,7 @@ export async function loadSubs(names, script) {
   if (!script) return { providers: [], errors: ["subs.mjs not found"] };
   for (const machine of names) {
     try {
-      const r = await exec("sh", ["-c", RUN_NODE, "usage-subs", script], { on: machine, timeout: 30000 });
+      const r = await exec("sh", ["-c", RUN_NODE, "usage-subs", script], { on: onOf(machine), timeout: 30000 });
       if (r.code !== 0) {
         errors.push(`${machine}: ${(r.stderr || `exit ${r.code}`).trim().split("\n").pop()}`);
         continue;

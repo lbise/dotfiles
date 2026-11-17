@@ -1,26 +1,37 @@
 #!/usr/bin/env bash
-# Link the Herdr desktop app's config on Windows to dot/.config/herdr-app in this
-# repo (WSL), so the repo holds the real files. On native Linux, install/symlinks.sh
-# links ~/.config/herdr-app instead.
+# Link the Herdr desktop app's config to dot/.config/herdr-app in this repo, so the
+# repo holds the real files. Links top-level JSON files, themes/*.json, layouts/*.json
+# and mods/*/; the app writes its own state next to them.
+#   Native Linux: links into ~/.config/herdr-app (install/symlinks.sh runs this).
+#   WSL:          links into %USERPROFILE%\.config\herdr-app, the Windows app's config.
 #
-# Re-run it after editing a tracked file from WSL: the app does not see changes made
-# on the WSL side, but it reloads a file whose link is replaced.
-#
-# Creating Windows symlinks needs an elevated WSL session or Windows Developer Mode.
+# WSL: re-run it after editing a tracked file: the app does not see changes made on
+# the WSL side, but it reloads a file whose link is replaced. Creating Windows
+# symlinks needs an elevated WSL session or Windows Developer Mode.
 set -Eeuo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)/dot/.config/herdr-app"
-win_profile="$(cd /mnt/c && cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
-app_dir="$(wslpath "$win_profile")/.config/herdr-app"
 
-if [[ "$repo_dir$app_dir" == *" "* ]]; then
-    echo "ERROR: paths with spaces are not supported: $repo_dir, $app_dir" >&2
-    exit 1
+if grep -qi 'microsoft\|wsl' /proc/version 2>/dev/null; then
+    windows=1
+    win_profile="$(cd /mnt/c && cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
+    app_dir="$(wslpath "$win_profile")/.config/herdr-app"
+else
+    windows=0
+    app_dir="${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app"
 fi
-if [[ ! -d $app_dir ]]; then
-    echo "ERROR: $app_dir does not exist; start the Herdr app once first" >&2
-    exit 1
+
+if ((windows)); then
+    if [[ "$repo_dir$app_dir" == *" "* ]]; then
+        echo "ERROR: paths with spaces are not supported: $repo_dir, $app_dir" >&2
+        exit 1
+    fi
+    if [[ ! -d $app_dir ]]; then
+        echo "ERROR: $app_dir does not exist; start the Herdr app once first" >&2
+        exit 1
+    fi
 fi
+mkdir -p "$app_dir"
 
 # shortcut: paths go to cmd.exe unquoted (WSL interop mangles embedded quotes),
 # so paths with spaces are refused; quote properly if a profile path ever has one.
@@ -46,25 +57,37 @@ backup() {
 # recreates a default keys.json the moment the file is missing.
 link_file() {
     local rel=$1 dst="$app_dir/$1" target dst_win
-    target="$(wslpath -w "$repo_dir/$rel")"
     backup "$dst"
     mkdir -p "$(dirname "$dst")"
-    dst_win="$(wslpath -w "$(dirname "$dst")")\\$(basename "$dst")"
-    win_cmd "mklink $dst_win.lnk $target >NUL && move /Y $dst_win.lnk $dst_win >NUL"
+    if ((windows)); then
+        target="$(wslpath -w "$repo_dir/$rel")"
+        dst_win="$(wslpath -w "$(dirname "$dst")")\\$(basename "$dst")"
+        win_cmd "mklink $dst_win.lnk $target >NUL && move /Y $dst_win.lnk $dst_win >NUL"
+    else
+        ln -sfn "$repo_dir/$rel" "$dst.lnk"
+        mv -fT "$dst.lnk" "$dst"
+    fi
     echo "linked $rel"
 }
 
 link_dir() {
     local rel=$1 dst="$app_dir/$1" target dst_win
-    target="$(wslpath -w "$repo_dir/$rel")"
     backup "$dst"
-    dst_win="$(wslpath -w "$(dirname "$dst")")\\$(basename "$dst")"
-    if [[ -L $dst ]]; then
-        win_cmd "rmdir $dst_win"
-    elif [[ -e $dst ]]; then
-        rm -rf "$dst"
+    mkdir -p "$(dirname "$dst")"
+    if ((windows)); then
+        target="$(wslpath -w "$repo_dir/$rel")"
+        dst_win="$(wslpath -w "$(dirname "$dst")")\\$(basename "$dst")"
+        if [[ -L $dst ]]; then
+            win_cmd "rmdir $dst_win"
+        elif [[ -e $dst ]]; then
+            rm -rf "$dst"
+        fi
+        win_cmd "mklink /D $dst_win $target >NUL"
+    else
+        [[ -e $dst && ! -L $dst ]] && rm -rf "$dst"
+        ln -sfn "$repo_dir/$rel" "$dst.lnk"
+        mv -fT "$dst.lnk" "$dst"
     fi
-    win_cmd "mklink /D $dst_win $target >NUL"
     echo "linked $rel/"
 }
 

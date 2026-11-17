@@ -30,6 +30,8 @@ if [[ -z "$SSH_CONNECTION" ]]; then
     fi
 
     zstyle :omz:plugins:ssh-agent identities $KEY
+    # Use the systemd ssh-agent.socket agent (environment.d) so herdr-core sees the keys
+    zstyle :omz:plugins:ssh-agent honor-existing yes
 fi
 
 # Disable automatic window title change

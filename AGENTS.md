@@ -1,6 +1,6 @@
 ## Herdr app
 
-The Herdr GUI runs natively on Windows and uses WSL as one of its machines. Its config lives in `dot/.config/herdr-app/`; see `dot/.config/herdr-app/AGENTS.md` before looking for Herdr config in WSL.
+The Herdr GUI runs natively on Windows (using WSL as one of its machines) and on Arch Linux. Its config lives in `dot/.config/herdr-app/`; see `dot/.config/herdr-app/AGENTS.md` before looking for Herdr config in WSL.
 
 ## Agent skills
 

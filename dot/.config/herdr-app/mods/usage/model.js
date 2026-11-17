@@ -29,6 +29,10 @@ export const billing = (provider) => BILLING[provider] || "metered";
 export const SERIES = 6;
 export const OTHER = "Other";
 
+/** This computer's name in the view; `exec` reaches it with `on: null`. */
+export const LOCAL = "this computer";
+export const onOf = (machine) => (machine === LOCAL ? null : machine);
+
 /** Collector rows of one machine as records. */
 export function toRecords(machine, rows) {
   return rows.map(([day, provider, model, project, ...figures]) => ({

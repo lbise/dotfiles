@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Drive the development copy of the Herdr app (its own home, so the daily window is untouched).
+# Works from WSL (app on Windows) and on native Linux; open and the pointer/keyboard commands need WSL.
 #   herdr-app-dev sync            copy mods/pi-chat and mods/review, layouts and themes from the repo into the dev home
 #   herdr-app-dev open            start the dev window (1280x820, at the screen's top left)
-#   herdr-app-dev shot [name]     save the dev window's frame, print its WSL path
+#   herdr-app-dev shot [name]     save the dev window's frame, print its path
 #   herdr-app-dev click X Y       press at client pixel X,Y (the shot's pixels); rightclick X Y: the right button
 #   herdr-app-dev wheel X Y D     wheel at X,Y: D > 0 up, 120 a notch; hwheel X Y D: D > 0 right
 #   herdr-app-dev move X Y        move the pointer there (hover)
@@ -11,12 +12,25 @@
 set -Eeuo pipefail
 here="$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")"
 repo="$(cd -- "$here/.." && pwd)/dot/.config/herdr-app"
-win_profile="$(cd /mnt/c && cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
-dev_win="$win_profile\\.config\\herdr-app-dev"
-dev="$(wslpath "$dev_win")"
-run() { (cd /mnt/c && HERDR_APP_HOME="$dev_win" WSLENV="HERDR_APP_HOME:${WSLENV:-}" herdr-app.exe "$@" | tr -d '\r'); }
+if grep -qi 'microsoft\|wsl' /proc/version 2>/dev/null; then
+    wsl=1
+    win_profile="$(cd /mnt/c && cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
+    dev_win="$win_profile\\.config\\herdr-app-dev"
+    dev="$(wslpath "$dev_win")"
+    out="$(wslpath "$(cd /mnt/c && cmd.exe /c 'echo %TEMP%' 2>/dev/null | tr -d '\r')")/herdr-shots"
+    run() { (cd /mnt/c && HERDR_APP_HOME="$dev_win" WSLENV="HERDR_APP_HOME:${WSLENV:-}" herdr-app.exe "$@" | tr -d '\r'); }
+    app_path() { wslpath -w "$1"; }
+else
+    wsl=0
+    dev="${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app-dev"
+    out="${TMPDIR:-/tmp}/herdr-shots"
+    run() { HERDR_APP_HOME="$dev" herdr-app "$@"; }
+    app_path() { echo "$1"; }
+fi
+need_wsl() { ((wsl)) || { echo "ERROR: herdr-app-dev ${1:-}: WSL only (drives the Windows window)" >&2; exit 1; }; }
 # Pointer input goes to the window `open` started, by its process id.
 input() {
+    need_wsl "$1"
     local pid
     pid="$(cat "$dev/window.pid" 2>/dev/null)" || { echo "ERROR: no dev window: run herdr-app-dev open" >&2; exit 1; }
     (cd /mnt/c && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$here/herdr-app-dev-input.ps1")" \
@@ -33,6 +47,7 @@ sync)
     cp "$repo"/themes/*.json "$dev/themes/"
     ;;
 open)
+    need_wsl open
     mkdir -p "$dev"
     # Started from Windows so the window gets HERDR_APP_HOME; its process id is kept for input.
     (cd /mnt/c && powershell.exe -NoProfile -Command "\$env:HERDR_APP_HOME='$dev_win'; (Start-Process -FilePath (Get-Command herdr-app.exe).Source -PassThru).Id" | tr -d '\r') >"$dev/window.pid"
@@ -44,9 +59,8 @@ click | rightclick | move) input "$1" -x "$2" -y "$3" ;;
 type) input type -text "$2" ;;
 wheel | hwheel) input "$1" -x "$2" -y "$3" -delta "$4" ;;
 shot)
-    out="$(wslpath "$(cd /mnt/c && cmd.exe /c 'echo %TEMP%' 2>/dev/null | tr -d '\r')")/herdr-shots"
     mkdir -p "$out"
-    run shot "$(wslpath -w "$out")\\${2:-dev}.png" >/dev/null
+    run shot "$(app_path "$out/${2:-dev}.png")" >/dev/null
     echo "$out/${2:-dev}.png"
     ;;
 *) run "$@" ;;
