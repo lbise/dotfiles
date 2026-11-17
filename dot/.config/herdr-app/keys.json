@@ -50,7 +50,6 @@
     "ctrl-shift-t": "tab.new",
     "ctrl-shift-k": "mod.open:picker",
     "ctrl-shift-u": "leo-tabs.usage",
-    "ctrl-shift-m": "leo-tabs.max",
     "ctrl-shift-p": "app.palette",
     "ctrl-,": "app.settings",
     "ctrl-shift-o": "pane.split:right",

@@ -4,8 +4,8 @@ A trimmed copy of the redmine and vault-secrets skills (ai-skills repo): the mod
 sends this file to the machine with `python3 -c`, so it must stand alone and use
 the standard library only.
 
-  list                open issues assigned to the current user, and every status name in
-                      Redmine's order
+  list                open issues assigned to the current user, the 50 last updated closed
+                      ones, and every status name in Redmine's order
   view <id>           one issue with its journals, relations, children, attachments, watchers
                       and allowed statuses; the standard fields its tracker uses, the related
                       issues' subjects and statuses, and the current user's id
@@ -241,8 +241,9 @@ def options(project, attr):
 def main(args):
     if args == ['list']:
         found = redmine('issues.json', assigned_to_id='me', status_id='open', sort='priority:desc,updated_on:desc', limit=100)
+        closed = redmine('issues.json', assigned_to_id='me', status_id='closed', sort='updated_on:desc', limit=50)
         statuses = [st['name'] for st in redmine('issue_statuses.json')['issue_statuses']]
-        print(json.dumps({'base': REDMINE_URL, 'issues': found['issues'], 'statuses': statuses}))
+        print(json.dumps({'base': REDMINE_URL, 'issues': found['issues'], 'closed': closed['issues'], 'statuses': statuses}))
     elif len(args) == 2 and args[0] == 'view' and args[1].isdigit():
         print(json.dumps(view(args[1])))
     elif len(args) in (3, 4) and args[0] == 'call':

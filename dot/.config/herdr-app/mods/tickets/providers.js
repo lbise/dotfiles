@@ -3,7 +3,7 @@
 // and how their output becomes the shape the view draws. Adding a tracker means
 // adding a provider here.
 //
-// Ticket: { key, source, id, ref, title, status, rank, priority, project, updated, url }
+// Ticket: { key, source, id, ref, title, status, closed, rank, priority, project, updated, url }
 //   id is what the person reads ("#123", "repo#12"), ref what the commands need,
 //   rank where its status comes in the tracker's order (the board's columns).
 // Detail: { scope, form, info: [[name, text]], description, comments: [{ author, at, body }],
@@ -79,14 +79,15 @@ export const PROVIDERS = {
       return call("PUT", `${issue}.json`, { issue: { [change.attr]: change.value } });
     },
     parseList(stdout, source) {
-      const { base, issues, statuses = [] } = JSON.parse(stdout);
-      return issues.map((i) => ({
+      const { base, issues, closed = [], statuses = [] } = JSON.parse(stdout);
+      return [...issues, ...closed].map((i, n) => ({
         key: `${source}:${i.id}`,
         source,
         id: `#${i.id}`,
         ref: i.id,
         title: i.subject,
         status: i.status?.name || "",
+        closed: n >= issues.length,
         rank: statuses.indexOf(i.status?.name),
         priority: i.priority?.name || "",
         project: i.project?.name || "",
@@ -153,7 +154,7 @@ export const PROVIDERS = {
 
   // gh keeps its own login, so nothing secret goes through the mod.
   github: {
-    list: () => ["gh", "search", "issues", "--assignee=@me", "--state=open", "--limit=100", "--json", GH_LIST],
+    list: () => ["gh", "search", "issues", "--assignee=@me", "--sort=updated", "--limit=100", "--json", GH_LIST],
     view: (ticket) => ["gh", "issue", "view", String(ticket.ref.number), "-R", ticket.ref.repo, "--json", GH_VIEW],
     options: () => null,
     update(ticket, change) {
@@ -172,7 +173,8 @@ export const PROVIDERS = {
           id: `${i.repository.name}#${i.number}`,
           ref: { repo: i.repository.nameWithOwner, number: i.number },
           title: i.title,
-          status: i.state === "open" ? "Open" : i.state,
+          status: i.state === "open" ? "Open" : "Closed",
+          closed: i.state !== "open",
           rank: 0,
           priority: "",
           project: i.labels.map((l) => l.name).join(", "),

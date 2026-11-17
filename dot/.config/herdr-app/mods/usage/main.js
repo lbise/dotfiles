@@ -126,8 +126,11 @@ class Report {
     cx.notify();
   }
 
-  flip(set, key, cx) {
-    if (set.has(key)) set.delete(key);
+  // Ctrl-click passes the chip's row: only this one stays on, or all again if it already was.
+  flip(set, key, cx, row) {
+    const solo = row && row.every((k) => (k === key) !== set.has(k));
+    if (row) for (const k of row) solo || k === key ? set.delete(k) : set.add(k);
+    else if (set.has(key)) set.delete(key);
     else set.add(key);
     cx.notify();
   }
@@ -151,12 +154,13 @@ class Report {
         .on_click((_e, cx) => this.set(field, key, cx))
         .child(text)));
 
+    const chipRows = { m: Object.keys(this.results).map((name) => `m:${name}`), p: sum.providers.map((p) => p.key) };
     const chip = (key, label, figure, extra) => {
       const on = !this.off.has(key);
       return h_flex().id(key).h(26).px(9).gap(6).items_center().rounded(7).border(1).flex_none()
         .border_color(on ? t.input : t.border).text_color(on ? t.foreground : t.dim)
         .cursor_pointer().hover((s) => s.bg(t.raised))
-        .on_click((_e, cx) => this.flip(this.off, key, cx))
+        .on_click((e, cx) => this.flip(this.off, key, cx, e.modifiers.control && chipRows[key[0]]))
         .child(label)
         .when(figure !== null, (el) => el.child(div().font_family(MONO).text_size(12).text_color(on ? t.muted : t.dim).child(figure)))
         .when(!!extra, (el) => el.child(extra));

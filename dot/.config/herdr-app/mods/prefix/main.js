@@ -13,6 +13,7 @@ const BINDINGS = [
   ["x", "Close pane", "pane.close"],
   ["X", "Close tab", "tab.close"],
   ["z", "Zoom pane", "pane.zoom"],
+  ["m", "Maximize side panel", "leo-tabs.max"],
   ["n", "Next tab", "tab.next"],
   ["p", "Toggle sidebar", "layout.toggle", { id: "sidebar" }],
   ["w", "Go to space, tab or agent", "mod.open", { name: "picker" }],

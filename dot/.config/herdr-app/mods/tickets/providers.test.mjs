@@ -8,10 +8,12 @@ const { redmine, github } = PROVIDERS;
 const list = redmine.parseList(JSON.stringify({
   base: "https://rm/redmine",
   issues: [{ id: 7, subject: "Fix it", status: { name: "New" }, priority: { name: "High" }, project: { name: "rom" }, updated_on: "2026-11-01T10:00:00Z" }],
+  closed: [{ id: 8, subject: "Done", status: { name: "Closed" }, updated_on: "2026-10-01T10:00:00Z" }],
   statuses: ["New", "In Progress"],
 }), "Work");
-assert.deepEqual(list, [{
-  key: "Work:7", source: "Work", id: "#7", ref: 7, title: "Fix it", status: "New", rank: 0, priority: "High", project: "rom",
+assert.deepEqual(list.map((t) => [t.ref, t.closed]), [[7, false], [8, true]]);
+assert.deepEqual(list.slice(0, 1), [{
+  key: "Work:7", source: "Work", id: "#7", ref: 7, title: "Fix it", status: "New", closed: false, rank: 0, priority: "High", project: "rom",
   updated: "2026-11-01T10:00:00Z", url: "https://rm/redmine/issues/7",
 }]);
 assert.deepEqual(redmine.view(list[0], "S"), ["python3", "-c", "S", "view", "7"]);
@@ -85,9 +87,10 @@ assert.deepEqual(redmine.options(list[0], detail, "category_id", "S"), ["python3
 // GitHub: gh's JSON, newest first.
 const issues = github.parseList(JSON.stringify([
   { number: 1, title: "Old", repository: { name: "app", nameWithOwner: "me/app" }, state: "open", labels: [], updatedAt: "2026-01-01T00:00:00Z", url: "u1" },
+  { number: 3, title: "Shut", repository: { name: "app", nameWithOwner: "me/app" }, state: "closed", labels: [], updatedAt: "2025-01-01T00:00:00Z", url: "u3" },
   { number: 2, title: "New", repository: { name: "app", nameWithOwner: "me/app" }, state: "open", labels: [{ name: "bug" }], updatedAt: "2026-02-01T00:00:00Z", url: "u2" },
 ]), "Home");
-assert.deepEqual(issues.map((t) => [t.key, t.id, t.status, t.project]), [["Home:me/app#2", "app#2", "Open", "bug"], ["Home:me/app#1", "app#1", "Open", ""]]);
+assert.deepEqual(issues.map((t) => [t.key, t.id, t.status, t.closed, t.project]), [["Home:me/app#2", "app#2", "Open", false, "bug"], ["Home:me/app#1", "app#1", "Open", false, ""], ["Home:me/app#3", "app#3", "Closed", true, ""]]);
 assert.deepEqual(github.view(issues[0]).slice(0, 6), ["gh", "issue", "view", "2", "-R", "me/app"]);
 const gh = github.parseView(JSON.stringify({ state: "OPEN", title: "New", body: "", author: { login: "me" }, assignees: [], labels: [], comments: [{ author: { login: "you" }, createdAt: "t", body: "ok" }] }));
 assert.deepEqual(gh.form.map((f) => [f.attr, f.value, f.place]), [["title", "New", "title"], ["state", "open", "status"]]);
