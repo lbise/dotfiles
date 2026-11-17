@@ -1,0 +1,5 @@
+{
+  "place": "none",
+  "title": "Sidebar (Leo)",
+  "overlay": { "kind": "popup", "at": { "x": 10, "y": 44 }, "width": 280, "height": 38 }
+}

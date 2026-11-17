@@ -13,9 +13,10 @@ const VIEWS_KEPT = 200;
 /**
  * A pane that runs Pi, as the chat needs it; null for any other pane.
  * `key` names the session: a terminal address is reused once its terminal ends.
+ * A Pi that exited keeps `app` but loses its status: its shell is no Pi.
  */
 export function piPane(pane) {
-  if (!pane || pane.app !== "pi" || !pane.terminal) return null;
+  if (!pane || pane.app !== "pi" || !pane.status || !pane.terminal) return null;
   const terminal = terminals().find((entry) => entry.address === pane.terminal);
   const { machine, id } = splitAddress(pane.terminal);
   return {
@@ -36,7 +37,7 @@ export function piPane(pane) {
 export function target() {
   const focus = focused();
   if (!focus) return null;
-  const mine = panes().filter((pane) => pane.tab === focus.tab && pane.app === "pi" && pane.terminal);
+  const mine = panes().filter((pane) => pane.tab === focus.tab && piPane(pane));
   return piPane(mine.find((pane) => pane.pane === focus.pane) || mine[0]);
 }
 

@@ -133,6 +133,7 @@ made the name does not matter. A command that cannot run sets `state.error`.
 ```jsonc
 { "type": "prompt", "text": "…", "images": ["/abs/path.png"] }   // send as the user; while working it steers. Slash commands, skills and templates in text run as if typed. Images: png, jpg, jpeg, gif, webp files on the agent's machine
 { "type": "abort" }
+{ "type": "quit" }                                               // as Pi's double Ctrl+C: aborts any run and exits Pi
 { "type": "model", "provider": "…", "id": "…" }
 { "type": "thinking", "level": "low" }
 { "type": "cycle", "what": "model", "direction": "backward" }   // as Ctrl+P (forward, the default) / Shift+Ctrl+P over `models`; "what": "thinking" as Shift+Tab over `thinkingLevels`

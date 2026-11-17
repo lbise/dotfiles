@@ -324,7 +324,7 @@ Chat settings offers a second ground. Choosing it writes these overrides into `s
 
 ## Layout
 
-- **Window** (`layouts/leo.json`): no title bar; traffic lights at 12, 16. A 268px sidebar on the chrome ground (brand 46px, Spaces and Agents lists sharing the height equally, a 69px footer) and the work column (tabs 42px, the work body, a 28px status line). Dividers are 1px rule grey. A Files / Changes side panel (368px, 280 to 900px) stays hidden until asked for.
+- **Window** (`layouts/leo.json`): no title bar; traffic lights at 12, 16. A 300px sidebar on the chrome ground (brand 46px, Agents cards above Spaces cards sharing the height equally, each scrolling on its own, from `mods/leo-sidebar/`; a 69px footer). `layouts/leo-classic.json` keeps the earlier sidebar: Herdr's Spaces list grouped by machine above its Agents list, 268px and the work column (tabs 42px, the work body, a 28px status line). Dividers are 1px rule grey. A Files / Changes side panel (368px, 280 to 900px) stays hidden until asked for.
 - **Work body:** 8px padding and an 8px gap. It is a stack of two children swapped in place: the chat panel and the active tab's terminal panes. The terminal keeps running under either.
 - **Terminal panes:** 10px radius, 1px rule border (input grey when focused), 8px between panes, 14 × 12px terminal padding, and the mod's 46px header always shown.
 - **Chat frame:** the same 10px radius and rule border, so both views read as one card. Top to bottom: the 46px header, the conversation, the dock (question card and reply box), the 34px status bar.

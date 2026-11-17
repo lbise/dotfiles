@@ -298,6 +298,11 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
       case "abort":
         c.abort();
         return;
+      case "quit":
+        // As Pi's double Ctrl+C: out now, even mid-run (shutdown alone waits for idle).
+        c.abort();
+        c.shutdown();
+        return;
       case "model": {
         const model = c.modelRegistry.find(String(command.provider), String(command.id));
         if (!model) throw new Error(`model: ${command.provider}/${command.id} not found`);

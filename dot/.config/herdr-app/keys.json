@@ -87,5 +87,17 @@
     "alt-7": "prefix.agent-7",
     "alt-8": "prefix.agent-8",
     "alt-9": "prefix.agent-9"
+  },
+  "layout:leo": {
+    "alt-1": "leo-sidebar.space-1",
+    "alt-2": "leo-sidebar.space-2",
+    "alt-3": "leo-sidebar.space-3",
+    "alt-4": "leo-sidebar.space-4",
+    "alt-5": "leo-sidebar.space-5",
+    "alt-6": "leo-sidebar.space-6",
+    "alt-7": "leo-sidebar.space-7",
+    "alt-8": "leo-sidebar.space-8",
+    "alt-9": "leo-sidebar.space-9",
+    "alt-a": "mod.open:leo-sidebar"
   }
 }

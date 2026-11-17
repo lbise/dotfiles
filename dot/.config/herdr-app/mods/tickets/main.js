@@ -1,8 +1,8 @@
-// Tickets: the tickets assigned to me (closed ones behind the Closed chip), from one source of sources.json at a time
+// Tickets: the tickets assigned to me (closed statuses start filtered out), from one source of sources.json at a time
 // (Redmine at work, GitHub issues at home; providers.js knows each kind). A source
 // runs its commands on its machine; one whose machine this window does not know is
-// left out. With several left, a switch picks one; the pick and the statuses turned
-// off are kept per computer (shared "tickets.source", "tickets.off", "tickets.closed"). Everything the
+// left out. With several left, a switch picks one; the pick and the status chips
+// flipped from their default are kept per computer (shared "tickets.source", "tickets.off"). Everything the
 // provider's form lists can be changed: lists in dropdowns (filtered by typing when
 // long), the rest in place. Redmine tickets also have attachments (opened in the
 // browser, saved to ~/Downloads on the source's machine, added by path or by dropping
@@ -20,10 +20,10 @@ import { appHome, checking, exec, layout, machines, notify, readTextFile, run as
 import { PROVIDERS, RELATIONS, ago, columns, dropped, parseSources, size, valueOf } from "./providers.js";
 
 const MONO = "Geist Mono";
+const lit = (off, key) => off.has(key) === key.startsWith("cl:"); // a closed status's chip starts off
 const TIMEOUT_MS = 60000;
 const SOURCE = "tickets.source";
-const OFF = "tickets.off"; // ["st:<status>"] turned off
-const CLOSED = "tickets.closed"; // true: closed tickets are shown
+const OFF = "tickets.off"; // status chips flipped from their default: "st:<open status>" turned off, "cl:<closed status>" turned on
 const VIEW = "tickets.view"; // "list" or "board"
 const DRAFTS = "tickets.drafts"; // ticket key -> { comment?, description? }
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -191,10 +191,10 @@ export default class Tickets extends View {
   // Ctrl-click passes the chip's row: only this one stays on, or all again if it already was.
   flip(key, cx, row) {
     const off = this.off();
-    const solo = row && row.every((k) => (k === key) !== off.has(k));
-    if (row) for (const k of row) solo || k === key ? off.delete(k) : off.add(k);
-    else if (off.has(key)) off.delete(key);
-    else off.add(key);
+    const turn = (k, on) => (on === k.startsWith("cl:") ? off.add(k) : off.delete(k));
+    const solo = row && row.every((k) => (k === key) === lit(off, k));
+    if (row) for (const k of row) turn(k, solo || k === key);
+    else turn(key, !lit(off, key));
     setShared(OFF, [...off]);
     cx.notify();
   }
@@ -463,23 +463,22 @@ export default class Tickets extends View {
     const sources = this.shown();
     const source = this.current();
     const result = source && this.results[source.name];
-    const fetched = result?.value || [];
-    const showClosed = shared(CLOSED) === true;
-    const closedCount = fetched.filter((x) => x.closed).length;
-    const all = showClosed ? fetched : fetched.filter((x) => !x.closed);
-    const statuses = [...new Set(all.map((x) => x.status))];
-    const tickets = all.filter((x) => !off.has(`st:${x.status}`));
+    const all = result?.value || [];
+    const chipOf = (x) => `${x.closed ? "cl" : "st"}:${x.status}`;
+    const chips = [...new Set(all.map(chipOf))];
+    const tickets = all.filter((x) => lit(off, chipOf(x)));
     const picked = this.ticket();
     const loading = result?.state === "loading";
     const narrow = (this.narrow = this.width < WIDE);
 
-    const chip = (key, label, figure, lit = !off.has(key), click = (e, cx) => this.flip(key, cx, e.modifiers.control && statuses.map((st) => `st:${st}`))) => {
+    const chip = (key, label, figure) => {
+      const on = lit(off, key);
       return h_flex().id(key).h(26).px(9).gap(6).items_center().rounded(7).border(1).flex_none()
-        .border_color(lit ? t.input : t.border).text_color(lit ? t.foreground : t.dim)
+        .border_color(on ? t.input : t.border).text_color(on ? t.foreground : t.dim)
         .cursor_pointer().hover((s) => s.bg(t.raised))
-        .on_click(click)
+        .on_click((e, cx) => this.flip(key, cx, e.modifiers.control && chips))
         .child(label)
-        .child(div().font_family(MONO).text_size(12).text_color(lit ? t.muted : t.dim).child(figure));
+        .child(div().font_family(MONO).text_size(12).text_color(on ? t.muted : t.dim).child(figure));
     };
     const switcher = h_flex().gap(4).children(sources.map((s) => {
       const on = s === source;
@@ -537,11 +536,9 @@ export default class Tickets extends View {
         .when(!narrow, (el) => el.child(views))
         .child(button(t, "refresh", narrow ? svg("mods/review/icons/refresh.svg").size(14) : "Refresh", !loading, (cx) => this.refresh(cx)))
         .child(maxButton(t)))
-      .when((statuses.length > 0 || closedCount > 0) && !(narrow && picked), (el) => el.child(h_flex().items_center().gap(6).flex_wrap()
+      .when(chips.length > 0 && !(narrow && picked), (el) => el.child(h_flex().items_center().gap(6).flex_wrap()
         .child(label("Status"))
-        .children(statuses.map((st) => chip(`st:${st}`, st, String(all.filter((x) => x.status === st).length))))
-        .when(closedCount > 0, (row) => row.child(chip("closed", "Closed", String(closedCount), showClosed,
-          (_e, cx) => { setShared(CLOSED, !showClosed); cx.notify(); })))))
+        .children(chips.map((key) => chip(key, key.slice(3), String(all.filter((x) => chipOf(x) === key).length))))))
       // Narrow: the list, or the picked ticket in its place.
       .when(narrow, (el) => el.child(picked
         ? card().id("detail").flex_1().min_h(0).overflow_y_scrollbar()

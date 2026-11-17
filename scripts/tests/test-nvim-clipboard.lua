@@ -3,7 +3,7 @@
 package.path = "dot/.config/nvim/lua/?.lua;" .. package.path
 
 local function setup(env, provider)
-	for _, name in ipairs({ "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY" }) do
+	for _, name in ipairs({ "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY", "HC_TERMINAL_ID", "WAYLAND_DISPLAY" }) do
 		vim.env[name] = env[name]
 	end
 	vim.g.clipboard = provider
@@ -15,6 +15,16 @@ end
 if vim.fn.has("wsl") == 0 then
 	setup({}, nil)
 	assert(vim.g.clipboard == nil, "Keep automatic detection for local sessions")
+end
+
+-- Herdr terminal: remote machines have no SSH_* and no Wayland.
+setup({ HC_TERMINAL_ID = "t1" }, nil)
+if vim.fn.has("wsl") == 0 then
+	assert(type(vim.g.clipboard) == "table" and vim.g.clipboard.name == "osc52", "Use OSC 52 in remote Herdr terminals")
+	setup({ HC_TERMINAL_ID = "t1", WAYLAND_DISPLAY = "wayland-1" }, nil)
+	assert(vim.g.clipboard == nil, "Keep automatic detection in local Herdr terminals")
+else
+	assert(vim.g.clipboard ~= nil and vim.g.clipboard.name ~= "osc52", "Keep the WSL provider in Herdr")
 end
 
 -- tmux already chose its provider.
@@ -45,4 +55,4 @@ assert(elapsed_ms < 2000, "Paste waited too long: " .. elapsed_ms .. "ms")
 local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 assert(#lines == 3 and lines[3] == "clipboard-test", "Unexpected paste: " .. vim.inspect(lines))
 
-print("PASS: local keeps detection, tmux is preserved, SSH copies via OSC 52 and paste falls back to the last yank")
+print("PASS: local keeps detection, tmux is preserved, SSH and remote Herdr copy via OSC 52 and paste falls back to the last yank")

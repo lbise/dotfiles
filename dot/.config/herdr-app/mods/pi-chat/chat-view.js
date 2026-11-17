@@ -44,6 +44,7 @@ const HURRY = 4000; // after a command, read fast until its effect shows
 const SENT_FOR = 60000;
 const COPIED_FOR = 1500;
 const GROW_AFTER = 30;
+const KEPT = 30; // sessions whose scroll and open rows are remembered
 const CODE_AFTER = 16; // a code block drawn plain gets its coloured view this soon after
 
 export class ChatView {
@@ -66,6 +67,7 @@ export class ChatView {
     this.shown = null; // the Pi on screen at the last tick; null while the chat is hidden
     this.openTurns = new Map(); // turn key -> open; a closed entry was open before
     this.openSteps = new Set();
+    this.kept = new Map(); // session -> { timeline, openTurns, openSteps } it was left with
     this.hoveredCell = null;
     this.knownCells = null; // step ids of the running turn seen so far; null before the first read
     this.growing = new Set(); // cells drawn small now, to scale in on the next draw
@@ -181,17 +183,24 @@ export class ChatView {
     return turn && turn.live && turn.durationMs !== null ? turn.durationMs + (Date.now() - feed.changedAt) : 0;
   }
 
-  // Another Pi, or another session of it, shows: nothing open, the newest message. Safe while drawing.
+  // Another Pi, or another session of it, shows: where it was left (scroll, open
+  // turns and steps), else nothing open and the newest message. Safe while drawing.
   show(pi, chat) {
     const session = `${pi.key}|${this.child ? this.child.path : ""}|${chat.epoch}`;
     if (session === this.session) return;
+    if (this.session) this.kept.set(this.session, { timeline: this.timeline, openTurns: this.openTurns, openSteps: this.openSteps });
+    if (this.kept.size > KEPT) this.kept.delete(this.kept.keys().next().value);
+    const kept = this.kept.get(session);
+    this.kept.delete(session);
+    const view = this.timeline.view;
+    this.timeline = kept ? kept.timeline : new Timeline();
+    this.timeline.view = view;
+    this.openTurns = kept ? kept.openTurns : new Map();
+    this.openSteps = kept ? kept.openSteps : new Set();
     this.session = session;
     this.picker.kind = null;
     this.sessionOpen = false;
     this.pointer.hovered.clear();
-    this.timeline.reset();
-    this.openTurns.clear();
-    this.openSteps.clear();
     this.knownCells = null;
     this.growing.clear();
     this.sent = null;

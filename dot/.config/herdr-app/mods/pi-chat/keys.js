@@ -3,15 +3,17 @@
 // them. A binding of ours, on a context wrapped right around the field (whose
 // own context is "Input"), matches as deep and is newer, so it comes first.
 //   PiChatField: the reply box. Enter sends instead of breaking the line
-//     (Shift+Enter still does). Pi's own keys, as in its terminal: Ctrl+P and
+//     (Shift+Enter still does; should the field's own Enter win, composer.js
+//     catches its submit). Pi's own keys, as in its terminal: Ctrl+P and
 //     Alt+P (Pi's Shift+Ctrl+P on Windows; Herdr's palette keeps that) cycle the
 //     models, Shift+Tab the thinking levels. Tab completes the path at the end of the text. Ctrl+G edits the text in Neovim (editor.js).
+//     Ctrl+C empties the box, a second within half a second quits Pi (as in Pi).
 //   PiChatMenu: a field with a list over it (the slash menu, the pickers):
 //     ↑↓ move, Tab and Enter pick, Esc closes.
 //   Both: Ctrl+A selects all the text (the field's own binding moves to the line start).
 
 // shortcut: Pi's default keys, not read from Pi's keybindings.json; read them once someone remaps them.
-const CONTEXTS = { PiChatField: ["enter", "tab", "ctrl-p", "alt-p", "shift-tab", "ctrl-a", "ctrl-g"], PiChatMenu: ["up", "down", "tab", "enter", "escape", "ctrl-a"] };
+const CONTEXTS = { PiChatField: ["enter", "tab", "ctrl-p", "alt-p", "shift-tab", "ctrl-a", "ctrl-g", "ctrl-c"], PiChatMenu: ["up", "down", "tab", "enter", "escape", "ctrl-a"] };
 
 const action = (key) => `pi_chat_key_${key.replace(/-/g, "_")}`;
 

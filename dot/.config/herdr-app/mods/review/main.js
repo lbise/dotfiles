@@ -70,6 +70,7 @@ export default class Review extends View {
     this.height = 0;
     this.x = 0; // the text scrolled sideways, design px
     this.y = 0; // the rows scrolled down, design px
+    this.spots = new Map(); // "<repo key>|<path>" -> { x, y }: where a file was left, this window only
     this.drag = null; // { axis, from, start, scale }: a scroll bar held at pointer `from`
     this.hunk = -1; // the hunk last jumped to
     this.commitInput = InputState.new({ placeholder: "Commit message" });
@@ -113,6 +114,10 @@ export default class Review extends View {
     if (key) setShared(key, { ...this.store(), ...change });
   }
 
+  leaveSpot(path) {
+    if (this.key()) this.spots.set(`${this.key()}|${path}`, { x: this.x, y: this.y });
+  }
+
   // ---- loading
 
   watch(cx) {
@@ -137,6 +142,7 @@ export default class Review extends View {
     const context = JSON.stringify(where);
     if (context !== this.context) {
       this.context = context;
+      if (this.view) this.leaveSpot(this.view.path);
       Object.assign(this, { repo: null, files: [], view: null, sel: null, compose: null, error: null, problem: null, watched: null, limited: false });
     }
     if (!where.cwd) return;
@@ -196,10 +202,10 @@ export default class Review extends View {
         view.folds = old.folds;
         layoutView(view);
       } else {
+        if (old) this.leaveSpot(old.path);
         this.sel = null;
         this.hunk = -1;
-        this.x = 0;
-        this.y = 0;
+        ({ x: this.x, y: this.y } = this.spots.get(`${this.key()}|${path}`) || { x: 0, y: 0 });
       }
       this.view = view;
       this.problem = null;

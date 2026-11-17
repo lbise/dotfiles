@@ -13,6 +13,7 @@ import { SlashMenu } from "./slash.js";
 import { icon, mix } from "./ui.js";
 
 const TWICE = 250; // a press that closes a menu also lands on its chip
+const QUIT = 500; // Pi's window for the second Ctrl+C
 
 export class Composer {
   /**
@@ -30,8 +31,19 @@ export class Composer {
     this.closedAt = 0;
     this.hint = ""; // the paths a Tab could not choose between
     this.files = []; // attached, staged on this computer: { rel, name, image }
+    this.clearedAt = 0; // the last Ctrl+C that emptied the box
     // A paste with no text: a picture or files copied in Explorer.
     this.input.on("paste_other", (_event, cx) => this.attach("paste", [], cx));
+    // Enter that reached the box's own binding instead of ours (keys.js): it has
+    // broken the line already. Shift+Enter keeps the break; Enter takes it back and sends.
+    this.input.on("submit", (event, cx) => {
+      if (event.shift || event.secondary) return;
+      const text = this.input.value();
+      const at = this.input.selected_range().start;
+      const br = text.lastIndexOf("\n", at - 1);
+      if (br >= 0 && !text.slice(br, at).trim()) this.input.set_value(text.slice(0, br) + text.slice(at));
+      this.enter(cx);
+    });
     // The button's look and the slash menu depend on the text: redraw when either changes.
     this.input.on("change", (_event, cx) => {
       const text = this.input.value();
@@ -182,10 +194,24 @@ export class Composer {
   fieldKey(key, cx) {
     if (key === "ctrl-a") selectAll(this.input, cx);
     else if (key === "ctrl-g") this.chat.editDraft(cx);
+    else if (key === "ctrl-c") this.ctrlC(cx);
     else if (key === "enter") this.enter(cx);
     else if (key === "tab") this.complete(cx);
     else if (key === "shift-tab") this.chat.command({ type: "cycle", what: "thinking" }, cx);
     else this.chat.command({ type: "cycle", what: "model", direction: key === "alt-p" ? "backward" : "forward" }, cx);
+  }
+
+  // As Pi: the first empties the box, a second soon after quits Pi.
+  ctrlC(cx) {
+    if (Date.now() - this.clearedAt < QUIT) {
+      this.clearedAt = 0;
+      return this.chat.command({ type: "quit" }, cx);
+    }
+    this.clearedAt = Date.now();
+    this.set("");
+    this.files = [];
+    this.hint = "";
+    cx.notify();
   }
 
   // ↑↓ Tab Enter Esc while the slash menu is open (keys.js hands them over).

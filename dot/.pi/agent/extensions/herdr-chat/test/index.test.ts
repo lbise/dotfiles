@@ -91,6 +91,7 @@ function setup({ hasUI = true } = {}) {
     },
     isIdle: () => true,
     abort: () => calls.push(["abort"]),
+    shutdown: () => calls.push(["shutdown"]),
     compact: (options: any) => calls.push(["compact", options]),
     getContextUsage: () => ({ tokens: 1200, contextWindow: 200000, percent: 0.6 }),
     ui: {
@@ -314,13 +315,16 @@ test("inbox commands run in order, and a later success clears the error", async 
   h.send({ type: "model", provider: "openai", id: "gpt-6" });
   h.send({ type: "prompt", text: "/skill:tdd go" });
   h.send({ type: "abort" });
-  const state = await until(() => h.calls.length === 3 && !h.state().error && h.state().draft && h.state(), "commands");
+  h.send({ type: "quit" });
+  const state = await until(() => h.calls.length === 5 && !h.state().error && h.state().draft && h.state(), "commands");
   assert.equal(state.draft, "half a thought");
   assert.equal(state.thinking, "low");
   assert.deepEqual(h.calls, [
     ["setModel", "gpt-6"],
     ["sendUserMessage", "/skill:tdd go", { deliverAs: "steer", expandPromptTemplates: true }],
     ["abort"],
+    ["abort"],
+    ["shutdown"],
   ]);
 
   for (const [command, message] of [

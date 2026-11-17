@@ -87,8 +87,13 @@ local function wsl_provider()
 	}
 end
 
-local function is_ssh()
-	return vim.env.SSH_CONNECTION ~= nil or vim.env.SSH_CLIENT ~= nil or vim.env.SSH_TTY ~= nil
+local function is_remote()
+	if vim.env.SSH_CONNECTION ~= nil or vim.env.SSH_CLIENT ~= nil or vim.env.SSH_TTY ~= nil then
+		return true
+	end
+	-- Herdr starts remote terminals through herdr-core, not an SSH login, so SSH_*
+	-- is unset there. WSL and the Wayland desktop are the local Herdr machines.
+	return vim.env.HC_TERMINAL_ID ~= nil and vim.env.WAYLAND_DISPLAY == nil and vim.fn.has("wsl") == 0
 end
 
 function M.setup()
@@ -96,7 +101,7 @@ function M.setup()
 		-- core.tmux already chose the tmux provider, or the user set one.
 		return
 	end
-	if is_ssh() then
+	if is_remote() then
 		-- Also avoids xclip over X forwarding, whose DISPLAY goes stale on reconnect.
 		vim.g.clipboard = osc52_provider()
 	elseif vim.fn.has("wsl") == 1 then

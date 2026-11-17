@@ -34,6 +34,9 @@ Elephant's defaults retain 100 entries in its on-disk cache, with no age-based e
 | Local Arch desktop | `wl-copy` (Neovim's detection) | `wl-paste` |
 | Local WSL | `win32yank.exe`, else `clip.exe` | `win32yank.exe`, else PowerShell `Get-Clipboard` |
 | SSH | OSC 52 | OSC 52 read if the terminal allows it |
+| Remote Herdr terminal | OSC 52 | Last Neovim yank (Herdr never answers OSC 52 reads) |
+
+Herdr starts remote terminals through herdr-core, so they have no `SSH_*` variables but may have a forwarded `DISPLAY` and `xclip`. Neovim treats a Herdr terminal (`HC_TERMINAL_ID`) without `WAYLAND_DISPLAY`, outside WSL, as remote. Herdr app writes OSC 52 text up to 1 MiB to the local clipboard.
 
 Over SSH, Ghostty answers OSC 52 reads (`clipboard-read = allow`). Windows Terminal does not, so `p` pastes the last Neovim yank; paste from Windows with Ctrl+Shift+V instead. Neovim asks the terminal once per session and waits up to 1 s before falling back.
 
