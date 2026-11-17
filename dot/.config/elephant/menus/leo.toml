@@ -50,6 +50,6 @@ submenu = "learn"
 
 [[entries]]
 text = "System"
-subtext = "Lock, suspend, restart, shutdown"
+subtext = "Lock, suspend, logout, restart, shutdown"
 icon = "system-shutdown-symbolic"
 submenu = "system"

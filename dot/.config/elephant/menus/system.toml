@@ -21,6 +21,12 @@ icon = "weather-clear-night-symbolic"
 actions = { "suspend" = "systemctl suspend" }
 
 [[entries]]
+text = "Logout"
+keywords = ["logout", "log out", "sign out", "exit"]
+icon = "system-log-out-symbolic"
+actions = { "logout" = "system-logout.sh" }
+
+[[entries]]
 text = "Restart"
 keywords = ["restart", "reboot"]
 icon = "system-reboot-symbolic"
