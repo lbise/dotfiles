@@ -445,3 +445,50 @@ test("a delegate result without a session names no subagent", () => {
   s.result("c1", "delegate", "Unknown subagent", { isError: true, details: {} });
   assert.equal(read(s.lines).turns[0].steps[0].task, undefined);
 });
+
+test("an answered ask_user reads as the question, then the user's answer as their message", () => {
+  const s = session();
+  s.user("Pick an accent");
+  const questions = [
+    { question: "Which accent?", context: "For the chat.", options: [{ label: "Lime", description: "bright", recommended: true }, { label: "Teal" }] },
+    { question: "Which ground?", options: [{ label: "Dark" }, { label: "Light" }] },
+  ];
+  s.assistant([text("Two choices."), call("c1", "read", { path: "a.c" }), call("c2", "ask_user", { questions })], "toolUse");
+  s.result("c1", "read", "x");
+  const t = read(s.lines);
+  const answer = s.result("c2", "ask_user", "…", { details: { answers: [{ selected: ["Teal"], text: "darker" }, { selected: [], text: "Sepia" }] } });
+  appendLines(t, s.take().slice(-1));
+  s.assistant([text("Done.")], "stop");
+  appendLines(t, s.take());
+
+  const [asking, replied] = t.turns;
+  assert.equal(t.turns.length, 2);
+  assert.equal(asking.answer, "Two choices.\n\n**Which accent?**\n\nFor the chat.\n\n- **Lime** (recommended) — bright\n- **Teal**\n\n**Which ground?**\n\n- **Dark**\n- **Light**");
+  assert.deepEqual(asking.narration, []);
+  assert.deepEqual(asking.steps.map((step) => [step.id, step.ok]), [["c1", true], ["c2", true]]);
+  assert.equal(replied.key, answer);
+  assert.deepEqual(replied.user, { text: "Which accent?\nTeal — darker\n\nWhich ground?\nSepia", skill: null, images: [] });
+  assert.equal(replied.answer, "Done.");
+  // The same, read in one go (a rebuild folds the same way).
+  assert.deepEqual(read(s.lines).turns.map((turn) => [turn.key, turn.user && turn.user.text, turn.answer]), t.turns.map((turn) => [turn.key, turn.user && turn.user.text, turn.answer]));
+});
+
+test("an older ask_user answer, a dismissed one, and one whose message still runs", () => {
+  const s = session();
+  s.user("Go");
+  s.assistant([call("c1", "ask_user", { question: "Which?", options: [{ label: "A" }, { label: "B" }] })], "toolUse");
+  s.result("c1", "ask_user", "…", { details: { answer: ["B"] } });
+  s.assistant([call("c2", "ask_user", { question: "Why?", options: [] })], "toolUse");
+  s.result("c2", "ask_user", "…", { details: { answer: null } });
+  s.assistant([call("c3", "ask_user", { questions: [{ question: "Name?", options: [] }] }), call("c4", "bash", { command: "make" })], "toolUse");
+  s.result("c3", "ask_user", "…", { details: { answers: [{ selected: [], text: "Ada" }] } });
+  let t = read(s.lines);
+  assert.deepEqual(t.turns.map((turn) => turn.user && turn.user.text), ["Go", "B", ""]);
+  assert.equal(t.turns[0].answer, "**Which?**\n\n- **A**\n- **B**");
+  assert.equal(t.turns[1].answer, "**Why?**");
+  assert.equal(t.turns[2].user.dismissed, true);
+  s.result("c4", "bash", "ok");
+  t = read(s.lines);
+  assert.deepEqual(t.turns.map((turn) => turn.user && turn.user.text), ["Go", "B", "", "Ada"]);
+  assert.deepEqual(t.turns[2].steps.map((step) => step.id), ["c3", "c4"]);
+});

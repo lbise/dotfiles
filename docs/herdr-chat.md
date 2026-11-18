@@ -67,7 +67,7 @@ Pi event announces (a typed draft, entries from other extensions) is picked up w
     "status": "running", "sessionPath": "/home/u/.pi/agent/sessions/--x--/…jsonl", "currentTool": "grep",
     "model": "anthropic/claude-…", "turns": 2, "tokens": 9000, "cost": 0.01 } ],  // running subagents, see Subagents
   "stream": { "text": "The check belongs in…", "thinking": false },  // assistant message being written, else null; thinking: the model is reasoning right now
-  "ask": { "id": "a1", "question": "Which accent?", "options": [ { "label": "Lime", "description": "…" } ], "multi": false },  // else null
+  "ask": { "id": "a1", "questions": [ { "question": "Which accent?", "context": "…", "options": [ { "label": "Lime", "description": "…", "recommended": true } ], "multi": false } ] },  // else null
   "draft": "",                    // text in Pi's input box
   "error": null                   // last extension error as a short string, for the mod to show; null again once a later inbox command succeeds
 }
@@ -106,9 +106,18 @@ extra usage), `"Credits"` (Codex credits), `"Prompt"` (Copilot's estimate for th
 `"Total"` (Azure Foundry, all time). A primary entry that is a plain summary (`"active"`, Azure's
 month total without budget) has at most a `label`.
 
-`ask` comes from the `ask_user` tool this extension gives the model. The same question is open as a
-select prompt in Pi's TUI; the first answer wins and closes the other. A description is absent when
-the model gave none.
+`ask` comes from the `ask_user` tool this extension gives the model: 1 to 4 questions asked together.
+The same questions are open as select prompts in Pi's TUI, one after the other; the first answer wins
+and closes the other. `context` (markdown), `description` and `recommended` are absent when the model
+gave none. Each question is answered with the options chosen (at most one unless `multi`) and the
+user's own words: with options they are a comment on the choice, alone they are the answer.
+
+The tool result's `details.answers` holds the answer (`null` when dismissed), one `{ selected, text }`
+per question. The chat shows an answered ask as a conversation: the questions end the asking turn as
+its answer (after the text of the message that asked), and the answer opens the next turn as the
+user's message; a dismissed ask (Escape in Pi, Skip in the chat, an abort) opens it with the line
+"You dismissed the questions." instead. Sessions from before carry `details.answer` (labels or a text) and one question at the
+call's top level; the chat reads both.
 
 ### `commands.json` (extension writes once per session start and on reload)
 
@@ -138,7 +147,7 @@ made the name does not matter. A command that cannot run sets `state.error`.
 { "type": "thinking", "level": "low" }
 { "type": "cycle", "what": "model", "direction": "backward" }   // as Ctrl+P (forward, the default) / Shift+Ctrl+P over `models`; "what": "thinking" as Shift+Tab over `thinkingLevels`
 { "type": "scope", "models": [ { "provider": "…", "id": "…" } ] } // the models Ctrl+P cycles through, saved as `enabledModels` in Pi's global settings; none or all is no scope
-{ "type": "answer", "id": "a1", "value": ["Lime"] }               // labels chosen, or free text as one string; ignored when id is not the pending ask
+{ "type": "answer", "id": "a1", "value": [ { "selected": ["Lime"], "text": "darker" } ] }  // one reply per question, or null to dismiss; ignored when id is not the pending ask
 { "type": "draft", "text": "…" }                                  // set Pi's input box
 { "type": "session", "action": "new" }                          // like /new
 { "type": "session", "action": "reload" }                       // like /reload

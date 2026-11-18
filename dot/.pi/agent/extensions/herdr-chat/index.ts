@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 
-import { type AskOption, createAsker, describeAnswer } from "./ask.ts";
+import { createAsker, describeAnswer, MAX_QUESTIONS, readQuestions } from "./ask.ts";
 import { type Command, takeInbox } from "./inbox.ts";
 import { type SessionInfo, sessionItems, treeItems } from "./lists.ts";
 import { createPublisher, writeJsonAtomic } from "./publish.ts";
@@ -338,14 +338,9 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
         if (!THINKING_LEVELS.includes(command.level as string)) throw new Error(`thinking: unknown level ${command.level}`);
         pi.setThinkingLevel(command.level as any);
         return;
-      case "answer": {
-        const value = command.value;
-        if (typeof value !== "string" && !(Array.isArray(value) && value.every((v) => typeof v === "string"))) {
-          throw new Error("answer: value must be the chosen labels or a text");
-        }
-        asker.answer(command.id, value); // false for an id that already got its answer: nothing to do
+      case "answer":
+        asker.answer(command.id, command.value); // false for an id that already got its answer: nothing to do
         return;
-      }
       case "draft":
         c.ui.setEditorText(typeof command.text === "string" ? command.text : "");
         return;
@@ -475,7 +470,7 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
       name: "ask_user",
       label: "Ask user",
       description:
-        "Ask the user one question and wait for their answer. Give 2 to 6 short, distinct options, each with a description when the label alone does not explain the trade-off. The user can also answer in their own words. Set multi to let them choose several. Returns the chosen labels or the user's text.",
+        `Ask the user 1 to ${MAX_QUESTIONS} questions and wait for their answers. Ask related questions together in one call rather than one after the other. Give each question 2 to 6 short, distinct options, each with a description when the label alone does not explain the trade-off; mark the one you would pick as recommended. Put what the user needs to decide (a short summary, a snippet to compare) in context. The user can also answer in their own words or add a comment to their choice. Set multi to let them choose several. Returns, per question, the chosen labels and the user's words.`,
       promptSnippet: "Ask the user a question with options when a decision is theirs to make",
       promptGuidelines: [
         "Use ask_user only for a real decision that belongs to the user and blocks the work: a choice between approaches with different trade-offs, a requirement you cannot infer, or a risky or irreversible action. Do not use ask_user for what the code or the conversation already answers, for routine confirmation, or to ask whether to continue; take the sensible default and say what you assumed.",
@@ -484,29 +479,43 @@ export function activate(pi: ExtensionAPI, dir: string, sessions = listSessions,
       parameters: {
         type: "object",
         properties: {
-          question: { type: "string", description: "The question, in one or two sentences" },
-          options: {
+          questions: {
             type: "array",
-            description: "The choices, 2 to 6. Do not add an 'other' option: the user can always type an answer",
+            minItems: 1,
+            maxItems: MAX_QUESTIONS,
+            description: `1 to ${MAX_QUESTIONS} independent questions, shown together`,
             items: {
               type: "object",
               properties: {
-                label: { type: "string", description: "Short name of the choice" },
-                description: { type: "string", description: "What choosing it means" },
+                question: { type: "string", description: "The question, in one or two sentences" },
+                context: { type: "string", description: "Optional markdown shown under the question: what the user needs to decide" },
+                options: {
+                  type: "array",
+                  description: "The choices, 2 to 6. Do not add an 'other' option: the user can always type an answer",
+                  items: {
+                    type: "object",
+                    properties: {
+                      label: { type: "string", description: "Short name of the choice" },
+                      description: { type: "string", description: "What choosing it means" },
+                      recommended: { type: "boolean", description: "The option you would pick; at most one per question" },
+                    },
+                    required: ["label"],
+                  },
+                },
+                multi: { type: "boolean", description: "Let the user choose several options. Default: false" },
               },
-              required: ["label"],
+              required: ["question", "options"],
             },
           },
-          multi: { type: "boolean", description: "Let the user choose several options. Default: false" },
         },
-        required: ["question", "options"],
+        required: ["questions"],
       } as any,
       executionMode: "sequential",
-      async execute(_toolCallId, params: { question: string; options: AskOption[]; multi?: boolean }, signal, _onUpdate, c) {
+      async execute(_toolCallId, params: { questions?: unknown }, signal, _onUpdate, c) {
         try {
-          const options = (params.options ?? []).map(({ label, description }) => ({ label, description }));
-          const answer = await asker.ask(c.ui, { question: params.question, options, multi: params.multi === true }, signal);
-          return { content: [{ type: "text", text: describeAnswer(answer) }], details: { answer: answer ?? null } };
+          const questions = readQuestions(params);
+          const answer = await asker.ask(c.ui, questions, signal);
+          return { content: [{ type: "text", text: describeAnswer(questions, answer) }], details: { answers: answer ?? null } };
         } catch (err) {
           fail(err);
           throw err;

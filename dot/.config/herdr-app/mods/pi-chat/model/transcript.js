@@ -18,6 +18,7 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} text
  * @property {string|null} skill Name of the skill the message invoked (`/skill:name`); `text` is then what followed it.
  * @property {ImageRef[]} images
+ * @property {boolean} [dismissed] Not a message: the user dismissed an ask_user call (`text` is "").
  *
  * @typedef {object} ChangedFile
  * @property {string} path
@@ -42,6 +43,14 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} [image] A read that gave the model an image: the file's absolute path on Pi's machine.
  * @property {string} [readPath] A read call's file, absolute; becomes `image` when the result holds one.
  * @property {TaskRef} [task] A delegate call's subagent, from its result.
+ * @property {AskQuestion[]} [ask] An ask_user call's questions.
+ *
+ * @typedef {object} AskQuestion
+ * @property {string} question
+ * @property {string} context Markdown, "" when none.
+ * @property {Array<{ label: string, description: string, recommended: boolean }>} options
+ *
+ * @typedef {{ selected: string[], text: string }} AskReply One question's answer: the labels chosen and the user's own words.
  *
  * @typedef {object} TaskRef A subagent of the delegate extension, as its tool result or completion message names it.
  * @property {string} sessionPath Its session file.
@@ -67,6 +76,8 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @typedef {object} Turn From one user message to the next.
  * @property {string} key Stable for the life of the turn; use it as the list key.
  * @property {UserMessage|null} user Null when the turn was not opened by the user: an extension's message, or history that starts mid-turn.
+ *   An answer to ask_user opens a turn too: the user's choices and words as the message; the asking turn's
+ *   `answer` is then the questions, after the text of the message that asked.
  * @property {Step[]} steps
  * @property {Narration[]} narration
  * @property {Note[]} notes
@@ -102,6 +113,7 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {Array<{ key: string, text: string }>} pending Internal: assistant text that is the answer unless a tool call follows.
  * @property {Map<string, string>} keys Internal: entry id to turn key, where the key is not the entry id.
  * @property {string|null} reserved Internal: the key promised to the next turn (see mergeLive).
+ * @property {{ step: Step, turn: Turn, entry: Entry }|null} asked Internal: an answered ask_user call whose message still has steps running.
  *
  * @typedef {object} Entry One line of the file, reduced to what the chat keeps.
  * @property {string} id
@@ -124,6 +136,8 @@ import { DETAIL_MAX, clip, fileChange, stepDetail, stepKind, stepLabel, writeDif
  * @property {string} [diff] Result: an edit's diff.
  * @property {boolean} [image] Result: it holds an image.
  * @property {TaskRef} [task] Result of a delegate call, or its completion note.
+ * @property {AskReply[]} [replies] Result of an ask_user call the user answered.
+ * @property {boolean} [dismissed] Result of an ask_user call the user dismissed.
  */
 
 const TEXT_MAX = 2000;
@@ -150,6 +164,7 @@ export function createTranscript(cwd) {
     pending: [],
     keys: new Map(),
     reserved: null,
+    asked: null,
   };
 }
 
@@ -341,6 +356,10 @@ function reduceMessage(entry, message, cwd) {
         if (detail) call.detail = detail;
         const diff = writeDiff(name, block.arguments);
         if (diff) call.diff = diff;
+        if (name === "ask_user") {
+          const ask = askQuestions(block.arguments);
+          if (ask) call.ask = ask;
+        }
         const path = block.arguments && block.arguments.path;
         if (name === "read" && typeof path === "string" && (path.startsWith("/") || cwd)) call.readPath = path.startsWith("/") ? path : `${cwd}/${path}`;
         entry.parts.push({ call });
@@ -357,6 +376,11 @@ function reduceMessage(entry, message, cwd) {
     if (typeof diff === "string" && diff) entry.diff = clip(diff, DETAIL_MAX);
     entry.image = content.some((/** @type {any} */ block) => block && block.type === "image");
     if (message.toolName === "delegate") taskRef(entry, message.details);
+    if (message.toolName === "ask_user" && entry.ok) {
+      const replies = askReplies(message.details);
+      if (replies) entry.replies = replies;
+      else if (message.details && (message.details.answers === null || message.details.answer === null)) entry.dismissed = true;
+    }
   } else if (message.role === "bashExecution") {
     note(entry, "bash", String(message.command || ""), message.output);
   }
@@ -378,6 +402,65 @@ function taskRef(entry, details) {
     status: text(details.status),
     taskId: typeof details.taskId === "string" && details.taskId ? details.taskId : null,
   };
+}
+
+const str = (/** @type {unknown} */ value, max = TEXT_MAX) => (typeof value === "string" ? clip(value, max) : "");
+
+/**
+ * An ask_user call's questions; also the older form, one question at the top level.
+ * @param {any} args
+ * @returns {AskQuestion[]|null}
+ */
+function askQuestions(args) {
+  /** @type {any[]|null} */
+  const list = args && (Array.isArray(args.questions) ? args.questions : typeof args.question === "string" ? [args] : null);
+  if (!list) return null;
+  return list.filter((q) => q && typeof q.question === "string").map((q) => ({
+    question: str(q.question),
+    context: str(q.context),
+    options: /** @type {any[]} */ (Array.isArray(q.options) ? q.options : [])
+      .filter((o) => o && typeof o.label === "string")
+      .map((o) => ({ label: str(o.label, 200), description: str(o.description, 200), recommended: o.recommended === true })),
+  }));
+}
+
+/**
+ * What the user answered, from an ask_user result's details; also the older form, one
+ * answer as labels or text. Null when the user dismissed the questions.
+ * @param {any} details
+ * @returns {AskReply[]|null}
+ */
+function askReplies(details) {
+  if (!details) return null;
+  const labels = (/** @type {unknown} */ value) => (Array.isArray(value) ? value.filter((l) => typeof l === "string").map((l) => clip(l, 200)) : []);
+  if (Array.isArray(details.answers)) return details.answers.map((/** @type {any} */ r) => ({ selected: labels(r && r.selected), text: str(r && r.text) }));
+  if (Array.isArray(details.answer)) return [{ selected: labels(details.answer), text: "" }];
+  if (typeof details.answer === "string") return [{ selected: [], text: str(details.answer) }];
+  return null;
+}
+
+/**
+ * The questions as the asking turn's answer, in markdown.
+ * @param {AskQuestion[]} questions
+ */
+export function askMarkdown(questions) {
+  return questions
+    .map(({ question, context, options }) => {
+      const choices = options.map((o) => `- **${o.label}**${o.recommended ? " (recommended)" : ""}${o.description ? ` — ${o.description}` : ""}`);
+      return [`**${question}**`, context, choices.join("\n")].filter(Boolean).join("\n\n");
+    })
+    .join("\n\n");
+}
+
+/**
+ * The user's answer as their message: each question's choices, then their words.
+ * @param {AskQuestion[]} questions
+ * @param {AskReply[]} replies
+ */
+export function replyText(questions, replies) {
+  const one = (/** @type {AskReply} */ { selected, text }) => [selected.join(", "), text].filter(Boolean).join(" — ") || "None of the options";
+  if (replies.length === 1) return one(replies[0]);
+  return replies.map((reply, i) => `${questions[i] ? questions[i].question : `Question ${i + 1}`}\n${one(reply)}`).join("\n\n");
 }
 
 /**
@@ -418,6 +501,7 @@ function rebuild(transcript) {
   transcript.current = null;
   transcript.unresolved = [];
   transcript.pending = [];
+  transcript.asked = null;
   // A key promised to the next turn is for a new entry, which only the tip can be.
   const reserved = transcript.reserved;
   transcript.reserved = null;
@@ -542,6 +626,7 @@ function foldResult(transcript, entry) {
   if (entry.image && step.readPath) step.image = step.readPath;
   if (entry.task) step.task = entry.task;
   if (entry.durationMs !== undefined) step.durationMs = entry.durationMs;
+  if (step.ask && (entry.replies || entry.dismissed)) transcript.asked = { step, turn, entry };
   if (step.change && entry.ok && !counted) {
     let file = turn.files.find((known) => known.path === step.change.path);
     if (!file) turn.files.push((file = { path: step.change.path, added: 0, removed: 0, steps: [] }));
@@ -550,4 +635,23 @@ function foldResult(transcript, entry) {
     file.removed += step.change.removed;
   }
   touch(turn, entry.at);
+  if (transcript.asked && transcript.unresolved.every((s) => s.ok !== undefined)) answered(transcript);
+}
+
+/**
+ * The user answered (or dismissed) an ask_user call and its message has no step left
+ * running: the questions end the asking turn as its answer, and the answer opens the
+ * next turn as the user's message, so the chat reads as the conversation it was.
+ * @param {Transcript} transcript
+ */
+function answered(transcript) {
+  const { step, turn, entry } = transcript.asked;
+  transcript.asked = null;
+  if (turn !== transcript.current) return; // the conversation moved on meanwhile
+  // The text of the message that asked introduces the questions.
+  const intro = turn.narration.filter((part) => !part.thought && part.key.startsWith(`${turn.lastId}:`));
+  turn.narration = turn.narration.filter((part) => !intro.includes(part));
+  turn.answer = [...intro.map((part) => part.text), askMarkdown(step.ask), turn.answer].filter(Boolean).join("\n\n");
+  const user = entry.replies ? { text: replyText(step.ask, entry.replies), skill: null, images: [] } : { text: "", skill: null, images: [], dismissed: true };
+  touch(open(transcript, entry, user), entry.at);
 }

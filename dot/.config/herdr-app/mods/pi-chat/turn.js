@@ -280,6 +280,7 @@ const NOTES = { compaction: "Context compacted.", branch: "Came back from anothe
 export function drawRow(item, ui) {
   const { t } = ui;
   const pointer = ui.chat.pointer;
+  if (item.kind === "dismissed") return quiet(t, "You dismissed the questions.");
   if (item.kind === "user") return bubble(t, item.key, item.text || "Image", item.images || 0, item.queued === true, pointer);
   if (item.kind === "work") return work(ui, item.turn);
   // An answer follows its turn's work line; one given without any work comes right after the message.

@@ -65,7 +65,7 @@
  * @property {{ startedAt: number, endedAt: number|null, steps: LiveStep[] }|null} turn
  * @property {LiveTask[]} [tasks] Running subagents; absent from an older extension.
  * @property {{ text: string, thinking: boolean }|null} stream
- * @property {{ id: string, question: string, options: Array<{ label: string, description?: string }>, multi: boolean }|null} ask
+ * @property {{ id: string, questions: Array<{ question: string, context?: string, options: Array<{ label: string, description?: string, recommended?: boolean }>, multi: boolean }> }|null} ask
  * @property {string} draft
  * @property {string|null} error
  *

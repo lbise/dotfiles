@@ -16,3 +16,4 @@ dot/.config/opencode/tui.jsonc
 # Type files the Herdr app generates inside each mod folder
 dot/.config/herdr-app/mods/*/*.d.ts
 dot/.config/herdr-app/mods/*/jsconfig.json
+**/.impeccable

@@ -332,7 +332,6 @@ test("inbox commands run in order, and a later success clears the error", async 
     [{ type: "prompt", text: " " }, "prompt: nothing to send"],
     [{ type: "prompt", text: "look", images: ["/tmp/a.txt"] }, "prompt: not an image: /tmp/a.txt"],
     [{ type: "model", provider: "locked", id: "m" }, "model: no credentials for locked"],
-    [{ type: "answer", id: "a1", value: 3 }, "answer: value must be the chosen labels or a text"],
     [{ type: "dance" }, "unknown command type dance"],
   ] as const) {
     h.send(command);
@@ -359,15 +358,21 @@ test("ask_user shows the question in the state and takes the answer from the inb
   await h.emit("session_start");
   await until(() => h.state());
   const tool = h.tools.get("ask_user");
-  const result = tool.execute("call1", { question: "Which accent?", options: [{ label: "Lime", description: "bright" }, { label: "Teal" }] }, undefined, undefined, h.ctx);
+  const questions = [{ question: "Which accent?", options: [{ label: "Lime", description: "bright" }, { label: "Teal" }] }];
+  const result = tool.execute("call1", { questions }, undefined, undefined, h.ctx);
 
   const state = await until(() => h.state().ask && h.state(), "ask");
   assert.equal(state.status, "asking");
-  assert.deepEqual(state.ask, { id: "a1", question: "Which accent?", options: [{ label: "Lime", description: "bright" }, { label: "Teal" }], multi: false });
+  assert.deepEqual(state.ask, { id: "a1", questions: [{ ...questions[0], multi: false }] });
   assert.equal(h.prompts.length, 1);
 
-  h.send({ type: "answer", id: "a1", value: ["Teal"] });
-  assert.deepEqual(await result, { content: [{ type: "text", text: "The user chose: Teal" }], details: { answer: ["Teal"] } });
+  h.send({ type: "answer", id: "a1", value: "Teal" });
+  await until(() => h.state().error === "answer: value must be one { selected, text } per question", "bad answer");
+  h.send({ type: "answer", id: "a1", value: [{ selected: ["Teal"], text: "darker" }] });
+  assert.deepEqual(await result, {
+    content: [{ type: "text", text: "The user chose: Teal. Their comment: darker" }],
+    details: { answers: [{ selected: ["Teal"], text: "darker" }] },
+  });
   assert.equal(h.prompts[0].signal!.aborted, true);
   assert.equal((await until(() => h.state().ask === null && h.state(), "ask cleared")).status, "idle");
 });
