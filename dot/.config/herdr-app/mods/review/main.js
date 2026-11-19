@@ -13,6 +13,7 @@ import { checking, layout, nextCommand, openOverlay, props, run, setShared, sett
 import { Dialog } from "./dialog.js";
 import { CHAR, ROW, layoutView, makeView, palette, sideways, splitRow, unifiedRow } from "./diffview.js";
 import { commentMessage } from "./files.js";
+import { openInNvim } from "./nvim.js";
 import { EXPAND, commentSpan, firstShown, hunkSpan, stackItems } from "./patch.js";
 import { branches, changedFiles, commitAll, compareFrom, defaultBase, fileDiff, findRepo, location } from "./git.js";
 
@@ -488,6 +489,22 @@ export default class Review extends View {
     if (span) this.askAbout(span);
   }
 
+  copyPath(cx) {
+    const path = this.view?.path;
+    if (!path) return;
+    cx.write_to_clipboard(path);
+    this.notice = `Copied ${path}`;
+  }
+
+  openEditor(cx) {
+    const path = this.view?.path, repo = this.repo;
+    if (!path || !repo || this.view.file.status === "D") return;
+    cx.spawn(async (cx) => {
+      try { await openInNvim(repo, path); } catch (e) { this.problem = `Cannot open Neovim: ${e.message || e}`; }
+      cx.notify();
+    });
+  }
+
   commit(cx) {
     const message = this.commitInput.value().trim();
     if (!message || !this.repo || this.busy || this.loading) return;
@@ -532,6 +549,8 @@ export default class Review extends View {
       l: () => { this.x += STEP; }, // clamped when drawn
       c: () => { if (this.compose) this.note.focus(); },
       a: () => this.askAbout(null),
+      y: () => this.copyPath(cx),
+      o: () => this.openEditor(cx),
     };
     const action = actions[e.key];
     if (!action) return;
@@ -795,7 +814,10 @@ export default class Review extends View {
       .border_b(1)
       .border_color(t.border)
       .bg(t.chrome)
-      .child(div().flex_1().min_w(0).truncate().text_size(12).child(file.old !== file.path ? `${file.old} → ${file.path}` : file.path))
+      .child(div().min_w(0).truncate().text_size(12).child(file.old !== file.path ? `${file.old} → ${file.path}` : file.path))
+      .child(this.button(t, "review-copy-path", icon("copy", 12), (cx) => this.copyPath(cx)))
+      .when(file.status !== "D", (el) => el.child(this.button(t, "review-nvim", icon("nvim", 12), (cx) => this.openEditor(cx))))
+      .child(div().flex_1())
       .child(this.button(t, "review-prev-hunk", icon("arrow-up", 12), () => this.jumpHunk(-1)))
       .child(this.button(t, "review-next-hunk", icon("arrow-down", 12), () => this.jumpHunk(1)))
       .when(Boolean(view.newLines), (el) => el.child(this.button(t, "review-full", "Full file", () => this.toggleFull(), { on: view.folds === "all" })))

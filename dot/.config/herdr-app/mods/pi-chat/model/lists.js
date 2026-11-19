@@ -149,6 +149,19 @@ export function matches(query, fields) {
 }
 
 /**
+ * What the slash menu filters on: the text between a slash at the very start of the
+ * box and the caret, or null when the caret is not in that first word. Text after
+ * the caret does not matter, so a slash typed before a draft opens the menu too.
+ * @param {string} text
+ * @param {number} caret
+ * @returns {string|null}
+ */
+export function slashQuery(text, caret) {
+  const match = /^\/(\S*)$/.exec(text.slice(0, caret));
+  return match ? match[1] : null;
+}
+
+/**
  * The slash menu for what follows the slash: the session commands, then Pi's;
  * names that start with the query first, then names that hold it, then descriptions
  * (from two letters on).
@@ -192,6 +205,16 @@ export function sessionCommand(text) {
 export function pathWord(text) {
   const match = /(?:^|\s)@?([^\s@]+)$/.exec(text);
   return match ? { start: text.length - match[1].length, word: match[1] } : null;
+}
+
+/**
+ * What the path menu lists: those of `found` that the path at the end of the reply still starts.
+ * @param {string[]} found
+ * @param {string} text
+ */
+export function pathChoices(found, text) {
+  const at = pathWord(text);
+  return at ? found.filter((path) => path.startsWith(at.word)) : [];
 }
 
 /**

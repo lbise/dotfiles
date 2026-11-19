@@ -1,10 +1,10 @@
 // The slash menu: a `/` at the start of the reply box lists what can follow it,
-// filtered as you type. Session commands first (the chat runs them), then Pi's
+// filtered as you type, also when typed before a draft already in the box. Session commands first (the chat runs them), then Pi's
 // skills, prompt templates and extension commands.
 
 import { div } from "gpui-kit";
 import { ScrollHandle, h_flex, v_flex } from "gpui-base";
-import { slashItems } from "./model/lists.js";
+import { slashItems, slashQuery } from "./model/lists.js";
 import { mix } from "./ui.js";
 
 const ROW = 30;
@@ -15,14 +15,15 @@ export class SlashMenu {
   constructor() {
     this.index = 0;
     this.query = null; // what follows the slash while the menu is open, else null
+    this.end = 0; // where the slash and its query end in the text
     this.dismissed = ""; // the text Esc closed the menu on: it stays closed until the text changes
     this.scroll = ScrollHandle.new();
   }
 
-  /** Follows the reply box. True when the menu just opened. */
-  follow(text) {
-    const match = /^\/(\S*)$/.exec(text);
-    const query = match && text !== this.dismissed ? match[1] : null;
+  /** Follows the reply box and its caret. True when the menu just opened. */
+  follow(text, caret = text.length) {
+    const query = text !== this.dismissed ? slashQuery(text, caret) : null;
+    this.end = caret;
     if (text !== this.dismissed) this.dismissed = "";
     const opened = query !== null && this.query === null;
     if (query !== this.query) {

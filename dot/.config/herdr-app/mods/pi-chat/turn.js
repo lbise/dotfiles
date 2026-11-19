@@ -1,7 +1,8 @@
 // The rows of a conversation: your message, the turn's work line with its cell
 // strip and steps, the answer, the changed files.
 
-import { div } from "gpui-kit";
+import { div, image } from "gpui-kit";
+import { openOverlay } from "herdr";
 import { Popup, h_flex, v_flex } from "gpui-base";
 import { errorText, formatCost, formatDuration } from "./model/format.js";
 import { copyButton, hoverArea, typedText } from "./copy.js";
@@ -14,9 +15,15 @@ import { MONO, icon, monoLine } from "./ui.js";
 // What a work line holds besides its cells: the words, the chevron, the count.
 const LINE_REST = 250;
 
+const PICTURE_W = 360;
+const PICTURE_H = 240;
+
 // Your message, selectable, with its copy button beside it. One sent while Pi
 // works waits until Pi takes it (a steer): it says so until it reaches the conversation.
-function bubble(t, key, text, images, queued, pointer) {
+// The pictures sent with it from here show under it (a click shows one full size);
+// any other picture it holds (sent from Pi's terminal, say) is only counted.
+function bubble(t, key, text, images, pictures, queued, pointer) {
+  const unseen = images - pictures.length;
   const id = `pi-chat-user-${key}`;
   // The copy button hangs in the right margin, level with the card's top, as an answer's does.
   return hoverArea(v_flex(), id, pointer)
@@ -24,21 +31,48 @@ function bubble(t, key, text, images, queued, pointer) {
     .w_full()
     .items_end()
     .pt(18)
-    .child(
-      div()
-        .max_w(560)
-        .px(14)
-        .py(10)
-        .rounded(14)
-        .bg(t.surface)
-        .when(queued, (el) => el.border_1().border_color(t.border).border_dashed())
-        .text_size(15)
-        .line_height(1.5)
-        .text_color(t.foreground)
-        .child(typedText(`${id}-text`, text)),
+    .when(Boolean(text), (el) =>
+      el
+        .child(
+          div()
+            .max_w(560)
+            .px(14)
+            .py(10)
+            .rounded(14)
+            .bg(t.surface)
+            .when(queued, (el) => el.border_1().border_color(t.border).border_dashed())
+            .text_size(15)
+            .line_height(1.5)
+            .text_color(t.foreground)
+            .child(typedText(`${id}-text`, text)),
+        )
+        .child(div().absolute().top(18).right(-34).child(copyButton(t, id, text, pointer, "Copy your message"))),
     )
-    .child(div().absolute().top(18).right(-34).child(copyButton(t, id, text, pointer, "Copy your message")))
-    .when(images > 0, (el) =>
+    .when(pictures.length > 0, (el) =>
+      el.child(
+        h_flex()
+          .pt(6)
+          .gap(6)
+          .flex_wrap()
+          .justify_end()
+          .children(
+            pictures.map((rel, index) =>
+              div()
+                .id(`${id}-picture-${index}`)
+                .w(PICTURE_W)
+                .h(PICTURE_H)
+                .p(4)
+                .rounded(10)
+                .bg(t.surface)
+                .cursor_pointer()
+                .tooltip("Show full size")
+                .on_click(() => openOverlay({ kind: "dialog", mod: "pi-chat", props: { image: rel }, width: 0.9, height: 0.9 }))
+                .child(image(rel).size_full()),
+            ),
+          ),
+      ),
+    )
+    .when(unseen > 0, (el) =>
       el.child(
         h_flex()
           .pt(6)
@@ -47,7 +81,7 @@ function bubble(t, key, text, images, queued, pointer) {
           .text_size(12.5)
           .text_color(t.muted)
           .child(icon("file", 13))
-          .child(images === 1 ? "1 image" : `${images} images`),
+          .child(unseen === 1 ? "1 image" : `${unseen} images`),
       ),
     )
     .when(queued, (el) =>
@@ -281,7 +315,7 @@ export function drawRow(item, ui) {
   const { t } = ui;
   const pointer = ui.chat.pointer;
   if (item.kind === "dismissed") return quiet(t, "You dismissed the questions.");
-  if (item.kind === "user") return bubble(t, item.key, item.text || "Image", item.images || 0, item.queued === true, pointer);
+  if (item.kind === "user") return bubble(t, item.key, item.text || (item.pictures && item.pictures.length ? "" : "Image"), item.images || 0, item.pictures || [], item.queued === true, pointer);
   if (item.kind === "work") return work(ui, item.turn);
   // An answer follows its turn's work line; one given without any work comes right after the message.
   if (item.kind === "answer") {

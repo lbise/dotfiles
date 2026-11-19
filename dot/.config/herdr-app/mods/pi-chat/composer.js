@@ -9,6 +9,7 @@ import { stageFiles } from "./attach.js";
 import { completePath, pathWord, sessionCommand } from "./model/lists.js";
 import { selectAll, takeKeys } from "./keys.js";
 import { menu } from "./menu.js";
+import { PathMenu } from "./paths.js";
 import { SlashMenu } from "./slash.js";
 import { icon, mix } from "./ui.js";
 
@@ -29,7 +30,7 @@ export class Composer {
     this.blank = true;
     this.open = null; // the open menu: "model" or "thinking"
     this.closedAt = 0;
-    this.hint = ""; // the paths a Tab could not choose between
+    this.paths = new PathMenu(); // the paths a Tab could not choose between
     this.files = []; // attached, staged on this computer: { rel, name, image }
     this.clearedAt = 0; // the last Ctrl+C that emptied the box
     // A paste with no text: a picture or files copied in Explorer.
@@ -48,11 +49,11 @@ export class Composer {
     this.input.on("change", (_event, cx) => {
       const text = this.input.value();
       const query = this.slash.query;
-      if (this.hint) {
-        this.hint = "";
+      if (this.paths.isOpen()) {
+        this.paths.follow(text);
         cx.notify();
       }
-      if (this.slash.follow(text)) this.chat.loadCommands(cx);
+      if (this.slash.follow(text, this.input.selected_range().end)) this.chat.loadCommands(cx);
       const blank = !text.trim();
       if (blank === this.blank && query === this.slash.query) return;
       this.blank = blank;
@@ -178,16 +179,46 @@ export class Composer {
       if (this.input.value() !== text) return;
       const next = completePath(text, found);
       if (next !== text) this.set(next);
-      this.hint = next === text && found.length > 1 ? found.slice(0, 20).map((path) => path.replace(/.*\/(?=.)/, "")).join("   ") : "";
+      this.paths.show(found, next);
       cx.notify();
     });
   }
 
-  // A slash menu entry: a session command runs (or opens its picker), anything else goes in the box.
-  accept(item, cx) {
-    if (item.kind !== "session") this.set(`/${item.name} `);
-    else if (this.chat.runSession(item.name, "", cx)) this.set("");
+  // A path from the menu goes in place of the typed one; a folder lists what is in it next.
+  acceptPath(path, cx) {
+    this.set(completePath(this.input.value(), [path]));
+    this.paths.close();
+    if (path.endsWith("/")) this.complete(cx);
     cx.notify();
+  }
+
+  // ↑↓ Tab Enter Esc while the path menu is open (keys.js hands them over).
+  pathKey(key, cx) {
+    if (key === "ctrl-a") return selectAll(this.input, cx);
+    if (key === "up" || key === "down") this.paths.move(key === "up" ? -1 : 1);
+    else if (key === "escape") this.paths.close();
+    else return this.acceptPath(this.paths.chosen(), cx);
+    cx.notify();
+  }
+
+  // A slash menu entry: a session command runs (or opens its picker), anything else goes in the box.
+  // Either replaces the typed `/query`; a draft after it stays.
+  accept(item, cx) {
+    const text = this.input.value();
+    const rest = text.slice(this.slash.end).replace(/^[ \t]+/, "");
+    if (item.kind !== "session") this.put(`/${item.name} `, rest);
+    else if (this.chat.runSession(item.name, "", cx)) this.put("", rest);
+    cx.notify();
+  }
+
+  // `head` then `rest` in the box, the caret between them.
+  put(head, rest) {
+    if (!rest) return this.set(head);
+    this.input.set_value("");
+    this.input.replace(head + rest);
+    this.input.set_selected_range({ start: head.length, end: head.length });
+    this.blank = !(head + rest).trim();
+    this.slash.follow(head + rest, head.length);
   }
 
   // Enter, and Pi's model and thinking keys, from the reply box (keys.js hands them over).
@@ -210,7 +241,7 @@ export class Composer {
     this.clearedAt = Date.now();
     this.set("");
     this.files = [];
-    this.hint = "";
+    this.paths.close();
     cx.notify();
   }
 
@@ -366,7 +397,17 @@ export class Composer {
             cx.notify();
           },
         });
-    const over = above.picker || slash;
+    const paths = above.picker || slash
+      ? null
+      : this.paths.render(t, {
+          width: Math.min(560, above.width),
+          accept: (path, cx) => this.acceptPath(path, cx),
+          hover: (index, cx) => {
+            this.paths.index = index;
+            cx.notify();
+          },
+        });
+    const over = above.picker || slash || paths;
     const box = v_flex()
       .id("pi-chat-reply")
       .w_full()
@@ -385,8 +426,7 @@ export class Composer {
       })
       .on_drop((event, cx) => this.attach("drop", event.paths, cx))
       .when(this.files.length, (el) => el.child(this.chips(t)))
-      .when(this.hint, (el) => el.child(div().pb(6).truncate().font_family("Geist Mono").text_size(12).text_color(t.muted).child(this.hint)))
-      .child(takeKeys(div().w_full(), slash !== null, (key, cx) => (slash ? this.slashKey(key, cx) : this.fieldKey(key, cx))).child(Textarea.new(this.input).w_full().text_size(15).text_color(t.foreground)))
+      .child(takeKeys(div().w_full(), Boolean(slash || paths), (key, cx) => (slash ? this.slashKey(key, cx) : paths ? this.pathKey(key, cx) : this.fieldKey(key, cx))).child(Textarea.new(this.input).w_full().text_size(15).text_color(t.foreground)))
       .child(h_flex().mt(8).gap(2).items_center().child(this.plus(t)).children(this.pickers(t, state)).child(div().flex_1()).child(h_flex().gap(6).children(this.buttons(t, working))));
     // The popovers hang from a line along the box's top edge.
     const anchor = Popup.new("pi-chat-over-reply", div().w_full().h(0)).anchor("bottom_left").when(over, (el) => el.content(div().pb(8).child(over)));

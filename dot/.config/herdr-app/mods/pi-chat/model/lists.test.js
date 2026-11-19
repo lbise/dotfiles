@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { completePath, matches, pathWord, parseCommands, parseModels, parseSessions, parseTree, sessionCommand, slashItems } from "./lists.js";
+import { completePath, matches, pathChoices, pathWord, parseCommands, parseModels, parseSessions, parseTree, sessionCommand, slashItems, slashQuery } from "./lists.js";
 import { formatAge } from "./format.js";
 
 test("sessions are checked and their titles made one line", () => {
@@ -37,6 +37,16 @@ test("commands keep their kind, unknown kinds are commands", () => {
     { name: "skill:tdd", description: "Test first", kind: "skill" },
     { name: "review", description: "", kind: "command" },
   ]);
+});
+
+test("the slash menu opens while the caret is in a first word that starts with a slash", () => {
+  assert.equal(slashQuery("/", 1), "");
+  assert.equal(slashQuery("/td", 3), "td");
+  assert.equal(slashQuery("/hello world", 1), "");
+  assert.equal(slashQuery("/tdhello world", 3), "td");
+  assert.equal(slashQuery("/tdd hello", 5), null);
+  assert.equal(slashQuery("hello /td", 9), null);
+  assert.equal(slashQuery("/td", 0), null);
 });
 
 test("the slash menu: session commands first, then by how well the name matches", () => {
@@ -94,4 +104,12 @@ test("a path at the end of the reply completes as far as its matches agree", () 
   assert.equal(completePath("see src/afh.c", ["src/afh.c"]), "see src/afh.c ");
   assert.equal(completePath("see src/a", ["src/a.c", "src/b.c"]), "see src/a"); // nothing more in common
   assert.equal(completePath("see x", []), "see x");
+});
+
+test("the path menu keeps what the typed path still starts", () => {
+  const found = ["~/src/", "~/scratch.md", "~/docs/"];
+  assert.deepEqual(pathChoices(found, "see ~/s"), ["~/src/", "~/scratch.md"]);
+  assert.deepEqual(pathChoices(found, "see ~/sr"), ["~/src/"]);
+  assert.deepEqual(pathChoices(found, "see ~/x"), []);
+  assert.deepEqual(pathChoices(found, "see "), []);
 });

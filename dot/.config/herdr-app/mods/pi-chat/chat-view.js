@@ -72,11 +72,13 @@ export class ChatView {
     this.knownCells = null; // step ids of the running turn seen so far; null before the first read
     this.growing = new Set(); // cells drawn small now, to scale in on the next draw
     this.sent = null; // { text, images, at, after }: sent from here at `at`, not in the conversation yet; `after` is when the last turn began
+    this.pictures = new Map(); // turn key -> the staged pictures sent with its message from here, to show them
     this.notice = "";
     this.hurryUntil = 0;
     this.second = -1;
     this.child = null; // { key, path, title, agent }: a subagent's conversation shows instead of Pi's
     this.childKeys = cx.focus_handle();
+    this.keys = cx.focus_handle(); // the chat's own: a click on the conversation takes the keyboard here
     this.pointer = {
       hovered: new Set(),
       copied: null,
@@ -159,6 +161,7 @@ export class ChatView {
       const turn = chat.turns.find((entry) => entry.user && entry.user.text === this.sent.text && (entry.startedAt || 0) > this.sent.after);
       if (turn) {
         this.timeline.rename(SENT_KEY, `${turn.key}:user`);
+        if (this.sent.images.length) this.pictures.set(turn.key, this.sent.images);
         this.sent = null;
       }
     }
@@ -407,7 +410,7 @@ export class ChatView {
     if (!pi) return;
     const feed = feedFor(pi);
     const last = feed.chat.turns[feed.chat.turns.length - 1];
-    const sent = { text, images: files.filter((file) => file.image).length, at: Date.now(), after: last ? last.startedAt || 0 : 0 };
+    const sent = { text, images: files.filter((file) => file.image).map((file) => file.rel), at: Date.now(), after: last ? last.startedAt || 0 : 0 };
     this.sent = sent;
     this.notice = "";
     this.hurryUntil = Date.now() + HURRY;
@@ -533,7 +536,7 @@ export class ChatView {
 
   conversation(t, look, feed, zoom) {
     const child = Boolean(feed.chat.file);
-    const items = conversationRows(feed.chat, child ? null : this.sent);
+    const items = conversationRows(feed.chat, child ? null : this.sent, this.pictures);
     if (!items.length) return child ? div().flex_1() : emptyChat(t);
     const now = agentNow(feed);
     const ui = { t, look, readOnly: child, width: look.width, elapsed: this.elapsed(feed), now, asking: !child && feed.chat.state.status === "asking", chat: this };
@@ -638,7 +641,31 @@ export class ChatView {
       const body = feed.reads > 0 ? noExtension(t, feed.chat.problem, openTerminal) : feedSilent(feed) ? silentMachine(t, pi.machine, openTerminal) : div().flex_1();
       return root.child(header).child(body);
     }
-    return root.child(header).child(this.conversation(t, look, feed, zoom)).child(this.dock(t, look, pi, feed)).child(this.status.render(t, state, zoom));
+    return root
+      .track_focus(this.keys)
+      .on_key_down((event, cx) => this.strayKey(event, cx))
+      .child(header)
+      .child(this.conversation(t, look, feed, zoom))
+      .child(this.dock(t, look, pi, feed))
+      .child(this.status.render(t, state, zoom));
+  }
+
+  // A key no one in the chat took, the reply box not focused (after a click on the
+  // conversation, say): Ctrl+C and typing go to the reply box. A selection's Ctrl+C
+  // copies before this hears it.
+  strayKey(event, cx) {
+    // Only the chat's own focus: keys from a focused field (the reply box, a picker, the
+    // ask view) bubble here too, and a dead key's `~` would be typed a second time.
+    if (!this.keys.is_focused()) return;
+    const { control, alt, platform } = event.modifiers;
+    if (event.keystroke === "ctrl-c") {
+      this.composer.focus();
+      this.composer.ctrlC(cx);
+    } else if (event.key_char && !control && !alt && !platform) {
+      this.composer.focus();
+      this.composer.input.replace(event.key_char);
+    } else return;
+    cx.stop_propagation();
   }
 }
 

@@ -20,8 +20,11 @@
   `draft` command). You read and send it there. Another agent gets them through `hc send`, which
   presses Enter.
 - Keys, while the panel has focus: `j`/`k` file, `n`/`p` hunk, `u` next unviewed file, `v` viewed,
-  `s` split, `f` full file, `h`/`l` sideways, `m` maximize, `r` refresh, `c` comment, Esc to leave a box or clear the
-  selection.
+  `s` split, `f` full file, `h`/`l` sideways, `m` maximize, `r` refresh, `c` comment, `y` copy the
+  file's path, `o` open it in Neovim, Esc to leave a box or clear the selection.
+- The file header's copy button copies the repo-relative path; the Neovim button (`nvim.js`) opens
+  the file (`:drop`) in a Neovim running in the focused space on the repo's machine (the focused
+  tab's first), through its server socket, and focuses it. With none, it opens Neovim in a new tab.
 - **Commit** (Changes mode) runs `git add -A && git commit` in your interactive shell (`$SHELL -ic`).
   herdr-core starts programs without your shell's setup, so the SSH agent (`SSH_AUTH_SOCK`, from
   oh-my-zsh's ssh-agent plugin) is missing there, and SSH-signed commits fail.
