@@ -62,6 +62,7 @@ export const PROVIDERS = {
     view: (ticket, script) => ["python3", "-c", script, "view", String(ticket.ref)],
     options: (ticket, detail, attr, script) => ["python3", "-c", script, "options", String(detail.scope), attr],
     download: (attachment, folder, script) => ["python3", "-c", script, "download", String(attachment.id), folder],
+    image: (attachment, script) => ["python3", "-c", script, "image", String(attachment.id)],
     update(ticket, change, script) {
       const call = (method, path, body) => ["python3", "-c", script, "call", method, path, ...(body ? [JSON.stringify(body)] : [])];
       const issue = `issues/${ticket.ref}`;
@@ -208,6 +209,37 @@ export const PROVIDERS = {
     },
   },
 };
+
+// An image in a ticket's text: ![alt](src "title") or <img … src="src" …>.
+const IMAGE = /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+
+/** The attachment an image's src names: its file name (the last one so named, as Redmine picks) or its URL. */
+function attachmentOf(src, attachments) {
+  const id = /\/attachments\/(?:download\/)?(\d+)(?:[/?#]|$)/.exec(src)?.[1];
+  if (id) return attachments.find((a) => String(a.id) === id);
+  let name = src;
+  try { name = decodeURIComponent(src); } catch { /* not encoded */ }
+  return attachments.filter((a) => a.name === name).pop();
+}
+
+/**
+ * A ticket's text cut at its images that are attachments: [{ text } | { image: attachment }].
+ * Markdown cannot draw them, so the view draws them between the pieces. Other images stay text.
+ */
+// shortcut: only attachments (Redmine); GitHub's image URLs need gh's login, fetch them through gh when wanted.
+export function inlineImages(text, attachments = []) {
+  const parts = [];
+  let at = 0;
+  for (const m of text.matchAll(IMAGE)) {
+    const image = attachmentOf(m[1] || m[2], attachments);
+    if (!image) continue;
+    if (text.slice(at, m.index).trim()) parts.push({ text: text.slice(at, m.index) });
+    parts.push({ image });
+    at = m.index + m[0].length;
+  }
+  if (text.slice(at).trim()) parts.push({ text: text.slice(at) });
+  return parts;
+}
 
 /** What typed text sets a form entry to: { value } or { error }. */
 export function valueOf(entry, text) {

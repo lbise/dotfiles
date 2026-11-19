@@ -7,7 +7,7 @@ import { div, image } from "gpui-kit";
 import { Popup, Textarea, TextareaState, h_flex, v_flex } from "gpui-base";
 import { stageFiles } from "./attach.js";
 import { completePath, pathWord, sessionCommand } from "./model/lists.js";
-import { selectAll, takeKeys } from "./keys.js";
+import { copySelection, selectAll, takeKeys } from "./keys.js";
 import { menu } from "./menu.js";
 import { PathMenu } from "./paths.js";
 import { SlashMenu } from "./slash.js";
@@ -179,7 +179,8 @@ export class Composer {
       if (this.input.value() !== text) return;
       const next = completePath(text, found);
       if (next !== text) this.set(next);
-      this.paths.show(found, next);
+      // One match is already in the box; the menu is for choosing between several.
+      if (found.length > 1) this.paths.show(found, next);
       cx.notify();
     });
   }
@@ -195,6 +196,7 @@ export class Composer {
   // ↑↓ Tab Enter Esc while the path menu is open (keys.js hands them over).
   pathKey(key, cx) {
     if (key === "ctrl-a") return selectAll(this.input, cx);
+    if (key === "ctrl-c") return this.ctrlC(cx);
     if (key === "up" || key === "down") this.paths.move(key === "up" ? -1 : 1);
     else if (key === "escape") this.paths.close();
     else return this.acceptPath(this.paths.chosen(), cx);
@@ -232,8 +234,10 @@ export class Composer {
     else this.chat.command({ type: "cycle", what: "model", direction: key === "alt-p" ? "backward" : "forward" }, cx);
   }
 
-  // As Pi: the first empties the box, a second soon after quits Pi.
-  ctrlC(cx) {
+  // As a terminal: selected text is copied. Else as Pi: the first empties the box, a second soon after quits Pi.
+  // `copy` false: the press came from outside the box, whose selection is not what was meant.
+  ctrlC(cx, copy = true) {
+    if (copy && copySelection(this.input, cx)) return;
     if (Date.now() - this.clearedAt < QUIT) {
       this.clearedAt = 0;
       return this.chat.command({ type: "quit" }, cx);
@@ -248,6 +252,7 @@ export class Composer {
   // ↑↓ Tab Enter Esc while the slash menu is open (keys.js hands them over).
   slashKey(key, cx) {
     if (key === "ctrl-a") return selectAll(this.input, cx);
+    if (key === "ctrl-c") return this.ctrlC(cx);
     const items = this.slash.items(this.chat.slashCommands());
     if (key === "up" || key === "down") this.slash.move(key === "up" ? -1 : 1, items.length);
     else if (key === "escape") this.slash.dismiss(this.input.value());

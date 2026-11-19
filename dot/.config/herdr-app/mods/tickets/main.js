@@ -14,10 +14,10 @@
 // leo-tabs.tickets, maximized with leo-tabs.max (mods/leo-tabs). Below WIDE it is
 // the list, or the picked ticket with a way back; the board needs the room.
 
-import { View, div, svg } from "gpui-kit";
+import { View, div, image, svg } from "gpui-kit";
 import { Input, InputState, Popup, Textarea, TextareaState, TextView, h_flex, v_flex } from "gpui-base";
-import { appHome, checking, exec, layout, machines, notify, readTextFile, run as runCommand, setShared, settings, shared, theme } from "herdr";
-import { PROVIDERS, RELATIONS, ago, columns, dropped, parseSources, size, valueOf } from "./providers.js";
+import { appHome, checking, exec, layout, machines, notify, readTextFile, run as runCommand, setShared, settings, shared, theme, writeTextFile } from "herdr";
+import { PROVIDERS, RELATIONS, ago, columns, dropped, inlineImages, parseSources, size, valueOf } from "./providers.js";
 
 const MONO = "Geist Mono";
 const lit = (off, key) => off.has(key) === key.startsWith("cl:"); // a closed status's chip starts off
@@ -26,6 +26,7 @@ const SOURCE = "tickets.source";
 const OFF = "tickets.off"; // status chips flipped from their default: "st:<open status>" turned off, "cl:<closed status>" turned on
 const VIEW = "tickets.view"; // "list" or "board"
 const DRAFTS = "tickets.drafts"; // ticket key -> { comment?, description? }
+const IMAGES = "tickets.images"; // cached image (app-home path) -> [width, height]
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const TWICE = 250; // a press that closes a dropdown also lands on its trigger
 const FILTER_FROM = 10; // a dropdown this long gets a filter field
@@ -56,6 +57,8 @@ export default class Tickets extends View {
     this.moving = ""; // the key of the card whose status is changing
     this.confirm = ""; // the remove button waiting for its second press: "att:<id>", "rel:<id>", "watch:<id>"
     this.downloads = {}; // attachment id -> { state, value: path, error }
+    this.images = {}; // "<source>:<attachment id>" -> { state, value: { path, width, height }, error }: images in the text
+    this.textWidth = 0; // design px of the description, which images shrink to
     this.attaching = false;
     this.attachPath = InputState.new({ placeholder: "Path on the machine, e.g. ~/logs/run.txt" });
     this.attachPath.on("submit", (_e, cx) => this.attachTyped(cx));
@@ -262,6 +265,55 @@ export default class Tickets extends View {
     this.apply({ relate: this.relType, to: to.value, ...(timed && delayText && { delay: Number(delayText) }) }, cx);
   }
 
+  /**
+   * An image attachment where the text puts it. Markdown cannot draw it and image() reads only
+   * files under the app's folder, which a mod writes only as text: the provider sends it as an SVG
+   * holding the image, kept in cache/tickets/ (an attachment never changes).
+   */
+  // shortcut: the cache is never pruned; if it grows too big, delete cache/tickets/ in the app's folder
+  // and the shared "tickets.images" (else the images it lists show empty).
+  picture(t, x, a, cx) {
+    const key = `${x.source}:${a.id}`;
+    const got = this.images[key];
+    if (!got) {
+      this.images[key] = { state: "loading" };
+      cx.spawn(async (cx) => {
+        this.images[key] = await this.fetchImage(this.sourceOf(x), a, key);
+        cx.notify();
+      });
+    }
+    if (got?.state !== "ok") {
+      return div().text_size(12).text_color(got?.state === "error" ? t.ansi1 : t.dim).child(got?.state === "error" ? `${a.name}: ${got.error}` : `Loading ${a.name}…`);
+    }
+    const { path, width, height } = got.value;
+    const scale = Math.min(1, (this.textWidth || width) / width);
+    return div().id(`img-${key}`).flex_none().cursor_pointer().on_click((_e, cx) => cx.open_url(a.url))
+      .child(image(path).w(width * scale).h(height * scale));
+  }
+
+  async fetchImage(source, a, key) {
+    const provider = PROVIDERS[source.kind];
+    const path = `cache/tickets/${key.replace(/[^\w-]/g, "_")}.svg`;
+    const sizes = /** @type {Record<string, number[]>} */ (shared(IMAGES) || {});
+    if (sizes[path]) return { state: "ok", value: { path, width: sizes[path][0], height: sizes[path][1] } };
+    const result = await run(source, provider.image(a, this.scripts[provider.script]), (out) => {
+      const [, width, height] = /^<svg [^>]*?width="(\d+)" height="(\d+)"/.exec(out) || [];
+      if (!+width || !+height) throw new Error("not an image");
+      return { svg: out, width: +width, height: +height };
+    });
+    if (result.state === "error") return result;
+    const { svg: text, width, height } = result.value;
+    const file = `${appHome()}/${path}`;
+    try {
+      await writeTextFile(file, text, null);
+    } catch (error) {
+      // Already there (another window wrote it): fine; a read past 1 MiB rejects, it is there too.
+      if ((await readTextFile(file).catch(() => "")) === null) return { state: "error", error: String(error.message || error) };
+    }
+    setShared(IMAGES, { ...(/** @type {object} */ (shared(IMAGES)) || {}), [path]: [width, height] });
+    return { state: "ok", value: { path, width, height } };
+  }
+
   // Dropdowns -------------------------------------------------------------
 
   /** A form entry, or one of the dropdowns that are not attributes: a relation's type, adding a watcher. */
@@ -457,7 +509,7 @@ export default class Tickets extends View {
     return (source && this.results[source.name]?.value || []).find((x) => x.key === this.picked);
   }
 
-  render() {
+  render(cx) {
     const t = theme();
     const off = this.off();
     const sources = this.shown();
@@ -516,7 +568,7 @@ export default class Tickets extends View {
         .child(text)));
     const empty = this.error ? note(this.error, t.ansi1)
       : note(loading ? "Loading…" : !source ? "No source for this computer in sources.json" : "No open tickets");
-    const detail = picked && this.detail(t, picked, this.details[picked.key]);
+    const detail = picked && this.detail(t, picked, this.details[picked.key], cx);
 
     return v_flex().id("tickets").size_full().bg(t.background).text_color(t.foreground).text_size(13).p(narrow ? 12 : 18).gap(12)
       .rounded(10).border_1().border_color(t.border).overflow_hidden()
@@ -652,10 +704,12 @@ export default class Tickets extends View {
       .child(entry.text === "" ? div().text_color(t.dim).child(hint) : div().child(String(entry.text)));
   }
 
-  detail(t, x, d) {
+  detail(t, x, d, cx) {
     const narrow = this.narrow;
     const value = d?.value;
-    const markdown = (id, text) => TextView.markdown(id, text.replace(/\r\n/g, "\n").replace(SOFT_BREAK, "$1  \n")).selectable(true);
+    const markdown = (id, text) => v_flex().gap(8).children(inlineImages(text.replace(/\r\n/g, "\n"), value?.attachments).map((part, i) => part.image
+      ? this.picture(t, x, part.image, cx)
+      : TextView.markdown(`${id}-${i}`, part.text.replace(SOFT_BREAK, "$1  \n")).selectable(true)));
     const section = (title, extra) => h_flex().gap(8).items_center().text_size(12).text_color(t.muted)
       .child(div().flex_1().child(title)).when(!!extra, (el) => el.child(extra));
     const box = (child) => div().rounded(8).border(1).border_color(t.input).bg(t.surface).px(8).py(6).child(child);
@@ -774,7 +828,13 @@ export default class Tickets extends View {
     return body
       .child(v_flex().gap(2).children(form))
       .when(info.length > 0, (el) => el.child(v_flex().gap(0).children(info)))
-      .child(v_flex().gap(8)
+      .child(v_flex().id("description").gap(8)
+        .on_size_change((box, cx) => {
+          const width = box.width / (settings().zoom || 1);
+          if (Math.abs(width - this.textWidth) < 1) return;
+          this.textWidth = width;
+          cx.notify();
+        })
         .child(section(drafted && !editing ? "Description · unsaved edit" : "Description", editing
           ? h_flex().gap(6)
             .child(button(t, "desc-cancel", "Cancel", true, (cx) => this.cancel(cx)))

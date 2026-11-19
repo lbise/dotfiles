@@ -23,6 +23,8 @@ export class PaneHeader {
         const command = await nextCommand();
         const pi = target();
         if (command === "toggle" && pi && pi.pane === props()?.pane) chooseView(pi, "chat");
+        // mod.json's "focusable" is for the chat; should pane.go land on a header, its terminal takes the keyboard.
+        else if (command === "focus" && props()?.pane) run("pane.focus", { pane: props().pane });
       }
     });
   }

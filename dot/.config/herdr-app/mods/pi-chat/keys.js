@@ -10,10 +10,12 @@
 //     Ctrl+C empties the box, a second within half a second quits Pi (as in Pi).
 //   PiChatMenu: a field with a list over it (the slash menu, the pickers):
 //     ↑↓ move, Tab and Enter pick, Esc closes.
-//   Both: Ctrl+A selects all the text (the field's own binding moves to the line start).
+//   Both: Ctrl+A selects all the text (the field's own binding moves to the line start);
+//     Ctrl+C copies the field's selected text, as in a terminal; with none selected
+//     it empties the reply box, whatever is open (a picker closes).
 
 // shortcut: Pi's default keys, not read from Pi's keybindings.json; read them once someone remaps them.
-const CONTEXTS = { PiChatField: ["enter", "tab", "ctrl-p", "alt-p", "shift-tab", "ctrl-a", "ctrl-g", "ctrl-c"], PiChatMenu: ["up", "down", "tab", "enter", "escape", "ctrl-a"] };
+const CONTEXTS = { PiChatField: ["enter", "tab", "ctrl-p", "alt-p", "shift-tab", "ctrl-a", "ctrl-g", "ctrl-c"], PiChatMenu: ["up", "down", "tab", "enter", "escape", "ctrl-a", "ctrl-c"] };
 
 const action = (key) => `pi_chat_key_${key.replace(/-/g, "_")}`;
 
@@ -29,6 +31,17 @@ export function bindKeys(cx) {
 export function selectAll(state, cx) {
   state.set_selected_range({ start: 0, end: state.value().length });
   cx.notify();
+}
+
+/**
+ * Ctrl+C on a text field: copies its selected text. False when nothing is selected.
+ * @param {{ value(): string, selected_range(): { start: number, end: number } }} state
+ */
+export function copySelection(state, cx) {
+  const { start, end } = state.selected_range();
+  if (start === end) return false;
+  cx.write_to_clipboard(state.value().slice(Math.min(start, end), Math.max(start, end)));
+  return true;
 }
 
 /**

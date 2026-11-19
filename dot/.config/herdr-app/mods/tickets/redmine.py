@@ -16,6 +16,9 @@ the standard library only.
                       upload files from this machine and attach them
   download <attachment id> <dir>
                       save an attachment into <dir> (not over an existing file); prints its path
+  image <attachment id>
+                      an image attachment (PNG, JPEG, GIF) as an SVG holding it, for the mod
+                      to show inline: the app draws only image files, and mods write only text
   options <project> <attr>
                       what an attribute can be set to: [{"id", "name"}], for tracker_id,
                       priority_id, assigned_to_id, category_id, fixed_version_id, project_id
@@ -24,11 +27,13 @@ Credential: REDMINE_API_KEY from the environment, else from the developer's Vaul
 agent folder (user_secrets/<user>/agent/credentials), as the skills do.
 """
 
+import base64
 import getpass
 import json
 import mimetypes
 import os
 import re
+import struct
 import sys
 import tempfile
 import urllib.error
@@ -42,6 +47,8 @@ MAIN_TOKEN_PATH = Path.home() / '.vault-token'
 AGENT_TOKEN_PATH = Path.home() / '.vault-token-agent'
 USER = getpass.getuser()
 LOGIN_HINT = 'connect to this machine once from VS Code (vault_ssh), or run `c login` there'
+# Its base64 must fit the 8 MiB the app reads of a command's output.
+MAX_IMAGE = 5 * 1024 * 1024
 
 
 class Failure(Exception):
@@ -180,10 +187,57 @@ def attach(issue_id, paths, description):
     redmine(f'issues/{issue_id}.json', {'issue': {'uploads': uploads}}, 'PUT')
 
 
+def download_url(found):
+    # Built from REDMINE_URL (content_url can be plain http), so the API key goes to Redmine only.
+    return f"{REDMINE_URL}/attachments/download/{found['id']}/{urllib.parse.quote(found['filename'])}"
+
+
+def image_size(data):
+    """(mime, width, height) of a PNG, GIF or JPEG; None for anything else."""
+    if data[:8] == b'\x89PNG\r\n\x1a\n' and len(data) >= 24:
+        return ('image/png', *struct.unpack('>II', data[16:24]))
+    if data[:6] in (b'GIF87a', b'GIF89a') and len(data) >= 10:
+        return ('image/gif', *struct.unpack('<HH', data[6:10]))
+    if data[:2] == b'\xff\xd8':
+        i = 2
+        while i + 9 <= len(data):
+            if data[i] != 0xFF:
+                return None
+            marker = data[i + 1]
+            if marker == 0xFF:  # fill byte
+                i += 1
+            elif 0xD0 <= marker <= 0xD9 or marker == 0x01:  # no length
+                i += 2
+            elif 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):  # a frame: its size
+                height, width = struct.unpack('>HH', data[i + 5:i + 9])
+                return ('image/jpeg', width, height)
+            else:
+                i += 2 + struct.unpack('>H', data[i + 2:i + 4])[0]
+    return None
+
+
+def image(attachment_id):
+    found = redmine(f'attachments/{attachment_id}.json')['attachment']
+    if found.get('filesize', 0) > MAX_IMAGE:
+        raise Failure('image too large to show here')
+    request = urllib.request.Request(download_url(found), headers={'X-Redmine-API-Key': api_key()})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            data = response.read(MAX_IMAGE + 1)
+    except OSError as error:
+        raise Failure(f'download failed: {getattr(error, "code", "") or type(error).__name__}') from None
+    known = len(data) <= MAX_IMAGE and image_size(data)
+    if not known:
+        raise Failure('not an image that can be shown here')
+    mime, width, height = known
+    body = base64.b64encode(data).decode()
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
+            f'<image width="{width}" height="{height}" href="data:{mime};base64,{body}"/></svg>')
+
+
 def download(attachment_id, folder):
     found = redmine(f'attachments/{attachment_id}.json')['attachment']
-    # Built from REDMINE_URL (content_url can be plain http), so the API key goes to Redmine only.
-    url = f"{REDMINE_URL}/attachments/download/{found['id']}/{urllib.parse.quote(found['filename'])}"
+    url = download_url(found)
     folder = os.path.expanduser(folder)
     os.makedirs(folder, exist_ok=True)
     stem, ext = os.path.splitext(os.path.basename(found['filename']) or 'attachment')
@@ -262,10 +316,12 @@ def main(args):
         attach(args[1], paths, args[3] if len(args) == 4 else '')
     elif len(args) == 3 and args[0] == 'download' and args[1].isdigit():
         print(download(args[1], args[2]))
+    elif len(args) == 2 and args[0] == 'image' and args[1].isdigit():
+        print(image(args[1]))
     elif len(args) == 3 and args[0] == 'options' and args[1].isdigit():
         print(json.dumps(options(args[1], args[2])))
     else:
-        raise Failure('usage: list | view <id> | call <method> <path> [json] | attach <id> <paths> [description] | download <id> <dir> | options <project> <attr>')
+        raise Failure('usage: list | view <id> | call <method> <path> [json] | attach <id> <paths> [description] | download <id> <dir> | image <id> | options <project> <attr>')
 
 
 if __name__ == '__main__':

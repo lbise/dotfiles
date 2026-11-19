@@ -110,8 +110,8 @@ function formatMoney(minor: number, decimals: number, currency: string | null | 
 }
 
 function extraSegments(extra: ExtraUsageRaw | undefined): Segment[] | undefined {
-  if (!extra) return undefined;
-  if (!extra.is_enabled) return [{ text: "off", tone: "warning" }];
+  // Disabled extra usage is not shown: "off" told nothing to act on.
+  if (!extra?.is_enabled) return undefined;
 
   const segments: Segment[] = [];
   const utilization = numberValue(extra.utilization);

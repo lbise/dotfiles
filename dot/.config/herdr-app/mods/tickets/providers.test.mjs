@@ -1,6 +1,6 @@
 // node mods/tickets/providers.test.mjs
 import assert from "node:assert/strict";
-import { PROVIDERS, ago, columns, dropped, parseSources, size, valueOf } from "./providers.js";
+import { PROVIDERS, ago, columns, dropped, inlineImages, parseSources, size, valueOf } from "./providers.js";
 
 const { redmine, github } = PROVIDERS;
 
@@ -145,4 +145,12 @@ assert.deepEqual(parseSources('[{"name":"Work","kind":"redmine","machine":"1-wsl
 assert.match(parseSources('[{"name":"X","kind":"jira"}]').error, /unknown kind/);
 assert.match(parseSources('[{"name":"X","kind":"github"},{"name":"X","kind":"github"}]').error, /differ/);
 assert.match(parseSources("{").error, /sources.json/);
+
+// Images that are attachments cut the text; by name (the last so named), encoded name or URL; others stay text.
+const shots = [{ id: 1, name: "a b.png" }, { id: 2, name: "c.png" }, { id: 3, name: "c.png" }];
+assert.deepEqual(
+  inlineImages('Before ![](c.png) mid <img style="width: 5px;" src="a%20b.png"> ![x](https://rm/attachments/download/1/a.png "t") ![](web.png)', shots),
+  [{ text: "Before " }, { image: shots[2] }, { text: " mid " }, { image: shots[0] }, { image: shots[0] }, { text: " ![](web.png)" }],
+);
+assert.deepEqual(inlineImages("no images"), [{ text: "no images" }]);
 console.log("ok");

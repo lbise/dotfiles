@@ -71,11 +71,10 @@ test("anthropic maps 5h and weekly windows", async () => {
   assert.equal(snapshot.secondary?.usedPercent, 3);
 });
 
-test("anthropic flags disabled extra usage", async () => {
+test("anthropic hides disabled extra usage", async () => {
   stubFetch(anthropicPayload);
   const snapshot = await anthropicProvider.fetchUsage(auth({ anthropic: "sk-ant-oat01-abc" }));
-  assert.equal(text(snapshot.extra), "off");
-  assert.equal(snapshot.extra?.[0].tone, "warning");
+  assert.equal(snapshot.extra, undefined);
 });
 
 test("anthropic shows enabled extra usage as bar and money", async () => {

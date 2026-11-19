@@ -7,7 +7,7 @@ import { Input, InputState, ScrollHandle, h_flex, v_flex } from "gpui-base";
 import { formatAge } from "./model/format.js";
 import { matches } from "./model/lists.js";
 import { askList } from "./feeds.js";
-import { selectAll, takeKeys } from "./keys.js";
+import { copySelection, selectAll, takeKeys } from "./keys.js";
 import { MONO, icon, mix } from "./ui.js";
 
 const ROW = 30;
@@ -104,6 +104,12 @@ export class Picker {
   // ↑↓ Tab Enter Esc from the search line (keys.js hands them over).
   key(key, cx) {
     if (key === "ctrl-a") selectAll(this.inputs[this.kind], cx);
+    else if (key === "ctrl-c") {
+      // As everywhere in the chat: Ctrl+C copies selected text, else goes to the reply box, which it empties.
+      if (copySelection(this.inputs[this.kind], cx)) return;
+      this.close(cx);
+      this.chat.composer.ctrlC(cx, false);
+    }
     else if (key === "up" || key === "down") this.move(key === "up" ? -1 : 1, cx);
     else if (key === "escape") this.close(cx);
     else if (key === "tab") {

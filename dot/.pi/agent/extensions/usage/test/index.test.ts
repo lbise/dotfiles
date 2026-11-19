@@ -95,7 +95,7 @@ test("session start publishes every generic status key", async () => {
   assert.match(h.statuses.get(STATUS_KEYS.primaryReset)!, new RegExp(`^${ICONS.reset} (60m|1h) \\d\\d:\\d\\d$`));
   assert.equal(h.statuses.get(STATUS_KEYS.secondary), `${ICONS.week} █░░░░░░░ 3%`);
   assert.match(h.statuses.get(STATUS_KEYS.secondaryReset)!, new RegExp(`^${ICONS.reset} 3d \\d\\d\\.\\d\\d$`));
-  assert.equal(h.statuses.get(STATUS_KEYS.extra), `${ICONS.money} off`);
+  assert.equal(h.statuses.has(STATUS_KEYS.extra), false);
   assert.equal(h.statuses.has("copilot-usage"), false);
 });
 
@@ -106,7 +106,7 @@ test("statuses are also sent as plain text in footer order, and withdrawn when c
 
   assert.ok(h.events.every((event) => event.channel === USAGE_EVENT));
   const sent = h.events.at(-1)!.data;
-  assert.deepEqual(sent.map((item: any) => item.key), Object.values(STATUS_KEYS));
+  assert.deepEqual(sent.map((item: any) => item.key), Object.values(STATUS_KEYS).filter((key) => key !== STATUS_KEYS.extra));
   assert.equal(sent[0].text, `${ICONS.hours} ███░░░░░ 42%`);
   assert.match(h.statuses.get(STATUS_KEYS.primary)!, /^<success>/);
 
@@ -275,7 +275,6 @@ test("plain statuses carry the window label, percent and time left; the footer i
     [STATUS_KEYS.primaryReset]: `<dim>${ICONS.reset} 2h10m ${at("2026-10-10T12:10:00Z")}</>`,
     [STATUS_KEYS.secondary]: `<success>${ICONS.week} </><success>█</><dim>░░░░░░░</><success> 3%</>`,
     [STATUS_KEYS.secondaryReset]: `<dim>${ICONS.reset} 3d ${day("2026-10-13T10:00:00Z")}</>`,
-    [STATUS_KEYS.extra]: `<dim>${ICONS.money} </><warning>off</>`,
   });
   assert.deepEqual(
     h.events.at(-1)!.data.map(({ text, ...meta }: any) => meta),
@@ -284,7 +283,6 @@ test("plain statuses carry the window label, percent and time left; the footer i
       { key: STATUS_KEYS.primaryReset, label: "5h", resets: "2h 10m" },
       { key: STATUS_KEYS.secondary, label: "Week", resets: "3d", percent: 3 },
       { key: STATUS_KEYS.secondaryReset, label: "Week", resets: "3d" },
-      { key: STATUS_KEYS.extra, label: "Extra" },
     ]
   );
 });

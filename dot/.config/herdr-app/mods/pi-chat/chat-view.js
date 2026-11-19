@@ -100,6 +100,8 @@ export class ChatView {
         const command = await nextCommand();
         const pi = target();
         if (command === "toggle" && pi) chooseView(pi, "terminal");
+        // pane.go (Alt+H/J/K/L) moved here: mod.json says "focusable".
+        else if (command === "focus" && pi) this.takeFocus(feedFor(pi).chat.state);
       }
     });
   }
@@ -217,7 +219,13 @@ export class ChatView {
     this.hurryUntil = Date.now() + HURRY;
     const state = feedFor(pi).chat.state;
     this.ask.show(state ? state.ask : null);
-    if (state && state.ask) this.ask.focus();
+    this.takeFocus(state);
+  }
+
+  // The keyboard where the person will type: a subagent's view, Pi's question, else the reply box.
+  takeFocus(state) {
+    if (this.child) this.childKeys.focus();
+    else if (state && state.ask) this.ask.focus();
     else this.composer.focus();
   }
 
@@ -660,7 +668,7 @@ export class ChatView {
     const { control, alt, platform } = event.modifiers;
     if (event.keystroke === "ctrl-c") {
       this.composer.focus();
-      this.composer.ctrlC(cx);
+      this.composer.ctrlC(cx, false);
     } else if (event.key_char && !control && !alt && !platform) {
       this.composer.focus();
       this.composer.input.replace(event.key_char);

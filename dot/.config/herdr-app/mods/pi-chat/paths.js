@@ -26,11 +26,11 @@ export class PathMenu {
     this.follow(text);
   }
 
-  /** Follows the reply box: filters, and closes once one match or none is left. */
+  /** Follows the reply box: filters, and closes once nothing matches. */
   follow(text) {
     if (!this.found.length) return;
     this.items = pathChoices(this.found, text);
-    if (this.items.length < 2) this.close();
+    if (!this.items.length) this.close();
     else this.move(0);
   }
 
