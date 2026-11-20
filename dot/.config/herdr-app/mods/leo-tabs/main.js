@@ -153,12 +153,18 @@ export default class Tabs extends View {
     });
   }
 
-  render() {
+  render(cx) {
     const t = theme();
     const space = spaces().find(p => p.active);
     const shown = space?.tabs ?? [];
     const active = shown.findIndex(tab => tab.active);
     const selected = shown[active]?.id;
+    // Another tab picked (a click, a key, another space) while a panel is maximized: the panel
+    // goes back to its side so the tab shows, and the tab gets the keyboard.
+    if (this.selected && selected && selected !== this.selected && find(layout(), "chat-view")?.hidden) {
+      this.restore(find(layout(), "panel"));
+      this.focusWork(cx);
+    }
     if (selected !== this.selected || active !== this.selectedIndex) {
       this.selected = selected;
       this.selectedIndex = active;
