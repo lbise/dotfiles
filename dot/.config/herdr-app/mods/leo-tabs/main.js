@@ -2,12 +2,17 @@
 // Usage, Tickets and Setups side panels after Files/Changes. It owns the side panel:
 // `leo-tabs.<panel>` toggles one, `leo-tabs.max` maximizes the shown one (the
 // chat hidden, the panel across the work area) or restores it; the panels'
-// own maximize buttons run the same command.
+// own maximize buttons run the same command. The keyboard follows: a panel shown
+// or maximized gets it (`<mod>.focus`), and closing one hands it back to the chat
+// or the focused terminal.
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, nextCommand } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, nextCommand, focused } from "herdr";
 
 const PANELS = ["files", "changes", "usage", "tickets", "setups"];
+// The mod in each panel that takes the keyboard; Files is Herdr's own and takes none.
+const KEYS = { changes: "review", usage: "usage", tickets: "tickets", setups: "setups" };
+const SETTLE_MS = 80; // a mod shown by a layout change hears commands once drawn
 const MAX = "panel.max"; // { px }: the side panel's width before it was maximized
 
 function find(node, id) {
@@ -40,8 +45,8 @@ export default class Tabs extends View {
     cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
-        if (command === "max") this.maximize();
-        else if (PANELS.includes(command)) this.toggle(command);
+        if (command === "max") this.maximize(cx);
+        else if (PANELS.includes(command)) this.toggle(command, cx);
         cx.notify();
       }
     });
@@ -103,25 +108,49 @@ export default class Tabs extends View {
     localStorage.setItem("panels", JSON.stringify(this.panels));
   }
 
-  toggle(id) {
+  toggle(id, cx) {
     const panel = find(layout(), "panel"), body = find(layout(), "panel-body");
-    if (panel && !panel.hidden && body?.active === id) run("layout.hide", { id: "panel" });
-    else { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: "panel" }); }
+    if (panel && !panel.hidden && body?.active === id) {
+      run("layout.hide", { id: "panel" });
+      this.focusWork(cx);
+    } else {
+      run("layout.select", { stack: "panel-body", child: id });
+      run("layout.show", { id: "panel" });
+      this.focusPanel(id, cx);
+    }
   }
 
-  maximize() {
+  maximize(cx) {
     const root = layout(), panel = find(root, "panel"), chat = find(root, "chat-view");
     if (!panel || !chat) return;
-    if (chat.hidden) return this.restore(panel);
-    if (panel.hidden) return;
-    setShared(MAX, { px: panel.size?.px || 368 });
-    run("layout.hide", { id: "chat-view" });
-    run("layout.resize", { id: "panel", weight: 1 });
+    if (chat.hidden) this.restore(panel);
+    else if (panel.hidden) return;
+    else {
+      setShared(MAX, { px: panel.size?.px || 368 });
+      run("layout.hide", { id: "chat-view" });
+      run("layout.resize", { id: "panel", weight: 1 });
+    }
+    this.focusPanel(find(root, "panel-body")?.active, cx);
   }
 
   restore(panel) {
     run("layout.show", { id: "chat-view" });
     if (!panel.size?.px) run("layout.resize", { id: "panel", px: shared(MAX)?.px || 368 });
+  }
+
+  /** The panel's mod takes the keyboard once it is drawn. */
+  focusPanel(id, cx) {
+    const mod = KEYS[id];
+    if (mod) cx.timer.after(SETTLE_MS, () => run(`${mod}.focus`));
+  }
+
+  /** The panel went: the keyboard goes back to the chat, or to the focused terminal. */
+  focusWork(cx) {
+    cx.timer.after(SETTLE_MS, () => {
+      const pane = focused()?.pane;
+      if (find(layout(), "chat-view")?.active === "chat-panel") run("pi-chat.focus");
+      else if (pane) run("pane.focus", { pane });
+    });
   }
 
   render() {
@@ -175,7 +204,7 @@ export default class Tabs extends View {
       return h_flex().id(`panel-${id}`).h(26).px(8).gap(5).flex_none().items_center().rounded(6)
         .text_size(12).bg(on ? t.selected : t.chrome).text_color(on ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover)).on_mouse_down("left", stop)
-        .on_click(() => this.toggle(id)).child(svg(icon).size(14)).child(label);
+        .on_click((_e, cx) => this.toggle(id, cx)).child(svg(icon).size(14)).child(label);
     };
     return h_flex().size_full().min_w(0).px(10).pl(lightsPadding).gap(3).items_center().bg(t.chrome).border_b(1).border_color(t.border)
       .on_mouse_up("left", () => { this.pressed = null; })

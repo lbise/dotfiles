@@ -7,11 +7,12 @@
 // A side panel (layouts/leo.json's
 // `usage` block), opened from the Usage button in the tab bar or leo-tabs.usage,
 // maximized with leo-tabs.max (mods/leo-tabs). Below WIDE it lays itself out for
-// the narrow panel: fewer table columns, stacked controls.
+// the narrow panel: fewer table columns, stacked controls. Keyboard: see HELP.
+// shortcut: the machine and provider chips are mouse only; give them keys if they get flipped often.
 
 import { View, div, svg } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
-import { appHome, exec, layout, machines, readTextFile, run, settings, theme } from "herdr";
+import { ScrollHandle, h_flex, v_flex } from "gpui-base";
+import { appHome, exec, layout, machines, nextCommand, readTextFile, run, settings, theme } from "herdr";
 import { usageChart, seriesColor } from "./chart.js";
 import {
   CREDIT_USD, GROUPS, LOCAL, OTHER, RANGES, billing, breakdownOf, formatBucket, formatCost, formatSpan, formatTokens, since, summarize,
@@ -36,6 +37,8 @@ const NARROW_COLUMNS = [
 const COLUMN_WIDTH = 96;
 const NARROW_COLUMN_WIDTH = 72;
 const WIDE = 760; // design px from which the full layout shows
+const HELP = ["t history/subscriptions", "1-4 range", "g/G group", "c cost/tokens", "j/k row", "enter/o open row",
+  "h/l day", "esc clear day", "r refresh", "m maximize", "q close", "? keys"];
 
 function findNode(node, id) {
   if (!node) return null;
@@ -59,18 +62,31 @@ function maxButton(t) {
 export default class Usage extends View {
   init(_given, cx) {
     this.width = 0; // design px
+    this.handle = cx.focus_handle();
     this.part = new Report(cx);
+    // "focus": leo-tabs showed the panel, or pane.go moved here (mod.json "focusable").
+    cx.spawn(async (cx) => {
+      for (;;) {
+        if ((await nextCommand()) === "focus") this.handle.focus();
+        cx.notify();
+      }
+    });
   }
 
   render(cx) {
     return v_flex().id("usage-root").size_full()
+      .track_focus(this.handle)
+      .on_key_down((e, cx) => {
+        if (e.modifiers.control || e.modifiers.alt || e.modifiers.platform) return;
+        if (this.part.key(e.key_char && e.key_char.trim() ? e.key_char : e.key, cx)) { cx.stop_propagation(); cx.notify(); }
+      })
       .on_size_change((size, cx) => {
         const width = size.width / (settings().zoom || 1);
         if (Math.abs(width - this.width) < 1) return;
         this.width = width;
         cx.notify();
       })
-      .child(this.part.render(this.width < WIDE));
+      .child(this.part.render(this.width < WIDE, this.handle.is_focused()));
   }
 }
 
@@ -90,6 +106,11 @@ class Report {
     this.bucket = ""; // the chart bar picked
     this.pointed = ""; // the chart bar under the pointer
     this.open = new Set(); // table rows opened into their breakdown
+    this.at = 0; // the table row the keyboard is on
+    this.rowKeys = []; // the table's rows and the chart's bars, as last drawn
+    this.barKeys = [];
+    this.help = false;
+    this.scroll = ScrollHandle.new();
     this.results = {}; // machine -> { state: "loading" | "ok" | "error", records, error }
     this.refresh(cx);
   }
@@ -126,6 +147,34 @@ class Report {
     cx.notify();
   }
 
+  /** A key on the focused panel (`name`: the character typed, else the key's name); true when taken. */
+  key(name, cx) {
+    const history = this.tab === "history";
+    const cycle = (list, now, by) => list[(list.findIndex(([key]) => key === now) + by + list.length) % list.length][0];
+    const range = RANGES[Number(name) - 1];
+    if (name === "t") this.set("tab", history ? "subs" : "history", cx);
+    else if (name === "r") history ? this.refresh(cx) : this.refreshSubs(cx);
+    else if (name === "m") run("leo-tabs.max");
+    else if (name === "q") run("leo-tabs.usage");
+    else if (name === "?") this.help = !this.help;
+    else if (!history) return false;
+    else if (range) this.set("range", range[0], cx);
+    else if (name === "g" || name === "G") this.set("group", cycle(GROUPS, this.group, name === "g" ? 1 : -1), cx);
+    else if (name === "c") this.set("metric", this.metric === "cost" ? "tokens" : "cost", cx);
+    else if (name === "j" || name === "k" || name === "down" || name === "up") {
+      this.at = Math.max(0, Math.min(this.rowKeys.length - 1, this.at + (name === "j" || name === "down" ? 1 : -1)));
+      this.scroll.scroll_to_item(2); // the table's card
+    } else if (name === "enter" || name === "o" || name === "space") {
+      if (this.rowKeys[this.at]) this.flip(this.open, this.rowKeys[this.at], cx);
+    } else if (name === "h" || name === "l") {
+      const bars = this.barKeys, at = bars.indexOf(this.bucket);
+      const next = at < 0 ? (name === "h" ? bars.length - 1 : 0) : Math.max(0, Math.min(bars.length - 1, at + (name === "h" ? -1 : 1)));
+      if (bars[next]) this.bucket = bars[next];
+    } else if (name === "escape" && this.bucket) this.set("bucket", "", cx);
+    else return false;
+    return true;
+  }
+
   // Ctrl-click passes the chip's row: only this one stays on, or all again if it already was.
   flip(set, key, cx, row) {
     const solo = row && row.every((k) => (k === key) !== set.has(k));
@@ -135,10 +184,13 @@ class Report {
     cx.notify();
   }
 
-  render(narrow) {
+  render(narrow, focused) {
     const t = theme();
     const records = Object.values(this.results).flatMap((r) => r.records);
     const sum = summarize(records, { from: since(this.range), off: this.off, group: this.group, metric: this.metric, bucket: this.bucket });
+    this.rowKeys = sum.groups.map((g) => g.key);
+    this.barKeys = sum.chart.bars.map((b) => b.key);
+    this.at = Math.max(0, Math.min(this.at, this.rowKeys.length - 1));
     const history = this.tab === "history";
     const loading = history ? Object.values(this.results).some((r) => r.state === "loading") : this.subs.state === "loading";
     const format = this.metric === "tokens" ? formatTokens : formatCost;
@@ -199,10 +251,11 @@ class Report {
       .when(!!g.note, (el) => el.child(div().flex_none().text_size(12).text_color(t.muted).child(g.note)));
 
     const rows = [];
-    for (const g of sum.groups) {
+    for (const [i, g] of sum.groups.entries()) {
       const opened = this.open.has(g.key);
       const dot = sum.chart.series.includes(g.key) ? seriesColor(t, sum.chart.series, g.key) : null;
       rows.push(h_flex().id(`row-${g.key}`).h(30).flex_none().items_center().px(10).border_b(1).border_color(t.border)
+        .when(focused && i === this.at, (el) => el.bg(t.selected))
         .cursor_pointer().hover((s) => s.bg(t.raised))
         .on_click((_e, cx) => this.flip(this.open, g.key, cx))
         .child(div().w(14).flex_none().text_color(t.dim).child(opened ? "▾" : "▸"))
@@ -253,8 +306,9 @@ class Report {
         .child(maxButton(t));
 
     return v_flex().id("usage").size_full().bg(t.background).text_color(t.foreground).text_size(13).p(narrow ? 12 : 18).gap(narrow ? 12 : 14)
-      .rounded(10).border_1().border_color(t.border).overflow_hidden()
+      .rounded(10).border_1().border_color(focused ? t.input : t.border).overflow_hidden()
       .child(header)
+      .when(this.help, (el) => el.child(div().text_size(11).text_color(t.muted).whitespace_normal().child(HELP.join(" · "))))
       .when(!history, (el) => el.child(v_flex().id("subs").flex_1().min_h(0).overflow_y_scrollbar()
         .child(subsView(t, this.subs, this.notes(records), narrow))))
       .when(history, (el) => el.child(h_flex().items_center().gap(6).flex_wrap()
@@ -265,7 +319,7 @@ class Report {
         .child(label("Providers"))
         .children(sum.providers.map(providerChip))
         .when(!sum.providers.length, (el) => el.child(div().text_color(t.muted).child(loading ? "Loading…" : "No usage in this range")))))
-      .when(history, (el) => el.child(v_flex().flex_1().min_h(0).gap(14).overflow_y_scrollbar()
+      .when(history, (el) => el.child(v_flex().id("usage-body").flex_1().min_h(0).gap(14).overflow_y_scrollbar().track_scroll(this.scroll)
         .child(h_flex().flex_wrap().gap_x(narrow ? 24 : 32).gap_y(10)
           .child(stat("Billed", formatCost(total.billed), total.credits ? `${formatTokens(total.credits)} Copilot credits` : ""))
           .child(stat("Subscriptions", formatCost(total.subscription), "API value, already paid"))

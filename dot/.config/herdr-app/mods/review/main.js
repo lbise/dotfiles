@@ -8,7 +8,7 @@
 // See .scratch/herdr-code-review/spec.md.
 
 import { View, div, svg } from "gpui-kit";
-import { Input, InputState, Scrollbar, Textarea, TextareaState, h_flex, v_flex } from "gpui-base";
+import { Input, InputState, ScrollHandle, Scrollbar, Textarea, TextareaState, h_flex, v_flex } from "gpui-base";
 import { checking, layout, nextCommand, openOverlay, props, run, setShared, settings, shared, theme, watchFolder } from "herdr";
 import { Dialog } from "./dialog.js";
 import { CHAR, ROW, layoutView, makeView, palette, sideways, splitRow, unifiedRow } from "./diffview.js";
@@ -25,6 +25,12 @@ const COMPOSER = 164; // design px of the inline comment box
 const STATUS = { A: "ansi2", D: "ansi1", U: "ansi1", R: "ansi4", M: "blocked" };
 const DEFAULTS = { mode: "changes", base: null, open: null, split: false, viewed: {}, comments: [] };
 const SIGN = { add: "+", del: "-", same: " " };
+// The keys, as `?` lists them under the panel (key_down has them).
+const HELP = [
+  "j/k file", "n/p hunk", "↑↓ space ctrl-d/u g/G scroll", "h/l sideways", "c comment hunk", "C comment file",
+  "S submit", "a ask", "v viewed", "u next unviewed", "b changes/branch", "B base", "s split", "f full file",
+  "i commit", "o nvim", "y copy path", "r refresh", "m maximize", "q close", "? keys",
+];
 
 const icon = (name, size = 14) => svg(`mods/review/icons/${name}.svg`).size(size).flex_none();
 const stop = (_event, cx) => cx.stop_propagation();
@@ -60,6 +66,8 @@ export default class Review extends View {
       return;
     }
     this.handle = cx.focus_handle();
+    this.baseScroll = ScrollHandle.new();
+    this.help = false; // the key list shows under the panel
     this.panelWidth = 0; // design px
     this.compose = null; // the open comment box: { path, whole, editing: a comment's id or null }
     this.repo = null; // { root, on, branch }
@@ -87,7 +95,8 @@ export default class Review extends View {
     this.note.on("change", (_e, cx) => cx.notify());
     cx.spawn(async (cx) => {
       for (;;) {
-        if ((await nextCommand()) === "focus") this.handle.focus();
+        // From pane.go, leo-tabs showing the panel, or a popup over it closing: an open comment box keeps the keyboard.
+        if ((await nextCommand()) === "focus") (this.compose ? this.note : this.handle).focus();
         cx.notify();
       }
     });
@@ -254,11 +263,29 @@ export default class Review extends View {
 
   pickBase(cx) {
     if (this.picking) { this.picking = null; cx.notify(); return; }
+    if (!this.repo || this.store().mode !== "branch") return;
     this.picking = [];
     cx.spawn(async (cx) => {
-      try { this.picking = await branches(this.repo); } catch (e) { this.picking = null; this.problem = String(e.message || e); }
+      try {
+        this.picking = await branches(this.repo);
+        this.pickAt = Math.max(0, this.picking.indexOf(this.store().base));
+        this.baseScroll.scroll_to_item(this.pickAt);
+      } catch (e) { this.picking = null; this.problem = String(e.message || e); }
       cx.notify();
     });
+  }
+
+  /** j/k (arrows) through the base list, Enter takes one, Esc closes it (key_down). */
+  pickKey(name) {
+    const list = this.picking;
+    if (!list.length) return false;
+    const by = { j: 1, down: 1, k: -1, up: -1 }[name];
+    if (by) {
+      this.pickAt = Math.max(0, Math.min(list.length - 1, this.pickAt + by));
+      this.baseScroll.scroll_to_item(this.pickAt);
+      return true;
+    }
+    return false;
   }
 
   viewed(file) {
@@ -289,10 +316,31 @@ export default class Review extends View {
     if (next) this.open(next.path, cx);
   }
 
+  /** The rows that head a hunk, in order. */
+  hunkHeads() {
+    return this.view ? this.view.rows.flatMap((row, index) => (row.kind === "hunk" ? [index] : [])) : [];
+  }
+
+  /** `c`: the comment box under the hunk last jumped to (n/p), the first before any jump. */
+  commentHunk(cx) {
+    const heads = this.hunkHeads();
+    const span = heads.length ? hunkSpan(this.view.rows, heads[Math.max(0, this.hunk)]) : null;
+    if (!span) return;
+    this.sel = { anchor: span[0], head: span[1] };
+    this.compose = { path: this.view.path, whole: false, editing: null };
+    this.note.set_value("");
+    this.focusNote(cx);
+  }
+
+  /** Scrolls the diff `by` design px (clamped when drawn). */
+  scrollBy(by) {
+    this.y = Math.max(0, this.y + by);
+  }
+
   jumpHunk(by) {
     const view = this.view;
     if (!view) return;
-    const heads = view.rows.flatMap((row, index) => (row.kind === "hunk" ? [index] : []));
+    const heads = this.hunkHeads();
     if (!heads.length) return;
     this.hunk = Math.max(0, Math.min(heads.length - 1, this.hunk + by));
     const line = this.splitShown() ? view.pairOf[heads[this.hunk]] : heads[this.hunk];
@@ -531,9 +579,25 @@ export default class Review extends View {
       if (this.compose) { this.closeComposer(cx); cx.stop_propagation(); return; }
       if (this.typing) { this.typing = null; this.handle.focus(); cx.stop_propagation(); cx.notify(); return; }
       if (this.picking) { this.picking = null; cx.stop_propagation(); cx.notify(); }
+      else if (this.help) { this.help = false; cx.stop_propagation(); cx.notify(); }
       return;
     }
-    if (this.typing || e.modifiers.control || e.modifiers.alt || e.modifiers.platform) return;
+    if (this.typing || e.modifiers.alt || e.modifiers.platform) return;
+    const page = Math.max(ROW, this.height - 2 * ROW);
+    if (e.modifiers.control) {
+      const half = { "ctrl-d": page / 2, "ctrl-u": -page / 2 }[e.keystroke];
+      if (half) { this.scrollBy(half); cx.stop_propagation(); cx.notify(); }
+      return;
+    }
+    // The character typed, so Shift+c is "C" on every layout; named keys (space, down) by name.
+    const name = e.key_char && e.key_char.trim() ? e.key_char : e.key;
+    if (this.picking) {
+      if (name === "enter") { const base = this.picking[this.pickAt]; if (base) this.setBase(base, cx); }
+      else if (!this.pickKey(name)) return;
+      cx.stop_propagation();
+      cx.notify();
+      return;
+    }
     const actions = {
       j: () => this.step(1, cx),
       k: () => this.step(-1, cx),
@@ -547,12 +611,26 @@ export default class Review extends View {
       r: () => this.refresh(cx, true),
       h: () => { this.x = Math.max(0, this.x - STEP); },
       l: () => { this.x += STEP; }, // clamped when drawn
-      c: () => { if (this.compose) this.note.focus(); },
+      c: () => (this.compose ? this.note.focus() : this.commentHunk(cx)),
+      C: () => { if (this.view) this.commentFile(this.view.path, cx); },
+      S: () => this.submitReview(),
       a: () => this.askAbout(null),
       y: () => this.copyPath(cx),
       o: () => this.openEditor(cx),
+      b: () => this.setMode(this.store().mode === "branch" ? "changes" : "branch", cx),
+      B: () => this.pickBase(cx),
+      i: () => { if (this.store().mode === "changes") this.commitInput.focus(); },
+      q: () => { if (this.expandable()) run("leo-tabs.changes"); },
+      "?": () => { this.help = !this.help; },
+      down: () => this.scrollBy(ROW),
+      up: () => this.scrollBy(-ROW),
+      space: () => this.scrollBy(e.modifiers.shift ? -page : page),
+      pagedown: () => this.scrollBy(page),
+      pageup: () => this.scrollBy(-page),
+      g: () => { this.y = 0; },
+      G: () => { this.y = Infinity; },
     };
-    const action = actions[e.key];
+    const action = actions[name];
     if (!action) return;
     action();
     cx.stop_propagation();
@@ -599,6 +677,8 @@ export default class Review extends View {
         this.panelWidth = width;
         cx.notify();
       })
+      // The panel's keys are live: the same edge a focused terminal pane gets.
+      .when(this.handle.is_focused() || Boolean(this.typing), (el) => el.border_color(t.input))
       .bg(t.background)
       .text_color(t.foreground)
       .text_size(13)
@@ -622,7 +702,11 @@ export default class Review extends View {
             .child(div().id("review-note-close").cursor_pointer().on_click((_e, cx) => { this.problem = null; this.notice = null; cx.notify(); }).child(icon("close", 12))),
         ),
       )
-      .child(body);
+      .child(body)
+      .when(this.help, (el) => el.child(
+        div().flex_none().px(10).py(6).border_t(1).border_color(t.border).bg(t.chrome).text_size(11).text_color(t.muted).whitespace_normal()
+          .child(HELP.join(" · ")),
+      ));
   }
 
   button(t, id, content, action, { on = false, title } = {}) {
@@ -705,15 +789,17 @@ export default class Review extends View {
       .max_h(220)
       .flex_none()
       .overflow_y_scroll()
+      .track_scroll(this.baseScroll)
       .p(4)
       .border_b(1)
       .border_color(t.border)
       .bg(t.surface)
       .when(!this.picking.length, (el) => el.child(div().p(6).text_color(t.dim).child("Loading branches…")))
       .children(
-        this.picking.map((name) =>
+        this.picking.map((name, i) =>
           div().id(`review-base-${name}`).h(24).px(8).flex().items_center().rounded(5).cursor_pointer().text_size(12)
             .when(name === st.base, (el) => el.bg(t.selected))
+            .when(i === this.pickAt, (el) => el.border_1().border_color(t.input))
             .hover((s) => s.bg(t.hover))
             .on_click((_e, cx) => this.setBase(name, cx))
             .child(name),

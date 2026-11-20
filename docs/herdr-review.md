@@ -19,9 +19,13 @@
   input** writes them into the tab's Pi as a draft, through the herdr-chat extension's inbox (a
   `draft` command). You read and send it there. Another agent gets them through `hc send`, which
   presses Enter.
-- Keys, while the panel has focus: `j`/`k` file, `n`/`p` hunk, `u` next unviewed file, `v` viewed,
-  `s` split, `f` full file, `h`/`l` sideways, `m` maximize, `r` refresh, `c` comment, `y` copy the
-  file's path, `o` open it in Neovim, Esc to leave a box or clear the selection.
+- Keys, while the panel has focus (it takes it when shown or maximized; its edge lights up):
+  `j`/`k` file, `n`/`p` hunk, arrows/space/`ctrl-d`/`ctrl-u`/`g`/`G` scroll, `u` next unviewed
+  file, `v` viewed, `s` split, `f` full file, `h`/`l` sideways, `b` Changes/Branch, `B` base (j/k,
+  Enter), `c` comment on the hunk, `C` on the file, `S` submit, `a` ask, `i` commit message, `m`
+  maximize, `q` close, `r` refresh, `y` copy the file's path, `o` open it in Neovim, `?` the key
+  list, Esc to leave a box or clear the selection. Usage, Tickets and Setups work the same way
+  (`?` lists their keys).
 - The file header's copy button copies the repo-relative path; the Neovim button (`nvim.js`) opens
   the file (`:drop`) in a Neovim running in the focused space on the repo's machine (the focused
   tab's first), through its server socket, and focuses it. With none, it opens Neovim in a new tab.

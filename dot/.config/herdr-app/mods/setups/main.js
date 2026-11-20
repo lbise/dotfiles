@@ -9,11 +9,11 @@
 // switch (extract --force). The andromeda ones wipe _obj, so they ask twice, and they are
 // refused while a checkout has tracked changes (extract --force resets them) or a run of mine is going.
 // A side panel (layouts/leo.json's `setups` block), opened from the Setups button in the
-// tab bar or leo-tabs.setups, maximized with leo-tabs.max (mods/leo-tabs).
+// tab bar or leo-tabs.setups, maximized with leo-tabs.max (mods/leo-tabs). Keyboard: see HELP.
 
 import { View, div, svg } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
-import { appHome, checking, exec, layout, machines, readTextFile, run, settings, spaces, theme } from "herdr";
+import { ScrollHandle, h_flex, v_flex } from "gpui-base";
+import { appHome, checking, exec, layout, machines, nextCommand, readTextFile, run, settings, spaces, theme } from "herdr";
 import { blockers, family, groups, onlyHere, sanityLine, short, unpushed } from "./model.js";
 
 const MONO = "Geist Mono";
@@ -21,6 +21,8 @@ const POLL_MS = 3 * 60 * 1000;
 const TIMEOUT_MS = 60000;
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const WIDE = 760; // design px from which a label column sits beside each line
+const HELP = ["j/k setup", "enter/o open", "d update dotfiles", "a update andromeda", "1-9 switch env (in button order)",
+  "w sanity report", "r refresh", "m maximize", "q close", "? keys"];
 
 export default class Setups extends View {
   init(_props, cx) {
@@ -28,6 +30,17 @@ export default class Setups extends View {
     this.reports = {}; // machine -> its last probe report
     this.status = {}; // machine -> { state: "loading" | "ok" | "error", error }
     this.confirm = ""; // the action waiting for its second press
+    this.at = 0; // the setup the keyboard is on
+    this.help = false;
+    this.handle = cx.focus_handle();
+    this.scroll = ScrollHandle.new();
+    // "focus": leo-tabs showed the panel, or pane.go moved here (mod.json "focusable").
+    cx.spawn(async (cx) => {
+      for (;;) {
+        if ((await nextCommand()) === "focus") this.handle.focus();
+        cx.notify();
+      }
+    });
     try { this.known = new Set(JSON.parse(localStorage.getItem("known") || "[]")); } catch { this.known = new Set(); }
     if (checking()) return;
     cx.spawn(async (cx) => {
@@ -101,10 +114,39 @@ export default class Setups extends View {
     else run("space.new", { machine: name, folder, tab: title, argv });
   }
 
+  /** The setups listed, in order. */
+  names() {
+    return [...this.known].filter((n) => machines().some((m) => m.name === n)).sort();
+  }
+
+  /** A key on the focused panel (`name`: the character typed, else the key's name); true when taken. */
+  key(name, cx) {
+    const names = this.names();
+    const setup = names[this.at], report = setup && this.status[setup]?.state !== "error" ? this.reports[setup] : null;
+    const plan = report ? this.plan(setup, report) : null;
+    const press = (item) => { if (item?.enabled) item.confirm ? this.confirmed(item.key, cx, item.run) : item.run(); };
+    if (name === "j" || name === "k" || name === "down" || name === "up") {
+      this.at = Math.max(0, Math.min(names.length - 1, this.at + (name === "j" || name === "down" ? 1 : -1)));
+      this.scroll.scroll_to_item(this.at);
+    } else if (name === "r") this.refresh(cx);
+    else if (name === "m") run("leo-tabs.max");
+    else if (name === "q") run("leo-tabs.setups");
+    else if (name === "?") this.help = !this.help;
+    else if ((name === "enter" || name === "o") && report) this.open(setup, report);
+    else if (name === "w" && report?.sanity?.url) cx.open_url(report.sanity.url);
+    else if (name === "d" && plan) press(plan.items.find((i) => i.dotfiles));
+    else if (name === "a" && plan) press(plan.items.find((i) => i.update));
+    else if (/^[1-9]$/.test(name) && plan) press(plan.items.filter((i) => i.env)[Number(name) - 1]);
+    else return false;
+    return true;
+  }
+
   render(cx) {
     const t = theme();
     const narrow = this.width < WIDE;
-    const names = [...this.known].filter((n) => machines().some((m) => m.name === n)).sort();
+    const names = this.names();
+    const focused = this.handle.is_focused();
+    this.at = Math.max(0, Math.min(this.at, names.length - 1));
     const loading = Object.values(this.status).some((s) => s.state === "loading");
     const waiting = !names.length && (loading || !this.script);
 
@@ -116,7 +158,12 @@ export default class Setups extends View {
       .child(maxButton(t));
 
     return v_flex().id("setups-root").size_full().bg(t.background).text_color(t.foreground).text_size(13)
-      .p(narrow ? 12 : 18).gap(12).rounded(10).border_1().border_color(t.border).overflow_hidden()
+      .p(narrow ? 12 : 18).gap(12).rounded(10).border_1().border_color(focused ? t.input : t.border).overflow_hidden()
+      .track_focus(this.handle)
+      .on_key_down((e, cx) => {
+        if (e.modifiers.control || e.modifiers.alt || e.modifiers.platform) return;
+        if (this.key(e.key_char && e.key_char.trim() ? e.key_char : e.key, cx)) { cx.stop_propagation(); cx.notify(); }
+      })
       .on_size_change((size, cx) => {
         const width = size.width / (settings().zoom || 1);
         if (Math.abs(width - this.width) < 1) return;
@@ -124,14 +171,15 @@ export default class Setups extends View {
         cx.notify();
       })
       .child(header)
-      .child(v_flex().id("setups-list").flex_1().min_h(0).gap(10).overflow_y_scrollbar()
-        .children(names.map((name) => this.card(t, name, narrow)))
+      .when(this.help, (el) => el.child(div().text_size(11).text_color(t.muted).whitespace_normal().child(HELP.join(" · "))))
+      .child(v_flex().id("setups-list").flex_1().min_h(0).gap(10).overflow_y_scrollbar().track_scroll(this.scroll)
+        .children(names.map((name, i) => this.card(t, name, narrow, focused && i === this.at)))
         .when(!names.length, (el) => el.child(div().text_color(t.muted).child(waiting
           ? "Looking for setups…"
           : "No setups: no machine has ~/andromeda with a harness config for its hostname."))));
   }
 
-  card(t, name, narrow) {
+  card(t, name, narrow, picked) {
     const report = this.reports[name];
     const status = this.status[name] || { state: "loading" };
     const offline = status.state === "error";
@@ -142,7 +190,7 @@ export default class Setups extends View {
         .child(report ? [family(report.host), report.asics ? `${report.asics} ASIC` : ""].filter(Boolean).join(" · ") : ""))
       .when(!!report?.andromeda.env, (el) => el.child(div().font_family(MONO).text_size(12).text_color(t.muted).child(report.andromeda.env)))
       .when(!!report && !offline, (el) => el.child(button(t, `open-${name}`, "Open", true, () => this.open(name, report))));
-    return v_flex().id(`setup-${name}`).gap(6).p(12).rounded(10).border(1).border_color(t.border).child(head)
+    return v_flex().id(`setup-${name}`).gap(6).p(12).rounded(10).border(1).border_color(picked ? t.input : t.border).child(head)
       .when(offline, (el) => el.child(div().text_size(12).text_color(t.ansi1).truncate().child(`Unreachable: ${status.error}`)))
       .when(!!report, (el) => el.children(this.lines(t, name, report, narrow)))
       .when(!!report && !offline, (el) => el.child(this.actions(t, name, report)));
@@ -194,7 +242,8 @@ export default class Setups extends View {
     return out;
   }
 
-  actions(t, name, report) {
+  /** What can be done on the setup: `why` the andromeda ones can't, and the actions (drawn as buttons, run by keys). */
+  plan(name, report) {
     const a = report.andromeda;
     // Someone else's run uses their own checkout; only mine would break under an extract.
     const busy = report.runs.some((r) => r.mine);
@@ -202,20 +251,26 @@ export default class Setups extends View {
     // extract --force resets tracked changes; any extract under a running test breaks it.
     const why = changes ? `Commit or stash first: ${changes}` : busy ? "A test is running" : "";
     const quoted = `'${a.path.replace(/'/g, "'\\''")}'`;
-    const andromeda = (key, label, title, script) => {
-      const asking = this.confirm === key;
-      return button(t, key, asking ? "Wipes _obj: press again" : label, !why, (cx) => this.confirmed(key, cx, () =>
-        this.act(name, report, title, `cd ${quoted} && source sourceme && ${script}`)), asking);
-    };
+    const andromeda = (key, label, title, script, extra) => ({ key, label, enabled: !why, confirm: true, ...extra,
+      run: () => this.act(name, report, title, `cd ${quoted} && source sourceme && ${script}`) });
     const env = a.env && /^[\w.-]+$/.test(a.env) ? a.env : null;
+    const items = [{ key: `dot-${name}`, label: "Update dotfiles", enabled: !!report.dotfiles, dotfiles: true,
+      run: () => this.act(name, report, "dotfiles", `"$HOME/.scripts/dotfiles" update`) }];
+    if (env) items.push(andromeda(`upd-${name}`, "Update andromeda", "andromeda update",
+      `git pull --rebase && python3 swcmp.py extract ${env} && python3 swcmp.py update`, { update: true }));
+    for (const e of a.envs.filter((e) => e !== a.env)) items.push(andromeda(`env-${name}-${e}`, `Switch to ${e}`, `extract ${e}`,
+      `python3 swcmp.py extract ${e} --force`, { env: e }));
+    return { why, items };
+  }
+
+  actions(t, name, report) {
+    const { why, items } = this.plan(name, report);
     return v_flex().gap(6).pt(4)
-      .child(h_flex().gap(6).flex_wrap().items_center()
-        .child(button(t, `dot-${name}`, "Update dotfiles", !!report.dotfiles, () =>
-          this.act(name, report, "dotfiles", `"$HOME/.scripts/dotfiles" update`)))
-        .when(!!env, (el) => el.child(andromeda(`upd-${name}`, "Update andromeda", "andromeda update",
-          `git pull --rebase && python3 swcmp.py extract ${env} && python3 swcmp.py update`)))
-        .children(a.envs.filter((e) => e !== a.env).map((e) => andromeda(`env-${name}-${e}`, `Switch to ${e}`, `extract ${e}`,
-          `python3 swcmp.py extract ${e} --force`))))
+      .child(h_flex().gap(6).flex_wrap().items_center().children(items.map((item) => {
+        const asking = item.confirm && this.confirm === item.key;
+        return button(t, item.key, asking ? "Wipes _obj: press again" : item.label, item.enabled,
+          (cx) => (item.confirm ? this.confirmed(item.key, cx, item.run) : item.run()), asking);
+      })))
       .when(!!why, (el) => el.child(div().text_size(12).text_color(t.muted).child(why)));
   }
 }

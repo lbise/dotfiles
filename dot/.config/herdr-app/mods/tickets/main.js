@@ -12,11 +12,13 @@
 // tickets and closing the app ("tickets.drafts"). A side panel (layouts/leo.json's
 // `tickets` block), opened from the Tickets button in the tab bar or
 // leo-tabs.tickets, maximized with leo-tabs.max (mods/leo-tabs). Below WIDE it is
-// the list, or the picked ticket with a way back; the board needs the room.
+// the list, or the picked ticket with a way back; the board needs the room. Keyboard: see HELP.
+// shortcut: the status chips, attachments, relations and watchers are mouse only, and the
+// ticket's text scrolls with the wheel only; give them keys if they get used often.
 
 import { View, div, image, svg } from "gpui-kit";
-import { Input, InputState, Popup, Textarea, TextareaState, TextView, h_flex, v_flex } from "gpui-base";
-import { appHome, checking, exec, layout, machines, notify, readTextFile, run as runCommand, setShared, settings, shared, theme, writeTextFile } from "herdr";
+import { Input, InputState, Popup, ScrollHandle, Textarea, TextareaState, TextView, h_flex, v_flex } from "gpui-base";
+import { appHome, checking, exec, layout, machines, nextCommand, notify, readTextFile, run as runCommand, setShared, settings, shared, theme, writeTextFile } from "herdr";
 import { PROVIDERS, RELATIONS, ago, columns, dropped, inlineImages, parseSources, size, valueOf } from "./providers.js";
 
 const MONO = "Geist Mono";
@@ -35,11 +37,27 @@ const DOWNLOADS = "~/Downloads"; // where Save puts an attachment, on the source
 // Trackers keep a single line break; markdown would join the lines. Two spaces keep it.
 const SOFT_BREAK = /([^\n])\n(?=[^\n])/g;
 const WIDE = 760; // design px from which the list and the ticket sit side by side
+const HELP = ["j/k ticket", "enter/o open", "esc back", "v list/board", "s source", "r refresh", "m maximize", "q close",
+  "on a ticket: t title", "S status", "e description", "c comment", "ctrl-enter save/send", "w watch", "y copy link", "b browser",
+  "in a list: j/k ↑↓ enter", "? keys"];
 
 export default class Tickets extends View {
   init(_props, cx) {
     this.width = 0; // design px
     this.narrow = true;
+    this.handle = cx.focus_handle();
+    this.listScroll = ScrollHandle.new();
+    this.cursor = ""; // the ticket the keyboard is on
+    this.menuAt = 0; // the open dropdown's option the keyboard is on
+    this.help = false;
+    this.shownKeys = []; // the tickets listed, as last drawn
+    // "focus": leo-tabs showed the panel, or pane.go moved here (mod.json "focusable").
+    cx.spawn(async (cx) => {
+      for (;;) {
+        if ((await nextCommand()) === "focus") this.handle.focus();
+        cx.notify();
+      }
+    });
     this.sources = [];
     this.error = "";
     this.scripts = {}; // provider script file -> its text
@@ -80,10 +98,10 @@ export default class Tickets extends View {
     this.lines = TextareaState.new({ rows: 3 });
     this.lines.set_auto_grow(2, 10);
     this.search = InputState.new({ placeholder: "Filter…" });
-    this.search.on("change", (_e, cx) => cx.notify());
+    this.search.on("change", (_e, cx) => { this.menuAt = 0; cx.notify(); });
     this.search.on("submit", (_e, cx) => {
-      const [first] = this.menuItems();
-      if (first) this.pickOption(first, cx);
+      const item = this.menuItems()[this.menuAt];
+      if (item) this.pickOption(item, cx);
     });
     if (checking()) return;
     cx.spawn(async (cx) => {
@@ -354,9 +372,10 @@ export default class Tickets extends View {
     const reopens = this.menu === null && Date.now() - this.closedAt < TWICE;
     if (this.menu === entry.attr || reopens) return this.closeMenu(cx);
     this.menu = entry.attr;
+    this.menuAt = 0;
     this.editing = null;
     this.search.set_value("");
-    cx.timer.after(50, () => this.search.focus());
+    cx.timer.after(50, () => this.focusSearch());
     const attr = entry.optionsAttr || entry.attr;
     const key = this.optionsKey(attr);
     if (!entry.options && this.options[key]?.state !== "ok" && this.options[key]?.state !== "loading") {
@@ -367,17 +386,90 @@ export default class Tickets extends View {
       cx.spawn(async (cx) => {
         const argv = provider.options(ticket, this.details[ticket.key].value, attr, this.scripts[provider.script]);
         this.options[key] = await run(source, argv, (out) => JSON.parse(out));
+        this.focusSearch();
         cx.notify();
       });
     }
     cx.notify();
   }
 
+  /** Typing filters a long dropdown; a short one has no field, and the keys stay with the panel (j/k, Enter). */
+  focusSearch() {
+    const entry = this.menu && this.entry(this.menu);
+    const all = entry && (entry.options || this.options[this.optionsKey(entry.optionsAttr || entry.attr)]?.value);
+    if (all && all.length >= FILTER_FROM) this.search.focus();
+  }
+
   closeMenu(cx) {
     if (this.menu === null) return;
     this.menu = null;
     this.closedAt = Date.now();
+    this.handle.focus();
     cx.notify();
+  }
+
+  /** A key on the panel (`name`: the character typed, else the key's name); true when taken. */
+  key(e, cx) {
+    const name = e.key_char && e.key_char.trim() ? e.key_char : e.key;
+    const typing = !this.handle.is_focused();
+    if (this.menu) {
+      const items = this.menuItems();
+      const by = { down: 1, up: -1, ...(!typing && { j: 1, k: -1 }) }[name];
+      if (by) this.menuAt = Math.max(0, Math.min(Math.min(items.length, SHOWN) - 1, this.menuAt + by));
+      else if (name === "enter" && !typing) { if (items[this.menuAt]) this.pickOption(items[this.menuAt], cx); }
+      else if (name === "escape") this.closeMenu(cx);
+      else return false;
+      return true;
+    }
+    const ticket = this.ticket();
+    const value = ticket && this.details[ticket.key]?.value;
+    if (e.keystroke === "ctrl-enter" && typing && ticket) {
+      if (this.editing === "description") this.apply({ attr: "description", value: this.description.value() }, cx);
+      else if (this.editing) this.saveEdit(cx);
+      else if (this.comment.value().trim()) this.apply({ comment: this.comment.value().trim() }, cx);
+      else return false;
+      return true;
+    }
+    if (name === "escape") {
+      if (this.editing) this.cancel(cx);
+      else if (typing) this.handle.focus();
+      else if (this.picked) this.unpick(cx);
+      else return false;
+      return true;
+    }
+    if (typing || e.modifiers.control || e.modifiers.alt || e.modifiers.platform) return false;
+    const keys = this.shownKeys, at = keys.indexOf(this.cursor);
+    if (name === "j" || name === "k" || name === "down" || name === "up") {
+      const next = keys[Math.max(0, Math.min(keys.length - 1, at + (name === "j" || name === "down" ? 1 : -1)))];
+      if (!next) return true;
+      this.cursor = next;
+      this.listScroll.scroll_to_item(keys.indexOf(next));
+      // Wide: the ticket shows beside the list as the keyboard moves; narrow: it would hide the list.
+      if (!this.narrow || this.picked) this.pick(this.find(next), cx);
+    } else if (name === "enter" || name === "o") { if (this.find(this.cursor)) this.pick(this.find(this.cursor), cx); }
+    else if (name === "v" && !this.narrow) setShared(VIEW, shared(VIEW) === "board" ? "list" : "board");
+    else if (name === "s") {
+      const sources = this.shown(), i = sources.indexOf(this.current());
+      if (sources.length > 1) this.choose(sources[(i + 1) % sources.length].name, cx);
+    } else if (name === "r") this.refresh(cx);
+    else if (name === "m") runCommand("leo-tabs.max");
+    else if (name === "q") runCommand("leo-tabs.tickets");
+    else if (name === "?") this.help = !this.help;
+    else if (!value || this.saving) return false;
+    else if (name === "t") { const title = value.form.find((f) => f.place === "title"); if (title) this.edit(title, cx); }
+    else if (name === "S") { const status = value.form.find((f) => f.place === "status"); if (status) this.toggleMenu(status, cx); }
+    else if (name === "e") this.edit({ attr: "description", value: value.description }, cx);
+    else if (name === "c") this.comment.focus();
+    else if (name === "w" && value.me && value.watchers) this.apply(value.watchers.some((w) => w.id === value.me) ? { unwatch: value.me } : { watch: value.me }, cx);
+    else if (name === "y") this.copy(ticket, cx);
+    else if (name === "b") cx.open_url(ticket.url);
+    else return false;
+    return true;
+  }
+
+  /** A ticket of the current source's list, by key. */
+  find(key) {
+    return (this.results[this.current()?.name]?.value || []).find((x) => x.key === key);
   }
 
   pickOption(option, cx) {
@@ -404,6 +496,7 @@ export default class Tickets extends View {
     if (this.editing === "description" && this.drafts[this.picked]) delete this.drafts[this.picked].description;
     this.editing = null;
     this.failed = "";
+    this.handle.focus(); // the field is gone
     cx.notify();
   }
 
@@ -463,7 +556,8 @@ export default class Tickets extends View {
         this.relTo.set_value("");
         this.relDelay.set_value("");
       }
-      if (this.picked === ticket.key) this.editing = null;
+      // The field is gone: the keyboard stays with the panel.
+      if (this.picked === ticket.key && this.editing) { this.editing = null; this.handle.focus(); }
       // Another project lists other trackers, categories and versions.
       if (what === "project_id") this.options = {};
       this.loadDetail(ticket, cx);
@@ -522,6 +616,9 @@ export default class Tickets extends View {
     const picked = this.ticket();
     const loading = result?.state === "loading";
     const narrow = (this.narrow = this.width < WIDE);
+    const focused = this.handle.is_focused();
+    this.shownKeys = tickets.map((x) => x.key);
+    if (!this.shownKeys.includes(this.cursor)) this.cursor = picked && this.shownKeys.includes(picked.key) ? picked.key : this.shownKeys[0] || "";
 
     const chip = (key, label, figure) => {
       const on = lit(off, key);
@@ -549,7 +646,8 @@ export default class Tickets extends View {
 
     const row = (x) => v_flex().id(`t-${x.key}`).px(12).py(8).gap(3).flex_none().border_b(1).border_color(t.border)
       .cursor_pointer().when(x.key === this.picked, (el) => el.bg(t.selected)).hover((s) => s.bg(t.raised))
-      .on_click((_e, cx) => this.pick(x, cx))
+      .when(focused && x.key === this.cursor && x.key !== this.picked, (el) => el.bg(t.hover))
+      .on_click((_e, cx) => { this.cursor = x.key; this.pick(x, cx); })
       .child(h_flex().gap(8).items_center()
         .child(div().flex_none().font_family(MONO).text_size(12).text_color(t.muted).child(x.id))
         .child(div().flex_1().min_w(0).truncate().child(x.title)))
@@ -571,7 +669,9 @@ export default class Tickets extends View {
     const detail = picked && this.detail(t, picked, this.details[picked.key], cx);
 
     return v_flex().id("tickets").size_full().bg(t.background).text_color(t.foreground).text_size(13).p(narrow ? 12 : 18).gap(12)
-      .rounded(10).border_1().border_color(t.border).overflow_hidden()
+      .rounded(10).border_1().border_color(focused || this.editing || this.menu ? t.input : t.border).overflow_hidden()
+      .track_focus(this.handle)
+      .on_key_down((e, cx) => { if (this.key(e, cx)) { cx.stop_propagation(); cx.notify(); } })
       .on_size_change((size, cx) => {
         const width = size.width / (settings().zoom || 1);
         if (Math.abs(width - this.width) < 1) return;
@@ -588,6 +688,7 @@ export default class Tickets extends View {
         .when(!narrow, (el) => el.child(views))
         .child(button(t, "refresh", narrow ? svg("mods/review/icons/refresh.svg").size(14) : "Refresh", !loading, (cx) => this.refresh(cx)))
         .child(maxButton(t)))
+      .when(this.help, (el) => el.child(div().text_size(11).text_color(t.muted).whitespace_normal().child(HELP.join(" · "))))
       .when(chips.length > 0 && !(narrow && picked), (el) => el.child(h_flex().items_center().gap(6).flex_wrap()
         .child(label("Status"))
         .children(chips.map((key) => chip(key, key.slice(3), String(all.filter((x) => chipOf(x) === key).length))))))
@@ -596,11 +697,11 @@ export default class Tickets extends View {
         ? card().id("detail").flex_1().min_h(0).overflow_y_scrollbar()
           .child(h_flex().px(12).pt(10).child(button(t, "back", "← Tickets", true, (cx) => this.unpick(cx))))
           .child(detail)
-        : card().id("list").flex_1().min_h(0).overflow_y_scrollbar()
+        : card().id("list").flex_1().min_h(0).overflow_y_scrollbar().track_scroll(this.listScroll)
           .children(tickets.map(row))
           .when(!tickets.length, (el) => el.child(empty))))
       .when(!narrow && view === "list", (el) => el.child(h_flex().flex_1().min_h(0).gap(14)
-        .child(card().id("list").w(480).flex_none().overflow_y_scrollbar()
+        .child(card().id("list").w(480).flex_none().overflow_y_scrollbar().track_scroll(this.listScroll)
           .children(tickets.map(row))
           .when(!tickets.length, (el) => el.child(empty)))
         .child(card().id("detail").flex_1().min_w(0).overflow_y_scrollbar()
@@ -619,7 +720,7 @@ export default class Tickets extends View {
   board(t, tickets) {
     const dragged = this.drag && tickets.find((x) => x.key === this.drag);
     const cardOf = (x) => v_flex().id(`card-${x.key}`).p(10).gap(6).flex_none().rounded(8).border(1)
-      .border_color(x.key === this.picked ? t.input : t.border).bg(x.key === this.picked ? t.selected : t.surface)
+      .border_color(x.key === this.picked || (x.key === this.cursor && this.handle.is_focused()) ? t.input : t.border).bg(x.key === this.picked ? t.selected : t.surface)
       .cursor_grab().hover((s) => s.border_color(t.input))
       .when(x.key === this.drag || x.key === this.moving, (el) => el.opacity(0.5))
       .on_mouse_down("left", (_e, cx) => { this.drag = x.key; cx.notify(); })
@@ -665,10 +766,10 @@ export default class Tickets extends View {
     const loaded = entry.options ? { state: "ok" } : this.options[this.optionsKey(entry.optionsAttr || entry.attr)] || { state: "loading" };
     const items = this.menuItems();
     const total = (entry.options || loaded.value || []).length;
-    const item = (o) => {
+    const item = (o, i) => {
       const on = o.id === entry.value || (o.id === "" && entry.value === "");
       return h_flex().id(`opt-${entry.attr}-${o.id}`).h(28).px(8).gap(8).flex_none().items_center().rounded(6)
-        .text_color(on ? t.foreground : t.muted).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+        .text_color(on ? t.foreground : t.muted).when(i === this.menuAt, (el) => el.bg(t.hover)).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
         .on_click((_e, cx) => this.pickOption(o, cx))
         .child(div().w(14).flex_none().child(on ? "✓" : ""))
         .child(div().flex_1().min_w(0).truncate().child(o.name));

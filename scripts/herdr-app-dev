@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drive the development copy of the Herdr app (its own home, so the daily window is untouched).
 # Works from WSL (app on Windows) and on native Linux; open and the pointer/keyboard commands need WSL.
-#   herdr-app-dev sync            copy mods/pi-chat and mods/review, layouts and themes from the repo into the dev home
+#   herdr-app-dev sync            copy the repo's mods, layouts, themes and keys.json into the dev home
 #   herdr-app-dev open            start the dev window (1280x820, at the screen's top left)
 #   herdr-app-dev shot [name]     save the dev window's frame, print its path
 #   herdr-app-dev click X Y       press at client pixel X,Y (the shot's pixels); rightclick X Y: the right button
@@ -39,10 +39,12 @@ input() {
 case "${1:-}" in
 sync)
     mkdir -p "$dev/layouts" "$dev/themes"
-    for mod in pi-chat review; do
+    for path in "$repo"/mods/*/; do
+        mod="$(basename "$path")"
         mkdir -p "$dev/mods/$mod"
-        rsync -a --delete --exclude '*.test.js' "$repo/mods/$mod/" "$dev/mods/$mod/"
+        rsync -a --delete --exclude '*.test.js' "$path" "$dev/mods/$mod/"
     done
+    cp "$repo/keys.json" "$dev/"
     cp "$repo"/layouts/*.json "$dev/layouts/" 2>/dev/null || true
     cp "$repo"/themes/*.json "$dev/themes/"
     ;;

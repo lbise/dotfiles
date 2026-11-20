@@ -18,6 +18,7 @@ const BINDINGS = [
   ["d", "Diff panel", "leo-tabs.changes"],
   ["u", "Usage panel", "leo-tabs.usage"],
   ["t", "Tickets panel", "leo-tabs.tickets"],
+  ["S", "Setups panel", "leo-tabs.setups"],
   ["n", "Next tab", "tab.next"],
   ["p", "Toggle sidebar", "layout.toggle", { id: "sidebar" }],
   ["w", "Go to space, tab or agent", "mod.open", { name: "picker" }],
