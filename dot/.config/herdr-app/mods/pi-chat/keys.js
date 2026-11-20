@@ -6,7 +6,7 @@
 //     (Shift+Enter still does; should the field's own Enter win, composer.js
 //     catches its submit). Pi's own keys, as in its terminal: Ctrl+P and
 //     Alt+P (Pi's Shift+Ctrl+P on Windows; Herdr's palette keeps that) cycle the
-//     models, Shift+Tab the thinking levels. Tab completes the path at the end of the text. Ctrl+G edits the text in Neovim (editor.js).
+//     models, Shift+Tab the thinking levels. Tab completes the path before the caret. Ctrl+G edits the text in Neovim (editor.js).
 //     Ctrl+C empties the box, a second within half a second quits Pi (as in Pi).
 //   PiChatMenu: a field with a list over it (the slash menu, the pickers):
 //     ↑↓ move, Tab and Enter pick, Esc closes.

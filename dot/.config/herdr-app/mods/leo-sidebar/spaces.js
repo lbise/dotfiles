@@ -1,13 +1,12 @@
 // The spaces as cards, in Herdr's order, not grouped by machine: the machine is a
 // quiet tag on the card until it cannot be reached, then the card says so loudly.
 // A machine in trouble with no space shown gets a card of its own, which can be
-// put away until its state changes. Clicking a machine tag hides that machine's
-// spaces and agents (shared "leo-sidebar.hidden"); the foot of the list brings it
-// back. Click to switch, right-click for the space menu, drag to reorder (within a
+// put away until its state changes. The server button in the header picks which
+// machines' spaces and agents show (shared "leo-sidebar.hidden"). Click to switch, right-click for the space menu, drag to reorder (within a
 // machine, as Herdr allows).
 
 import { div } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { Popover, h_flex, v_flex } from "gpui-base";
 import { openOverlay, run, setShared, shared, spaces, theme } from "herdr";
 import { machineLabel } from "./data.js";
 import { hiddenMachines, knownMachines, setHidden, stateOf } from "./live.js";
@@ -21,6 +20,7 @@ export class SpacesView {
   constructor() {
     this.pressed = null;
     this.over = null;
+    this.picking = false;
     try { this.dismissed = JSON.parse(localStorage.getItem("dismissed") ?? "{}"); } catch { this.dismissed = {}; }
     if (!this.dismissed || typeof this.dismissed !== "object" || Array.isArray(this.dismissed)) this.dismissed = {};
   }
@@ -59,7 +59,6 @@ export class SpacesView {
     const colors = this.colors(all);
     const hidden = hiddenMachines();
     const sp = this.visible();
-    const away = [...hidden].map((m) => ({ m, n: all.filter((s) => (s.machine ?? "") === m).length }));
     const withSpaces = new Set(sp.map((s) => s.machine).filter(Boolean));
     const lone = knownMachines()
       .map((m) => ({ name: m.name, state: stateOf(m.name) }))
@@ -67,20 +66,37 @@ export class SpacesView {
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13).border_t(1).border_color(t.border)
       .child(h_flex().h(36).flex_none().pt(4).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
         .child("Spaces")
+        .child(h_flex().gap(2).items_center()
+        .child(this.machinePicker(t, all, hidden))
         .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6)
           .hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip("New space")
-          .on_click(() => run("space.new")).child(chrome("plus", 14))))
+          .on_click(() => run("space.new")).child(chrome("plus", 14)))))
       .child(v_flex().id("lsb-spaces").flex_1().min_h(0).px(10).pb(10).gap(6).overflow_y_scrollbar()
         .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
-        .children([...lone.map((m) => this.machineCard(t, m)), ...sp.map((s, i) => this.card(t, s, i, colors))]))
-      // Hidden machines, each a click away from coming back.
-      .when(away.length > 0, (el) => el.child(h_flex().flex_none().flex_wrap().px(16).py(8).gap(6).items_center().border_t(1).border_color(t.border)
-        .text_size(11.5).text_color(t.dim)
-        .child("Hidden:")
-        .children(away.map(({ m, n }) => div().id(`unhide-${m || "local"}`).px(6).py(1).rounded(5).font_family(MONO)
-          .hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip("Show it again")
-          .on_click(() => setHidden(m, false))
-          .child(`${m ? machineLabel(m) : "this computer"}${n ? ` (${n})` : ""}`)))));
+        .children([...lone.map((m) => this.machineCard(t, m)), ...sp.map((s, i) => this.card(t, s, i, colors))]));
+  }
+
+  // The header's server button: every machine with a check when its spaces and agents show.
+  machinePicker(t, all, hidden) {
+    const names = ["", ...new Set([...knownMachines().map((m) => m.name), ...all.map((s) => s.machine), ...hidden].filter(Boolean))];
+    const button = div().id("machines-pick").size(26).flex_none().flex().items_center().justify_center().rounded(6)
+      .when(hidden.size > 0, (el) => el.text_color(t.muted))
+      .hover((s) => s.bg(t.hover).text_color(t.foreground)).tooltip("Machines shown")
+      .child(chrome("server", 13));
+    return Popover.new("machines-popover").anchor("top_right").open(this.picking)
+      .on_open_change((open, cx) => { this.picking = open; cx.notify(); })
+      .trigger(button)
+      .content(v_flex().mt(4).min_w(200).p(4).rounded(8).border_1().border_color(t.border).bg(t.popover).shadow_md()
+        .children(names.map((m) => {
+          const n = all.filter((s) => (s.machine ?? "") === m).length;
+          return h_flex().id(`show-${m || "local"}`).h(28).px(8).gap(8).items_center().rounded(6).cursor_pointer()
+            .hover((s) => s.bg(t.hover)).text_size(12.5).text_color(t.foreground)
+            .on_click((_e, cx) => { setHidden(m || null, !hidden.has(m)); cx.notify(); })
+            .child(hidden.has(m) ? div().size(13).flex_none() : chrome("check", 13).text_color(t.accent))
+            .child(chrome(m ? "server" : "monitor", 12).text_color(t.muted))
+            .child(div().flex_1().min_w(0).truncate().font_family(MONO).child(m ? machineLabel(m) : "this computer"))
+            .when(n > 0, (el) => el.child(div().flex_none().text_size(11.5).text_color(t.dim).child(String(n))));
+        })));
   }
 
   // A machine in trouble that has no space to show it on.
@@ -136,11 +152,7 @@ export class SpacesView {
         .child(v_flex().flex_1().min_w(0).gap(2)
           .child(h_flex().gap(8).items_center().min_w(0)
             .child(div().flex_initial().min_w(0).truncate().font_medium().text_color(t.foreground).child(s.name))
-            .child(div().id(`hide-${s.id}`).flex_none().rounded(5).px(3).mx(-3)
-              .hover((h) => h.bg(t.raised)).tooltip(`Hide ${s.machine ? machineLabel(s.machine) : "this computer"}'s spaces and agents`)
-              .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-              .on_click((_e, cx) => { cx.stop_propagation(); setHidden(s.machine, true); })
-              .child(machineTag(t, s.machine)))
+            .child(machineTag(t, s.machine))
             .child(div().flex_1())
             .when(Boolean(s.status) && s.status !== "idle", (el) => el.child(mark(t, s.status, true))))
           .when(Boolean(s.branch), (el) => el.child(h_flex().gap(5).items_center().min_w(0).text_color(t.muted)

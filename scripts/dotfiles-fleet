@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 HOSTS_FILE=${DOTFILES_HOSTS:-$HOME/.config/dotfiles/hosts}
+# What a setup holds; the Herdr Setups mod runs the same script.
+PROBE="$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../dot/.config/herdr-app/mods/setups/probe.py"
 # Hosts file lines are "HOST [# COMMENT]"; lines starting with # are comments.
 # Sets host and note to the trimmed parts of the current line.
 PARSE_LINE='{
@@ -19,7 +21,9 @@ usage() {
 Usage: dotfiles-fleet [sync|apps|update|system]
        dotfiles-fleet add HOST [COMMENT] [--label LABEL]
        dotfiles-fleet remove HOST
+       dotfiles-fleet release HOST [--force]
        dotfiles-fleet list
+       dotfiles-fleet check
 
 Runs the selected dotfiles command sequentially on each SSH destination in
 $DOTFILES_HOSTS or ~/.config/dotfiles/hosts. Blank lines and comments are
@@ -30,6 +34,12 @@ lists HOST with COMMENT (adding again replaces the comment). On WSL with the Win
 Herdr as N-LABEL, N being the next free ordering number. LABEL defaults to the
 remote hostname without the ch03wx prefix. remove unlists HOST. list prints the
 listed hosts and their comments.
+
+check shows what each host holds: andromeda env and branches, runs in progress,
+the latest sanity run, dotfiles state, and work only that host has. release hands
+HOST back: it stops and lists that work (uncommitted, untracked, stashed, local-only
+commits in andromeda and dotfiles) unless --force, then unlists HOST and, on WSL,
+removes it from Herdr.
 EOF
 }
 
@@ -142,6 +152,46 @@ remove_host() {
     echo "Removed $host from $HOSTS_FILE"
 }
 
+check_hosts() {
+    local host
+    [[ -r "$HOSTS_FILE" ]] || error "hosts file is not readable: $HOSTS_FILE"
+    while IFS= read -r -u 3 host; do
+        ssh -o BatchMode=yes -o ConnectTimeout=10 "$host" python3 - --text < "$PROBE" 2>/dev/null ||
+            echo "$host  unreachable"
+        echo
+    done 3< <(list_hosts)
+}
+
+release_host() {
+    local host=$1 force=$2 code=0 short machine
+    validate_host "$host"
+    host_listed "$host" || error "$host is not listed in $HOSTS_FILE"
+
+    ssh -o BatchMode=yes -o ConnectTimeout=10 "$host" python3 - --unsaved < "$PROBE" 2>/dev/null || code=$?
+    if (( code )) && [[ -z "$force" ]]; then
+        (( code == 1 )) && echo "Only $host has the work above." || echo "Could not check $host for unsaved work (exit $code)."
+        error "$host not released; push or drop it, or: dotfiles-fleet release $host --force"
+    fi
+
+    remove_host "$host"
+    command -v hc.exe >/dev/null || return 0
+    # Herdr reports the remote hostname; the hosts file may say user@host.domain.
+    short=${host#*@}
+    short=${short%%.*}
+    machine=$(win hc.exe machine ls --json | tr -d '\r' | python3 -c '
+import json, sys
+for m in json.load(sys.stdin)["machines"]:
+    if m["host"].lower() == sys.argv[1].lower():
+        print(m["name"])' "$short") || true
+    if [[ -z "$machine" ]]; then
+        echo "$host is not in Herdr"
+    elif win hc.exe machine rm "$machine"; then
+        echo "Removed $machine from Herdr"
+    else
+        echo "warning: 'hc.exe machine rm $machine' failed; remove it from Herdr instead" >&2
+    fi
+}
+
 main() {
     local action=${1:-update}
     local host failed=()
@@ -169,12 +219,21 @@ main() {
             remove_host "$2"
             return 0
             ;;
+        release)
+            [[ $# -eq 2 || ( $# -eq 3 && "$3" == --force ) ]] || error "usage: dotfiles-fleet release HOST [--force]"
+            release_host "$2" "${3:-}"
+            return 0
+            ;;
     esac
     [[ $# -le 1 ]] || error "only one command may be specified"
 
     case "$action" in
         list)
             list_entries | awk -F '\t' '{ printf "%-24s %s\n", $1, $2 }'
+            return 0
+            ;;
+        check)
+            check_hosts
             return 0
             ;;
         sync|apps|update|system) ;;

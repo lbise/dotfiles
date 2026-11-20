@@ -1,5 +1,6 @@
-# When authenticated with LDAP login shell is bash, execute zsh only then
-if [[ $- == *i* ]] && [ -x /usr/bin/zsh ] && [ -z "$ZSH_VERSION" ]; then
+# When authenticated with LDAP login shell is bash, execute zsh only then.
+# Not for `bash -ic CMD`: Herdr starts programs that way, and zsh would drop CMD.
+if [[ $- == *i* ]] && [ -x /usr/bin/zsh ] && [ -z "$ZSH_VERSION" ] && [ -z "$BASH_EXECUTION_STRING" ]; then
     exec zsh
 fi
 

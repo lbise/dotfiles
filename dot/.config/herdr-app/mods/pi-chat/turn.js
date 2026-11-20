@@ -324,7 +324,7 @@ export function drawRow(item, ui) {
     return v_flex()
       .w_full()
       .pt(gap)
-      .child(markdown(t, id, item.turn.answer, pointer, ui.chat.code))
+      .child(markdown(t, id, item.turn.answer, pointer, ui.chat.code, ui.width))
       .when(!item.turn.live, (el) => el.child(answerFooter(ui, id, item.turn)));
   }
   if (item.kind === "files") return files(t, item.turn, ui.chat, item.key);

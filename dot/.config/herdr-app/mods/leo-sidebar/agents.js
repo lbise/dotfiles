@@ -116,7 +116,10 @@ export class AgentsView {
     }
 
     const strip = alertStrip(t, a.address, machine, machineState);
+    const alerting = machineState && machineState !== "ok"; // the machine's edge wins
     return card(t, `ag-${a.address}`, a.focused, machineState)
+      // Needs you: the card itself stands out, in the blocked colour.
+      .when(a.status === "blocked" && !alerting, (el) => el.border_color(t.blocked).when(!a.focused, (el) => el.bg(t.blocked + "1f")))
       .on_click(() => run("pane.focus", { pane: a.pane }))
       // What a working Pi is doing right now shows on hover.
       .when(Boolean(current(turn)) && working, (el) => el.tooltip(`${current(turn).verb} ${current(turn).label}`))

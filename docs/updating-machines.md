@@ -105,6 +105,25 @@ Run the normal update on each host, sequentially:
 dotfiles-fleet update
 ```
 
+To see what each host holds (andromeda env and branches, runs in progress, the
+latest sanity run, dotfiles state, and work only that host has):
+
+```bash
+dotfiles-fleet check
+```
+
+Before handing a setup back to a colleague:
+
+```bash
+dotfiles-fleet release user@workstation
+```
+
+It stops and lists any uncommitted or untracked files, stashes and local-only
+commits in andromeda and dotfiles. `--force` releases anyway. Releasing unlists
+the host and, on WSL, removes it from Herdr. Both commands run
+`dot/.config/herdr-app/mods/setups/probe.py` on the host, the same probe the
+Herdr Setups panel uses.
+
 Other supported fleet commands are `sync`, `apps`, and `system`. The `system`
 command requests a TTY because sudo may prompt. Set `DOTFILES_HOSTS` to use a
 different host-list file.

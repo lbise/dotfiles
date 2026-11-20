@@ -1,4 +1,4 @@
-// The path menu: Tab on a path at the end of the reply box lists the files and
+// The path menu: Tab on a path before the caret in the reply box lists the files and
 // folders it could become, over the box. Typing on filters the list; ↑↓ choose,
 // Enter or Tab take the chosen one (a folder lists its own next), Esc closes.
 

@@ -92,6 +92,7 @@ export class ChatView {
           cx.notify();
         });
       },
+      wheel: (event, cx) => this.timeline.wheel(event, cx),
     };
     bindKeys(cx);
     cx.timer.every(TICK, (cx) => this.tick(cx));
@@ -547,7 +548,8 @@ export class ChatView {
     const items = conversationRows(feed.chat, child ? null : this.sent, this.pictures);
     if (!items.length) return child ? div().flex_1() : emptyChat(t);
     const now = agentNow(feed);
-    const ui = { t, look, readOnly: child, width: look.width, elapsed: this.elapsed(feed), now, asking: !child && feed.chat.state.status === "asking", chat: this };
+    const width = this.width ? Math.min(look.width, this.width - 48) : look.width; // the rows' padding
+    const ui = { t, look, readOnly: child, width, elapsed: this.elapsed(feed), now, asking: !child && feed.chat.state.status === "asking", chat: this };
     const list = this.timeline.render({
       items,
       row: (item) => drawRow(item, ui),

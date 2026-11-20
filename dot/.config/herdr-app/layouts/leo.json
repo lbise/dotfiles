@@ -205,6 +205,13 @@
                       "content": {
                         "mod": "tickets"
                       }
+                    },
+                    {
+                      "id": "setups",
+                      "type": "block",
+                      "content": {
+                        "mod": "setups"
+                      }
                     }
                   ]
                 }

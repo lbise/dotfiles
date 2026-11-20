@@ -50,7 +50,7 @@ export class Composer {
       const text = this.input.value();
       const query = this.slash.query;
       if (this.paths.isOpen()) {
-        this.paths.follow(text);
+        this.paths.follow(this.split()[0]);
         cx.notify();
       }
       if (this.slash.follow(text, this.input.selected_range().end)) this.chat.loadCommands(cx);
@@ -170,15 +170,30 @@ export class Composer {
       .child(icon("plus", 15));
   }
 
-  // Tab: the path at the end of the text, completed from the files on Pi's machine.
-  complete(cx) {
+  // The text before the caret, whose last word is the path Tab completes, and the text after it.
+  split() {
     const text = this.input.value();
-    if (!pathWord(text)) return;
+    const at = this.input.selected_range().end;
+    return [text.slice(0, at), text.slice(at)];
+  }
+
+  // `head` with its path completed from `found`, then `rest`, the caret after the completion.
+  // No space added after a file when `rest` starts with one.
+  completeAt(head, rest, found) {
+    const next = completePath(head, found);
+    if (next !== head) this.put(/^\s/.test(rest) ? next.trimEnd() : next, rest);
+    return next;
+  }
+
+  // Tab: the path before the caret, completed from the files on Pi's machine.
+  complete(cx) {
+    const [head, rest] = this.split();
+    if (!pathWord(head)) return;
     cx.spawn(async (cx) => {
-      const found = await this.chat.listPaths(pathWord(text).word);
-      if (this.input.value() !== text) return;
-      const next = completePath(text, found);
-      if (next !== text) this.set(next);
+      const found = await this.chat.listPaths(pathWord(head).word);
+      const [nowHead, nowRest] = this.split();
+      if (nowHead !== head || nowRest !== rest) return;
+      const next = this.completeAt(head, rest, found);
       // One match is already in the box; the menu is for choosing between several.
       if (found.length > 1) this.paths.show(found, next);
       cx.notify();
@@ -187,7 +202,8 @@ export class Composer {
 
   // A path from the menu goes in place of the typed one; a folder lists what is in it next.
   acceptPath(path, cx) {
-    this.set(completePath(this.input.value(), [path]));
+    const [head, rest] = this.split();
+    this.completeAt(head, rest, [path]);
     this.paths.close();
     if (path.endsWith("/")) this.complete(cx);
     cx.notify();

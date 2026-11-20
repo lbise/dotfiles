@@ -99,7 +99,15 @@ export class Timeline {
    * @param {boolean} options.ready The conversation was read: rows that arrive from now on enter with motion.
    * @param {string} options.thumb The colour of the scroll thumb.
    */
+  /** Scrolls by a wheel event over the conversation. */
+  wheel(event, cx) {
+    const before = `${this.top}|${this.following}`;
+    this.scrollBy(event.delta.y / (this.zoom || 1));
+    if (before !== `${this.top}|${this.following}`) cx.notify();
+  }
+
   render({ items, row, width, zoom, ready, thumb }) {
+    this.zoom = zoom;
     for (const item of items) {
       if (this.seen.has(item.key)) continue;
       this.seen.add(item.key);
@@ -179,11 +187,7 @@ export class Timeline {
         this.view = height;
         cx.notify();
       })
-      .on_scroll_wheel((event, cx) => {
-        const before = `${this.top}|${this.following}`;
-        this.scrollBy(event.delta.y / zoom);
-        if (before !== `${this.top}|${this.following}`) cx.notify();
-      })
+      .on_scroll_wheel((event, cx) => this.wheel(event, cx))
       .child(this.following ? column.bottom(0) : column.top(first - this.top))
       .when(scrolls, (el) => el.child(div().absolute().right(3).top(thumbTop).w(4).h(thumbHeight).rounded(2).bg(thumb)));
   }

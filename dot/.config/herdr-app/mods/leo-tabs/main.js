@@ -1,5 +1,5 @@
 // Clone of Herdr's built-in tabs mod (read-only, replaced on every start), plus
-// Usage and Tickets side panels after Files/Changes. It owns the side panel:
+// Usage, Tickets and Setups side panels after Files/Changes. It owns the side panel:
 // `leo-tabs.<panel>` toggles one, `leo-tabs.max` maximizes the shown one (the
 // chat hidden, the panel across the work area) or restores it; the panels'
 // own maximize buttons run the same command.
@@ -7,7 +7,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
 import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, nextCommand } from "herdr";
 
-const PANELS = ["files", "changes", "usage", "tickets"];
+const PANELS = ["files", "changes", "usage", "tickets", "setups"];
 const MAX = "panel.max"; // { px }: the side panel's width before it was maximized
 
 function find(node, id) {
@@ -167,7 +167,7 @@ export default class Tabs extends View {
       : 10;
     const panel = find(root, "panel"), body = find(root, "panel-body");
     const enabled = shared("workspace.panels") ?? ["files", "changes"];
-    this.syncPanel(space, panel, body, [...enabled, "usage", "tickets"]);
+    this.syncPanel(space, panel, body, [...enabled, "usage", "tickets", "setups"]);
     // Never an empty work area: the chat comes back once the maximized panel closes.
     if (panel?.hidden && find(root, "chat-view")?.hidden) this.restore(panel);
     const panelButton = (id, label, icon) => {
@@ -188,6 +188,7 @@ export default class Tabs extends View {
       .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Diff", "mods/changes/changes.svg")))
       .child(panelButton("usage", "Usage", "mods/usage/usage.svg"))
       .child(panelButton("tickets", "Tickets", "mods/tickets/tickets.svg"))
+      .child(panelButton("setups", "Setups", "mods/setups/setups.svg"))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/tabs/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));

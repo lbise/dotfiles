@@ -198,8 +198,8 @@ export function sessionCommand(text) {
 }
 
 /**
- * The path being typed at the end of a reply (after a space, an optional `@` dropped), or null.
- * shortcut: completes only at the end of the text and paths without spaces; follow the caret if that gets in the way.
+ * The path at the end of `text` (the reply up to the caret; after a space, an optional `@` dropped), or null.
+ * shortcut: paths without spaces only; quote them if that gets in the way.
  * @param {string} text
  */
 export function pathWord(text) {
@@ -208,7 +208,7 @@ export function pathWord(text) {
 }
 
 /**
- * What the path menu lists: those of `found` that the path at the end of the reply still starts.
+ * What the path menu lists: those of `found` that the path at the end of `text` (the reply up to the caret) still starts.
  * @param {string[]} found
  * @param {string} text
  */
